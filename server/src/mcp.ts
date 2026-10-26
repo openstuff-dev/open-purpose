@@ -27,7 +27,8 @@ Workflow:
    (\`git remote get-url origin\`), plus the "project" value from .agentcontext.json if that file exists,
    the path you are working in and the nearest manifest (package.json, *.csproj, ...). Always send the
    remote: parts of a project can be bound to one repository.
-   Follow what it says. More specific rules override general ones.
+   Follow what it says. More specific rules override general ones. When a context is large, its most
+   general sections are shortened to their first sentence; read those with read_section when they matter.
 2. If no project is found, ask the user which project the repo belongs to, then call register_repository
    (or create_project), and write .agentcontext.json with {"project": "<slug>"} in the repo root.
 3. When the user corrects you in a way that should also apply next time, call propose_learning with the
@@ -108,7 +109,8 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
 
   server.registerTool('get_context', {
     title: 'Get context',
-    description: 'Get the group, organization, project and scope-specific guidelines that apply to the code you are about to work on. Call this before starting a task.',
+    description: 'Get the group, organization, project and scope-specific guidelines that apply to the code you are about to work on. Call this before starting a task. '
+      + 'Over the organization\'s size budget, the most general sections are shortened to their first sentence; read_section gives the full text.',
     inputSchema: {
       ...locate,
       scopes: z.array(z.string()).optional().describe('Scope slugs to include even if path/stack do not match'),

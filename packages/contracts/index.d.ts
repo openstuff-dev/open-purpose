@@ -223,7 +223,8 @@ export interface ExportFile {
   server_version: string;
   source: {
     kind: 'group' | 'organization';
-    group: { slug: string; name: string };
+    /** context_max_tokens is missing in files from before context budgets; null = no limit. */
+    group: { slug: string; name: string; context_max_tokens?: number | null };
     /** Key of the exported organization. */
     organization: string | null;
   };
@@ -265,6 +266,8 @@ export interface ExportOrganization {
   created_at: string;
   archived_at: string | null;
   aliases: string[];
+  /** Missing in files from before context budgets; null = no limit. */
+  context_max_tokens?: number | null;
 }
 
 export interface ExportProject {

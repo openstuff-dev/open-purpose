@@ -26,7 +26,7 @@ const fileSchema = z.object({
   server_version: z.string(),
   source: z.object({
     kind: z.enum(['group', 'organization']),
-    group: z.object({ slug: z.string(), name: z.string() }),
+    group: z.object({ slug: z.string(), name: z.string(), context_max_tokens: z.number().int().min(1000).nullable().optional() }),
     organization: ref,
   }),
   includes: z.object({ history: z.boolean(), proposals: z.boolean(), people: z.boolean(), api_specs: z.boolean() }),
@@ -38,6 +38,7 @@ const fileSchema = z.object({
   })),
   organizations: z.array(z.object({
     key, slug, name: z.string().min(1), summary: z.string(), created_at: time, archived_at: time.nullable(), aliases: z.array(slug),
+    context_max_tokens: z.number().int().min(1000).nullable().optional(),
   })),
   read_grants: z.array(z.object({ reader: key, target: key })),
   projects: z.array(z.object({

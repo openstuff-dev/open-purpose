@@ -344,6 +344,74 @@ describe('OpenPurpose with groups and organizations', () => {
     expect((await api('GET', '/me', undefined, { token: ADMIN, agent: true })).status).toBe(400);
   });
 
+  it('shortens the most general sections when a context is over its budget', async () => {
+    const args = { remote_url: SSH_REMOTE, path: 'frontend/src/app.ts' };
+    const { client, call } = await mcp(t.jonas);
+    const before = (await api('GET', '/me')).data.group.context_max_tokens;
+    expect(before).toBeNull(); // opt-in
+    expect((await api('PUT', '/group', { context_max_tokens: 999 })).status).toBe(400);
+    expect((await api('PUT', '/group', { context_max_tokens: 5000 }, { token: t.ida })).status).toBe(403);
+    const baseline = (await api('POST', '/context', args)).data.budget;
+    expect(baseline).toMatchObject({ max_tokens: null, shortened: 0 });
+
+    const sentences = (n: number, what: string) => Array.from({ length: n }, (_, i) => `Rule ${i} keeps the ${what} honest.`).join(' ');
+    const groupDoc = (await api('GET', '/documents?organization_id=group')).data.find((d: any) => d.kind === 'guidelines');
+    const general = (await api('POST', `/documents/${groupDoc.id}/sections`, { heading: 'Very long group rules', body: sentences(200, 'ledger') })).data.section;
+    const feDoc = (await api('POST', '/documents', { scope_id: frontendScopeId, kind: 'guidelines', title: 'Frontend conventions' })).data;
+    const specific = (await api('POST', `/documents/${feDoc.id}/sections`, { heading: 'Long frontend rules', body: sentences(40, 'form') })).data.section;
+
+    // Room for everything except the long group section.
+    const budget = Math.max(1000, Math.ceil((baseline.tokens + 1000) / 100) * 100);
+    expect((await api('PUT', '/group', { context_max_tokens: budget })).status).toBe(200);
+    const ctx = (await call('get_context', args)).text;
+    expect(ctx).toContain('shortened** to fit the context budget');
+    expect(ctx).toContain(`Rule 0 keeps the ledger honest. … _(`);
+    expect(ctx).toContain(`read_section s:${general.id.slice(0, 8)}`);
+    expect(ctx).not.toContain('Rule 199 keeps the ledger honest.');
+    expect(ctx).toContain('Rule 39 keeps the form honest.');
+    expect(Math.ceil(ctx.length / 4)).toBeLessThanOrEqual(budget + 200); // + review feedback, if any
+    const rest = JSON.parse((await call('read_section', { section_id: general.id.slice(0, 8) })).text);
+    expect(rest.body).toContain('Rule 199 keeps the ledger honest.');
+    const rendered = (await api('POST', '/context', args)).data;
+    expect(rendered.budget.max_tokens).toBe(budget);
+    expect(rendered.budget.shortened).toBeGreaterThan(0);
+    const flags = rendered.blocks.flatMap((b: any) => b.documents.flatMap((d: any) => d.sections))
+      .filter((x: any) => [general.id, specific.id].includes(x.id)).map((x: any) => [x.heading, !!x.shortened]);
+    expect(Object.fromEntries(flags)).toEqual({ 'Very long group rules': true, 'Long frontend rules': false });
+
+    // With several organizations the group's budget applies, not the organization's.
+    expect((await api('PATCH', `/organizations/${o.logistics}`, { context_max_tokens: 999 })).status).toBe(400);
+    expect((await api('PATCH', `/organizations/${o.logistics}`, { context_max_tokens: null })).data.context_max_tokens).toBeNull();
+    expect((await api('POST', '/context', args)).data.budget.max_tokens).toBe(budget);
+
+    await api('PATCH', `/organizations/${o.logistics}`, { context_max_tokens: null });
+    await api('PUT', '/group', { context_max_tokens: before });
+    await api('DELETE', `/sections/${general.id}`);
+    await api('DELETE', `/sections/${specific.id}`);
+    await client.close();
+  });
+
+  it('uses the organization\'s budget while the group has one organization', async () => {
+    const solo = await api('POST', '/groups', { name: 'Solo Shop', organization_name: 'Solo', admin_name: 'Sol' });
+    expect(solo.status).toBe(201);
+    const sol: Who = { token: solo.data.token };
+    const me = (await api('GET', '/me', undefined, sol)).data;
+    const org = me.organizations[0];
+    expect(org.context_max_tokens).toBeNull();
+    const doc = (await api('GET', `/documents?organization_id=${org.id}`, undefined, sol)).data.find((d: any) => d.kind === 'guidelines');
+    const long = Array.from({ length: 400 }, (_, i) => `Rule ${i} applies everywhere.`).join(' ');
+    await api('POST', `/documents/${doc.id}/sections`, { heading: 'Everything', body: long }, sol);
+    // The group's (hidden) budget doesn't count; the organization's does.
+    await api('PUT', '/group', { context_max_tokens: 1000 }, sol);
+    expect((await api('POST', '/context', {}, sol)).data.budget).toMatchObject({ max_tokens: null, shortened: 0 });
+    await api('PATCH', `/organizations/${org.id}`, { context_max_tokens: 1000 }, sol);
+    const ctx = (await api('POST', '/context', {}, sol)).data;
+    expect(ctx.budget).toMatchObject({ max_tokens: 1000, shortened: 1 });
+    expect(ctx.markdown).toContain('Rule 0 applies everywhere. … _(');
+    await api('PATCH', `/organizations/${org.id}`, { context_max_tokens: null }, sol);
+    expect((await api('POST', '/context', {}, sol)).data.budget).toMatchObject({ max_tokens: null, shortened: 0 });
+  });
+
   it('gives agents the endpoints and DTOs of attached API specs', async () => {
     const portal = (await api('GET', `/projects?organization_id=${o.logistics}`)).data.find((p: any) => p.slug === 'customer-portal');
     const gateway = (await api('GET', `/projects?organization_id=${o.payments}`)).data.find((p: any) => p.slug === 'payment-gateway');
@@ -828,7 +896,7 @@ definitions:`);
     expect(res.data.warnings.join('\n')).not.toContain('Group-wide content is left out');
     const restored: Who = { token: ADMIN, group: 'acme-restored' };
     const again = (await api('GET', '/export?people=1', undefined, restored)).data;
-    expect(again.source.group).toEqual({ slug: 'acme-restored', name: 'Acme restored' });
+    expect(again.source.group).toEqual({ slug: 'acme-restored', name: 'Acme restored', context_max_tokens: null });
     expect(comparable(again)).toEqual(comparable(file));
     // People are there, disabled and without tokens, with their roles.
     const members = (await api('GET', '/members', undefined, restored)).data;

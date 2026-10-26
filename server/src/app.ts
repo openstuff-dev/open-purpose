@@ -158,7 +158,10 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       return {
         actor: req.actor,
         groups: await groupsOf(pool, req.actor),
-        group: { ...a.group, role: a.groupRole, can_admin: a.canAdmin(null), can_edit: a.canEdit(null) },
+        group: {
+          ...a.group, role: a.groupRole, can_admin: a.canAdmin(null), can_edit: a.canEdit(null),
+          context_max_tokens: await admin.groupContextBudget(req.db, a),
+        },
         organizations: await admin.listOrganizations(req.db, a),
         current_organization_id: a.orgId,
         /** Set in agent mode: which agent is simulated, and which organizations the person may simulate. */
@@ -221,7 +224,12 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
     api.post('/groups/import', groupImportConfig, async (req, reply) => reply.status(201).send(
       await unpack(parse(groupImport, req.body), (file, opts) => importAsGroup(pool, req.actor, file, { ...opts, dryRun: false }))));
     api.put('/group', async (req) => {
-      await admin.renameGroup(req.db, req.access, parse(z.object({ name: z.string().min(1).max(200) }), req.body).name);
+      const body = parse(z.object({
+        name: z.string().min(1).max(200).optional(),
+        context_max_tokens: z.number().int().min(1000).max(1_000_000).nullable().optional(),
+      }), req.body);
+      if (body.name !== undefined) await admin.renameGroup(req.db, req.access, body.name);
+      if (body.context_max_tokens !== undefined) await admin.setGroupContextBudget(req.db, req.access, body.context_max_tokens);
       return { ok: true };
     });
 
@@ -244,6 +252,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       const { slug, take_alias, ...body } = parse(z.object({
         name: z.string().min(1).optional(), slug: z.string().optional(), summary: z.string().optional(),
         archived: z.boolean().optional(), take_alias: z.boolean().optional(),
+        context_max_tokens: z.number().int().min(1000).max(1_000_000).nullable().optional(),
       }), req.body);
       const orgId = (req.params as { id: string }).id;
       // A slug change still leaves an alias behind; /rename also updates links.

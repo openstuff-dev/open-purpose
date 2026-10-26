@@ -109,6 +109,7 @@ function samplePath(glob: string): string {
             </span>
           }
           <span><span class="quiet">New learnings go to</span> {{ r.learning_target.label }}</span>
+          <span><span class="quiet">Size</span> {{ size(r) }}</span>
           <span class="av-actions">
             <div class="segmented sm" role="tablist" aria-label="View">
               <button
@@ -158,6 +159,13 @@ function samplePath(glob: string): string {
                         <div class="layer-section-head">
                           <strong>{{ s.heading }}</strong
                           ><app-mode-badge [mode]="s.mode" />
+                          @if (s.shortened) {
+                            <span
+                              class="flag muted"
+                              title="Agents get the first sentence only, to stay within the context budget"
+                              >Shortened</span
+                            >
+                          }
                         </div>
                         <app-md [text]="s.body" />
                       </div>
@@ -228,6 +236,16 @@ export class AgentView {
 
   layerName(level: string): string {
     return LAYER[level] ?? level;
+  }
+
+  /** "~3,200 tokens of 16,000 · 4 sections shortened" */
+  size(r: ContextResult): string {
+    const n = (v: number) => v.toLocaleString('en-US');
+    const of = r.budget.max_tokens === null ? ', no budget' : ` of ${n(r.budget.max_tokens)}`;
+    const cut = r.budget.shortened
+      ? ` · ${r.budget.shortened} ${r.budget.shortened === 1 ? 'section' : 'sections'} shortened`
+      : '';
+    return `~${n(r.budget.tokens)} tokens${of}${cut}`;
   }
 
   count(b: ContextResult['blocks'][number]): number {

@@ -115,6 +115,8 @@ import { splitList } from '../shared/scope-list';
           </dd>
           <dt>New learnings go to</dt>
           <dd>{{ r.learning_target.label }}</dd>
+          <dt>Size</dt>
+          <dd>{{ size(r) }}</dd>
         </dl>
         <div class="tabs" role="tablist">
           <button type="button" role="tab" [attr.aria-selected]="!raw()" (click)="raw.set(false)">
@@ -153,6 +155,16 @@ export class PreviewPage {
       .projects()
       .then((p) => this.projects.set(p))
       .catch((e) => this.notices.error(e));
+  }
+
+  /** "~3,200 tokens of 16,000 · 4 sections shortened" */
+  size(r: ContextResult): string {
+    const n = (v: number) => v.toLocaleString('en-US');
+    const of = r.budget.max_tokens === null ? ', no budget' : ` of ${n(r.budget.max_tokens)}`;
+    const cut = r.budget.shortened
+      ? ` · ${r.budget.shortened} ${r.budget.shortened === 1 ? 'section' : 'sections'} shortened`
+      : '';
+    return `~${n(r.budget.tokens)} tokens${of}${cut}`;
   }
 
   scoped(r: ContextResult) {

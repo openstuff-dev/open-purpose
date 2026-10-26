@@ -336,6 +336,36 @@ organization, the project and the part of the code you are in (a repository or a
                       </button>
                     </form>
                   </div>
+                  <div class="setting-row">
+                    <div>
+                      <h3>Context budget</h3>
+                      <p>
+                        Largest context an agent gets from <code>get_context</code>, in every
+                        organization. Over it, the most general sections are cut to their first
+                        sentence, and agents read the rest with <code>read_section</code>. Leave
+                        empty for no limit.
+                      </p>
+                    </div>
+                    <form (ngSubmit)="saveGroupBudget()">
+                      <input
+                        name="gbudget"
+                        type="number"
+                        min="1000"
+                        step="1000"
+                        inputmode="numeric"
+                        placeholder="No limit"
+                        [(ngModel)]="groupBudget"
+                        aria-label="Context budget in tokens"
+                      />
+                      <button
+                        class="btn"
+                        type="submit"
+                        [disabled]="budgetValue(groupBudget) === session.group()?.context_max_tokens"
+                      >
+                        Save
+                      </button>
+                    </form>
+                  </div>
                 </div>
               </section>
             }
@@ -369,6 +399,24 @@ organization, the project and the part of the code you are in (a repository or a
                           >Summary
                           <textarea name="osum" rows="3" [(ngModel)]="orgDraft.summary"></textarea>
                         </label>
+                        @if (!session.groupShown()) {
+                          <label class="full"
+                            >Context budget (tokens)
+                            <input
+                              name="obudget"
+                              type="number"
+                              min="1000"
+                              step="1000"
+                              inputmode="numeric"
+                              placeholder="No limit"
+                              [(ngModel)]="orgDraft.budget"
+                            />
+                            <span class="quiet"
+                              >Over it, <code>get_context</code> cuts the most general sections to
+                              their first sentence. Leave empty for no limit.</span
+                            >
+                          </label>
+                        }
                         <div class="form-actions full">
                           <button class="btn primary" type="submit">Save</button>
                           <button class="btn" type="button" (click)="editingOrg.set(null)">
@@ -400,6 +448,17 @@ organization, the project and the part of the code you are in (a repository or a
                             }
                           </h3>
                           <p class="multiline">{{ o.summary || 'No summary' }}</p>
+                          @if (!session.groupShown()) {
+                            <p class="quiet">
+                              {{
+                                o.context_max_tokens === null
+                                  ? 'No context budget'
+                                  : 'Context budget: ' +
+                                    o.context_max_tokens.toLocaleString('en-US') +
+                                    ' tokens'
+                              }}
+                            </p>
+                          }
                         </div>
                       </div>
                       <div class="form-actions">
@@ -590,7 +649,12 @@ export class SettingsPage {
   name = '';
   tokenLabel = '';
   groupName = '';
-  orgDraft = { name: '', summary: '' };
+  groupBudget: number | null = null;
+  orgDraft: { name: string; summary: string; budget: number | null } = {
+    name: '',
+    summary: '',
+    budget: null,
+  };
   newOrg = { name: '', slug: '', summary: '' };
 
   private readonly base = this.session.me()?.public_url ?? location.origin;
@@ -621,6 +685,7 @@ export class SettingsPage {
       if (me) {
         this.name = me.actor.name;
         this.groupName = me.group.name;
+        this.groupBudget = me.group.context_max_tokens;
       }
     });
     effect(() => {
@@ -706,13 +771,25 @@ export class SettingsPage {
 
   async renameGroup(): Promise<void> {
     await this.run(async () => {
-      await this.api.renameGroup(this.groupName.trim());
+      await this.api.updateGroup({ name: this.groupName.trim() });
       await this.reloadMe();
     }, 'Renamed group');
   }
 
+  /** An empty number input gives null or ''; both mean no limit. */
+  budgetValue(v: number | string | null): number | null {
+    return v === null || v === '' ? null : Number(v);
+  }
+
+  async saveGroupBudget(): Promise<void> {
+    await this.run(async () => {
+      await this.api.updateGroup({ context_max_tokens: this.budgetValue(this.groupBudget) });
+      await this.reloadMe();
+    }, 'Saved context budget');
+  }
+
   editOrg(o: Organization): void {
-    this.orgDraft = { name: o.name, summary: o.summary };
+    this.orgDraft = { name: o.name, summary: o.summary, budget: o.context_max_tokens };
     this.editingOrg.set(o.id);
   }
 
@@ -721,6 +798,9 @@ export class SettingsPage {
       await this.api.updateOrganization(o.id, {
         name: this.orgDraft.name.trim(),
         summary: this.orgDraft.summary,
+        ...(this.session.groupShown()
+          ? {}
+          : { context_max_tokens: this.budgetValue(this.orgDraft.budget) }),
       });
       this.editingOrg.set(null);
       await this.reloadMe();
@@ -760,7 +840,7 @@ export class SettingsPage {
         ))
       )
         return;
-      if (naming) await this.api.renameGroup(this.groupName.trim());
+      if (naming) await this.api.updateGroup({ name: this.groupName.trim() });
       this.newOrg = { name: '', slug: '', summary: '' };
       this.addingOrg.set(false);
       await this.reloadMe();

@@ -91,6 +91,8 @@ export interface Organization {
   slug: string;
   name: string;
   summary: string;
+  /** Applies while the group has a single organization. null = no limit. */
+  context_max_tokens: number | null;
   created_at: string;
   archived_at: string | null;
   readable: boolean;
@@ -105,7 +107,13 @@ export interface Organization {
 export interface Me {
   actor: Actor;
   groups: GroupRef[];
-  group: GroupRef & { role: Role | null; can_admin: boolean; can_edit: boolean };
+  group: GroupRef & {
+    role: Role | null;
+    can_admin: boolean;
+    can_edit: boolean;
+    /** Applies once the group has several organizations. null = no limit. */
+    context_max_tokens: number | null;
+  };
   organizations: Organization[];
   current_organization_id: string | null;
   /** Set while agent mode is on. */
@@ -309,13 +317,20 @@ export interface ContextResult {
     level: string;
     label: string;
     scope: { slug: string; name: string; reason: string } | null;
-    documents: Array<{ id: string; kind: DocKind; title: string; sections: Section[] }>;
+    documents: Array<{
+      id: string;
+      kind: DocKind;
+      title: string;
+      sections: Array<Section & { shortened?: boolean }>;
+    }>;
   }>;
   learning_target: { label: string };
   related: Array<{ direction: 'uses' | 'used_by'; node: GraphNode }>;
   apis: Array<
     ApiSpec & { project_ref: string; project_name: string; relation: 'this' | 'uses' | 'used_by' }
   >;
+  /** tokens are estimated as characters / 4. */
+  budget: { max_tokens: number | null; tokens: number; shortened: number };
   markdown: string;
 }
 

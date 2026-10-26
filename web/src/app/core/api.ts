@@ -79,7 +79,8 @@ export class Api {
   myTokens = () => this.get<TokenRow[]>('/me/tokens');
   createMyToken = (label: string) => this.send<{ token: string }>('POST', '/me/tokens', { label });
   revokeMyToken = (id: string) => this.send<void>('DELETE', `/me/tokens/${id}`);
-  renameGroup = (name: string) => this.send('PUT', '/group', { name });
+  updateGroup = (body: { name?: string; context_max_tokens?: number | null }) =>
+    this.send('PUT', '/group', body);
   groups = () => this.get<GroupRow[]>('/groups');
   createGroup = (body: { name: string; organization_name?: string; admin_name?: string }) =>
     this.send<{ group: GroupRef; organization: Organization; token?: string }>(
@@ -125,7 +126,13 @@ export class Api {
   }) => this.send<Organization>('POST', '/organizations', body);
   updateOrganization = (
     id: string,
-    body: { name?: string; slug?: string; summary?: string; archived?: boolean },
+    body: {
+      name?: string;
+      slug?: string;
+      summary?: string;
+      archived?: boolean;
+      context_max_tokens?: number | null;
+    },
   ) => this.send<Organization>('PATCH', `/organizations/${id}`, body);
   setReader = (targetId: string, readerId: string, allowed: boolean) =>
     this.send('PUT', `/organizations/${targetId}/readers/${readerId}`, { allowed });

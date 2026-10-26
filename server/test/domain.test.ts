@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { excerpt } from '../src/service/context.js';
 import { parseRemote, slugify } from '../src/domain/remote.js';
 import { detectStacks } from '../src/domain/stacks.js';
 import { matchScopes, mostSpecific, normalizePath } from '../src/domain/scopes.js';
@@ -179,5 +180,25 @@ describe('zip', () => {
     expect(files[1].data.toString('utf8').startsWith('# Ærlig')).toBe(true);
     expect(() => readZip(zip, () => true, 100)).toThrow();
     expect(() => readZip(Buffer.from('not a zip at all, really'), () => true, 100)).toThrow('not a readable zip file');
+  });
+});
+
+describe('excerpt', () => {
+  const id = '0123456789abcdef';
+  it('keeps the first sentence and points to the rest', () => {
+    expect(excerpt({ id, body: 'Amounts are integer øre, e.g. 100 for 1 kr. Never floats.\n\nMore here.' }))
+      .toBe('Amounts are integer øre, e.g. 100 for 1 kr. … _(4 more words: `read_section s:01234567`)_');
+  });
+  it('skips headings, fences and list markers', () => {
+    expect(excerpt({ id, body: '## Why\n\n```ts\nconst x = 1;\n```\n\n- Use signals. Not zones.' }))
+      .toMatch(/^Use signals\. … /);
+  });
+  it('cuts a long sentence at a word', () => {
+    const lead = excerpt({ id, body: 'word '.repeat(100) }).split(' … ')[0];
+    expect(lead.length).toBeLessThanOrEqual(200);
+    expect(lead.endsWith('word')).toBe(true);
+  });
+  it('handles an empty body', () => {
+    expect(excerpt({ id, body: '' })).toBe('_(0 more words: `read_section s:01234567`)_');
   });
 });

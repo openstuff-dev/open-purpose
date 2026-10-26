@@ -179,7 +179,8 @@ export async function importAsGroup(
   let commit = false;
   try {
     const { rows } = await c.query<{ id: string }>(
-      'INSERT INTO groups (slug, name) VALUES ($1, $2) RETURNING id', [suggested ?? slug, name]);
+      'INSERT INTO groups (slug, name, context_max_tokens) VALUES ($1, $2, $3) RETURNING id',
+      [suggested ?? slug, name, file.source.group.context_max_tokens ?? null]);
     await c.query(`SELECT set_config('openpurpose.group_id', $1, true)`, [rows[0].id]);
     await c.query(`INSERT INTO memberships (actor_id, organization_id, role) VALUES ($1, NULL, 'admin')`, [actor.id]);
     await apply({ c, file, opts: {}, report, actorId: actor.id, groupContent: true, groupRoles: true, label: labelOf(file) });
@@ -271,8 +272,9 @@ async function apply(run: Run): Promise<void> {
     } else {
       slug = entry.suggested_slug ?? entry.new_slug!;
       const { rows } = await c.query<{ id: string }>(
-        `INSERT INTO organizations (slug, name, summary, created_at, archived_at) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        [slug, o.name, o.summary, o.created_at, o.archived_at]);
+        `INSERT INTO organizations (slug, name, summary, created_at, archived_at, context_max_tokens)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+        [slug, o.name, o.summary, o.created_at, o.archived_at, o.context_max_tokens ?? null]);
       orgId = rows[0].id;
       names.org.set(o.key, o.name);
       if (slug !== o.slug) warn(`${o.name} is imported as "${slug}", so links to [[${o.slug}]] don't lead to it.`);

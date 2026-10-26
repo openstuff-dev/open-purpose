@@ -128,6 +128,17 @@ export async function renameGroup(db: Db, a: Access, name: string): Promise<void
   await db.query('UPDATE groups SET name = $2 WHERE id = $1', [a.group.id, name.trim()]);
 }
 
+/** The context budget every organization in the group gets, once it has several. null = no limit. */
+export async function setGroupContextBudget(db: Db, a: Access, maxTokens: number | null): Promise<void> {
+  a.requireAdmin(null);
+  await db.query('UPDATE groups SET context_max_tokens = $2 WHERE id = $1', [a.group.id, maxTokens]);
+}
+
+export async function groupContextBudget(db: Queryable, a: Access): Promise<number | null> {
+  const { rows } = await db.query<{ max: number | null }>('SELECT context_max_tokens AS max FROM groups WHERE id = $1', [a.group.id]);
+  return rows[0]?.max ?? null;
+}
+
 // ───────────────────────────── organizations ─────────────────────────────
 
 export interface OrgListItem extends Organization {
@@ -142,7 +153,7 @@ export interface OrgListItem extends Organization {
 
 export async function listOrganizations(db: Queryable, a: Access): Promise<OrgListItem[]> {
   const { rows } = await db.query<Organization & { projects: number; aliases: SlugAlias[] }>(
-    `SELECT o.id, o.slug, o.name, o.summary, o.created_at, o.archived_at,
+    `SELECT o.id, o.slug, o.name, o.summary, o.context_max_tokens, o.created_at, o.archived_at,
             (SELECT count(*)::int FROM projects p WHERE p.organization_id = o.id AND p.archived_at IS NULL) AS projects,
             COALESCE((SELECT json_agg(json_build_object('id', x.id, 'old_slug', x.old_slug, 'created_at', x.created_at) ORDER BY x.created_at DESC)
                         FROM slug_aliases x WHERE x.organization_id = o.id), '[]') AS aliases
@@ -167,7 +178,7 @@ export async function listOrganizations(db: Queryable, a: Access): Promise<OrgLi
 async function insertOrganization(c: Queryable, input: { name: string; slug?: string; summary?: string }, actorId: string | null): Promise<Organization> {
   const { rows } = await c.query<Organization>(
     `INSERT INTO organizations (slug, name, summary) VALUES ($1, $2, $3)
-     RETURNING id, slug, name, summary, created_at, archived_at`,
+     RETURNING id, slug, name, summary, context_max_tokens, created_at, archived_at`,
     [input.slug || slugify(input.name), input.name.trim(), input.summary ?? '']);
   await seedOrgDocs(c, rows[0].id, actorId);
   return rows[0];
@@ -192,16 +203,19 @@ export async function createOrganization(
 }
 
 export async function updateOrganization(
-  db: Db, a: Access, id: string, input: { name?: string; slug?: string; summary?: string; archived?: boolean },
+  db: Db, a: Access, id: string,
+  input: { name?: string; slug?: string; summary?: string; archived?: boolean; context_max_tokens?: number | null },
 ): Promise<Organization> {
   a.requireAdmin(id);
   if (input.slug !== undefined || input.archived !== undefined) a.requireAdmin(null);
   try {
     const { rows } = await db.query<Organization>(
       `UPDATE organizations SET name = COALESCE($2, name), slug = COALESCE($3, slug), summary = COALESCE($4, summary),
-              archived_at = CASE WHEN $5::boolean IS NULL THEN archived_at WHEN $5 THEN COALESCE(archived_at, now()) ELSE NULL END
-        WHERE id = $1 RETURNING id, slug, name, summary, created_at, archived_at`,
-      [id, input.name?.trim() || null, input.slug?.toLowerCase() || null, input.summary ?? null, input.archived ?? null]);
+              archived_at = CASE WHEN $5::boolean IS NULL THEN archived_at WHEN $5 THEN COALESCE(archived_at, now()) ELSE NULL END,
+              context_max_tokens = CASE WHEN $6::boolean THEN $7::integer ELSE context_max_tokens END
+        WHERE id = $1 RETURNING id, slug, name, summary, context_max_tokens, created_at, archived_at`,
+      [id, input.name?.trim() || null, input.slug?.toLowerCase() || null, input.summary ?? null, input.archived ?? null,
+       input.context_max_tokens !== undefined, input.context_max_tokens ?? null]);
     if (!rows[0]) throw notFound('Organization');
     return rows[0];
   } catch (err) {

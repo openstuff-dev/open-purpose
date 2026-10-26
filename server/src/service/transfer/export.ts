@@ -26,7 +26,7 @@ export async function exportContent(
   };
 
   const organizations = (await db.query<ExportOrganization>(
-    `SELECT o.id AS key, o.slug, o.name, o.summary, o.created_at, o.archived_at,
+    `SELECT o.id AS key, o.slug, o.name, o.summary, o.created_at, o.archived_at, o.context_max_tokens,
             ARRAY(SELECT x.old_slug FROM slug_aliases x WHERE x.organization_id = o.id ORDER BY x.created_at) AS aliases
        FROM organizations o WHERE $1::uuid IS NULL OR o.id = $1 ORDER BY o.created_at, o.slug`, [org])).rows;
 
@@ -115,7 +115,10 @@ export async function exportContent(
     server_version: serverVersion,
     source: {
       kind: org ? 'organization' : 'group',
-      group: { slug: a.group.slug, name: a.group.name },
+      group: {
+        slug: a.group.slug, name: a.group.name,
+        context_max_tokens: (await db.query<{ max: number | null }>('SELECT context_max_tokens AS max FROM groups WHERE id = $1', [a.group.id])).rows[0]?.max ?? null,
+      },
       organization: org,
     },
     includes,

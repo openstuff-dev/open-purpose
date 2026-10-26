@@ -30,6 +30,8 @@ export interface Organization {
   slug: string;
   name: string;
   summary: string;
+  /** Largest get_context, in estimated tokens, before general sections are shortened. null = no limit. */
+  context_max_tokens: number | null;
   created_at: string;
   archived_at: string | null;
 }

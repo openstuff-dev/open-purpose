@@ -28,7 +28,19 @@ export interface ContextBlock {
   level: LevelKind;
   label: string;
   scope: (Pick<Scope, 'id' | 'slug' | 'name'> & { reason: string }) | null;
-  documents: Array<Pick<Document, 'id' | 'kind' | 'title' | 'mode'> & { sections: Section[] }>;
+  documents: Array<Pick<Document, 'id' | 'kind' | 'title' | 'mode'> & { sections: ContextSection[] }>;
+}
+
+/** shortened: only the first sentence goes to the agent, to stay within the organization's budget. */
+export type ContextSection = Section & { shortened?: boolean };
+
+export interface ContextBudget {
+  /** The organization's limit; null = no limit. */
+  max_tokens: number | null;
+  /** Estimated size of the markdown sent (characters / 4). */
+  tokens: number;
+  /** How many sections were cut to their first sentence. */
+  shortened: number;
 }
 
 export interface ContextResult {
@@ -48,6 +60,7 @@ export interface ContextResult {
   related: Related[];
   /** API specs of this project and of related projects the agent can read. */
   apis: ContextApi[];
+  budget: ContextBudget;
   markdown: string;
 }
 
@@ -192,6 +205,7 @@ export async function buildContext(db: Queryable, a: Access, req: ContextRequest
     learning_target: target,
     related: [],
     apis: [],
+    budget: { max_tokens: null, tokens: 0, shortened: 0 },
   };
   if (project) {
     result.related = await relatedTo(db, a, project.id);
@@ -210,7 +224,82 @@ export async function buildContext(db: Queryable, a: Access, req: ContextRequest
       };
     });
   }
-  return { ...result, markdown: renderMarkdown(result) };
+  // Once the group has several organizations it sets the budget; until then the organization does.
+  const { rows: [budget] } = result.group.shown || !org
+    ? await db.query<{ max: number | null }>('SELECT context_max_tokens AS max FROM groups WHERE id = $1', [a.group.id])
+    : await db.query<{ max: number | null }>('SELECT context_max_tokens AS max FROM organizations WHERE id = $1', [org.id]);
+  return compact(result, budget?.max ?? null);
+}
+
+const estimateTokens = (text: string) => Math.ceil(text.length / 4);
+
+/** Which kinds of document give way first inside one level. */
+const SHORTEN_ORDER: Record<Document['kind'], number> = {
+  learnings: 0, reference: 1, glossary: 2, guidelines: 3, business_logic: 4, purpose: 5,
+};
+
+/**
+ * Keep the context within `maxTokens` by cutting sections to their first
+ * sentence: the most general level first (group, then organization, project,
+ * scopes), and inside a level learnings and reference before purpose, longest
+ * first. The most specific rules are the last to go. Sections keep their full
+ * body in the result; only the markdown shows the excerpt.
+ */
+export function compact(ctx: Omit<ContextResult, 'markdown'>, maxTokens: number | null): ContextResult {
+  let markdown = renderMarkdown(ctx);
+  let tokens = estimateTokens(markdown);
+  if (maxTokens !== null && tokens > maxTokens) {
+    const candidates = ctx.blocks.flatMap((b, level) => b.documents.flatMap((d) => d.sections.map((s) => ({ s, level, kind: d.kind }))))
+      .sort((x, y) => x.level - y.level || SHORTEN_ORDER[x.kind] - SHORTEN_ORDER[y.kind] || y.s.body.length - x.s.body.length);
+    // The notice about shortened sections costs a little too.
+    let estimate = tokens + estimateTokens(shortenedNotice(candidates.length, maxTokens));
+    for (const { s } of candidates) {
+      if (estimate <= maxTokens) break;
+      const saved = s.body.trim().length - excerpt(s).length;
+      if (saved <= 0) continue;
+      s.shortened = true;
+      estimate -= saved / 4;
+    }
+    const shortened = candidates.filter((c) => c.s.shortened).length;
+    ctx.budget = { max_tokens: maxTokens, tokens: 0, shortened };
+    markdown = renderMarkdown(ctx);
+    tokens = estimateTokens(markdown);
+  }
+  ctx.budget = { max_tokens: maxTokens, tokens, shortened: ctx.budget.shortened };
+  return { ...ctx, markdown };
+}
+
+const EXCERPT_CHARS = 200;
+
+/** The first sentence of a section, as plain text, and how to read the rest. */
+export function excerpt(s: Pick<Section, 'id' | 'body'>): string {
+  const lines = s.body.trim().split('\n');
+  const prose: string[] = [];
+  let inFence = false;
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line.startsWith('```')) { inFence = !inFence; continue; }
+    if (inFence || /^(#+|\||>\s*$|---+$)/.test(line)) continue;
+    if (!line) { if (prose.length) break; continue; }
+    prose.push(line.replace(/^(?:[-*+]|\d+[.)]|>)\s+/, ''));
+  }
+  const paragraph = prose.join(' ');
+  // A sentence ends before a capital, so "e.g. 100" doesn't end it.
+  const sentence = paragraph.match(/^.+?[.!?](?=\s+[\p{Lu}"'(\[*_`]|$)/u)?.[0] ?? paragraph;
+  let lead = sentence;
+  if (lead.length > EXCERPT_CHARS) {
+    const cut = lead.slice(0, EXCERPT_CHARS);
+    lead = cut.slice(0, cut.lastIndexOf(' ') > EXCERPT_CHARS / 2 ? cut.lastIndexOf(' ') : EXCERPT_CHARS);
+  }
+  const words = (t: string) => t.split(/\s+/).filter(Boolean).length;
+  const rest = Math.max(words(s.body) - words(lead), 0);
+  const more = `_(${rest} more word${rest === 1 ? '' : 's'}: \`read_section s:${shortId(s.id)}\`)_`;
+  return lead ? `${lead} … ${more}` : more;
+}
+
+function shortenedNotice(count: number, maxTokens: number): string {
+  return `> **${count} section${count === 1 ? ' is' : 's are'} shortened** to fit the context budget (~${maxTokens.toLocaleString('en-US')} tokens). `
+    + 'The most general ones were shortened first. When one looks relevant to your task, read it in full with `read_section`.';
 }
 
 const shortId = (id: string) => id.slice(0, 8);
@@ -258,6 +347,7 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
   out.push(`How to read this: general rules come first (${ctx.group.shown ? 'group, then organization' : 'organization'}), specific ones last (project, then the part of the code you are in). When two rules conflict, the more specific one wins.`);
   out.push('');
   out.push('Each section has a marker `[s:<id> · <mode>]`. **locked**: read-only for you. **propose**: your edits become proposals a person approves. **open**: you may edit directly.');
+  if (ctx.budget.shortened && ctx.budget.max_tokens !== null) out.push('', shortenedNotice(ctx.budget.shortened, ctx.budget.max_tokens));
 
   let any = false;
   for (const block of ctx.blocks) {
@@ -267,7 +357,7 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
     for (const doc of block.documents) {
       out.push('', `### ${doc.title}`);
       for (const s of doc.sections) {
-        out.push('', `#### ${s.heading}  \`[s:${shortId(s.id)} · ${s.mode}]\``, '', s.body.trim() || '_(empty)_');
+        out.push('', `#### ${s.heading}  \`[s:${shortId(s.id)} · ${s.mode}]\``, '', s.shortened ? excerpt(s) : s.body.trim() || '_(empty)_');
       }
     }
   }

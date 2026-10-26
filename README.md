@@ -101,12 +101,20 @@ second organization under Settings › Organizations.
   the real MCP tool's output, word for word. The server runs the tool as that
   agent, offers only read tools, and only lets a person look through an agent's
   eyes if they can already read everything that agent can.
+- **Context budget.** Big rule sets don't flood an agent. When `get_context` would be
+  larger than the budget (estimated as characters / 4), the most general sections are
+  cut to their heading and first sentence: group first, then organization, project and
+  scopes, with learnings and reference before purpose. Each shortened section says how
+  much is left and which `read_section` call returns it, so the most specific rules
+  always arrive in full. A group admin sets the budget for the whole group; while there
+  is only one organization, its admin sets it there. Budgets are opt-in: until one is
+  set, every matching section is sent in full.
 - **What agents see** on every project: the exact merged context an agent gets
   for each part of the code, layer by layer. **Settings → Test a repository**
   does the same for any git remote, including ones OpenPurpose doesn't know yet.
 - Personal and per-agent **tokens** with revocation, and Postgres full-text search.
 - **Settings** for your account and personal tokens, light/dark theme, agent setup
-  instructions, organizations and read access, people and agents, export and import,
+  instructions, organizations, read access and context budgets, people and agents, export and import,
   and (for server admins) all groups. Press ⌘K / Ctrl+K anywhere to jump to a page or project, or search rules.
 
 ## Run it
@@ -261,5 +269,4 @@ npm test
 
 - Sign-in through Entra ID / OIDC (tokens only for now)
 - Notifications when something lands in the inbox
-- Size budgeting for very large contexts (all matching sections are sent)
 - Importing edited Markdown (exports include a Markdown copy, but imports read only its `manifest.json`)
