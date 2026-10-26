@@ -67,8 +67,8 @@ html.agent-mode body::after {
 
 /* No soft shadows; everything is drawn with rules. */
 html.agent-mode .btn, html.agent-mode input, html.agent-mode select, html.agent-mode textarea,
-html.agent-mode .drawer, html.agent-mode .menu, html.agent-mode .notice, html.agent-mode .tip,
-html.agent-mode .composer, html.agent-mode .palette, html.agent-mode .search-trigger { box-shadow: none !important; }
+html.agent-mode .drawer, html.agent-mode .menu, html.agent-mode .notice,
+html.agent-mode .composer { box-shadow: none !important; }
 html.agent-mode .drawer { border-left-width: 1px; }
 html.agent-mode .drawer-backdrop { background: rgb(0 0 0 / 0.55); }
 
@@ -96,30 +96,15 @@ html.agent-mode .icon-btn:hover { background: var(--hover); }
 /* Links: dashed underline on hover. */
 html.agent-mode a:hover { text-decoration: underline dashed; text-underline-offset: 3px; }
 
-/* Shell: rail, brand, top bar. */
+/* Shell: brand and the agent bar. */
 html.agent-mode .brand::after { content: '~agent'; color: var(--agent); font-weight: 400; font-size: var(--fs-sm); }
-html.agent-mode .rail li a { border: 1px dashed transparent; }
-html.agent-mode .rail li a.active { background: transparent; border-color: var(--agent); color: var(--agent); box-shadow: none; }
-html.agent-mode .rail li a.active::before { content: '>'; color: var(--agent); margin-right: -0.25rem; }
-html.agent-mode .rail li a .count { background: var(--agent); color: var(--accent-ink); }
 html.agent-mode .badge, html.agent-mode .avatar { font-family: var(--mono); }
-html.agent-mode .topbar { background: var(--ground); backdrop-filter: none; }
-html.agent-mode .search-trigger { background: transparent; }
-html.agent-mode .search-trigger::before { content: '$'; color: var(--agent); }
-html.agent-mode .search-trigger > .icon { display: none; }
+html.agent-mode .agent-bar { border-bottom-style: dashed; }
 
-/* The switch becomes a [■ ] toggle. */
-html.agent-mode .agent-switch { background: transparent; border-style: dashed; }
-html.agent-mode .agent-switch .track { width: 1.6rem; height: 0.9rem; background: transparent; border: 1px solid var(--agent); }
-html.agent-mode .agent-switch .thumb { top: 1px; left: 1px; width: calc(0.9rem - 4px); height: calc(0.9rem - 4px); background: var(--agent); box-shadow: none; }
-html.agent-mode .agent-switch[aria-checked='true'] .thumb { transform: translateX(0.7rem); }
-html.agent-mode .tip { background: var(--surface); color: var(--ink); border: 1px dashed var(--agent); }
-html.agent-mode .tip::before { display: none; }
-
-/* The banner is a status line. */
-html.agent-mode .agent-banner { background: var(--agent-soft); border-bottom: 1px dashed var(--agent); }
-html.agent-mode .agent-banner p::before { content: '[agent] '; color: var(--agent); }
-html.agent-mode .agent-banner > .icon { display: none; }
+/* The transcript reads like a terminal session. */
+html.agent-mode .call { background: transparent; }
+html.agent-mode .call-head { border-bottom-style: dashed; }
+html.agent-mode .call-next { border-top-style: dashed; }
 
 /* Tabs and segmented controls invert when active. */
 html.agent-mode .page-tabs { background: var(--ground); border-bottom-style: dashed; }

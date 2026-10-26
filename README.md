@@ -89,13 +89,14 @@ A small company simply has one group with one organization.
 - **Project pages** split into tabs: Documents, Scopes, API, What agents see,
   Connections, Repositories and Settings, under a strip that shows where the
   project sits (group › organization › project › scopes).
-- **Agent mode**, a switch in the top bar: the whole UI shows exactly what an agent
-  in the chosen organization reads (its organization, organizations shared with it,
-  group-wide rules), with other organizations' projects as names only, and nothing
-  editable. The server builds the same access an agent token gets, refuses every
-  write, and only lets a person look through an agent's eyes if they can already
-  read everything that agent can. The UI switches to a terminal look while it's on,
-  so it's never mistaken for the normal view.
+- **Agent mode**, a switch in the top bar: the UI is replaced by a console that
+  shows only what an agent in the chosen organization gets back from OpenPurpose.
+  You ask like an agent would: `get_context` for a project or git remote, a path
+  and stacks, then `get_related`, `get_api`, `read_section`, `search` and the list
+  tools. Follow-up calls the output points to are one click away. Each answer is
+  the real MCP tool's output, word for word. The server runs the tool as that
+  agent, offers only read tools, and only lets a person look through an agent's
+  eyes if they can already read everything that agent can.
 - **What agents see** on every project: the exact merged context an agent gets
   for each part of the code, layer by layer. **Settings → Test a repository**
   does the same for any git remote, including ones OpenPurpose doesn't know yet.

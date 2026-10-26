@@ -281,6 +281,17 @@ describe('OpenPurpose with groups and organizations', () => {
     // ...but reading the context agents get (a POST with a body) works, as the agent would get it.
     const ctx = await api('POST', '/context', { project: 'logistics/customer-portal', path: 'frontend/src/app.ts' }, asLogisticsAgent);
     expect(ctx.status).toBe(200);
+    // The agent console runs the real MCP read tools: the same text a Logistics agent gets.
+    const args = { project: 'logistics/customer-portal', path: 'frontend/src/app.ts' };
+    const tool = await api('POST', '/agent/tool', { name: 'get_context', args }, asLogisticsAgent);
+    expect(tool.status).toBe(200);
+    const { client, call } = await mcp(t.jonas);
+    expect(tool.data).toEqual({ text: (await call('get_context', args)).text, is_error: false });
+    await client.close();
+    const hidden = await api('POST', '/agent/tool', { name: 'get_context', args: { project: 'payments/payment-gateway' } }, asLogisticsAgent);
+    expect(hidden.data.is_error).toBe(true);
+    expect((await api('POST', '/agent/tool', { name: 'update_section', args: {} }, asLogisticsAgent)).status).toBe(400);
+    expect((await api('POST', '/agent/tool', { name: 'get_context', args }, root)).status).toBe(403);
     // Payments was granted read access to Logistics, so its agents read both.
     const asPaymentsAgent = await api('GET', '/me', undefined, { token: t.ida, org: o.payments, agent: true });
     expect(asPaymentsAgent.data.agent_view.readable_organization_ids).toEqual(expect.arrayContaining([o.logistics, o.payments]));

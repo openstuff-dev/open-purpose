@@ -33,7 +33,31 @@ import { Palette } from './shared/palette';
         </form>
       </main>
     } @else if (session.me(); as me) {
-      <div class="shell" [class.rail-open]="railOpen()" [class.agent-mode]="!!me.agent_view">
+      @if (me.agent_view) {
+        <!-- Agent mode: only what the agent itself gets back, nothing of the regular UI. -->
+        <div class="agent-shell">
+          <header class="agent-bar">
+            <span class="brand">
+              <svg viewBox="0 0 40 40" width="22" height="22" aria-hidden="true"><use href="#openpurpose-mark"/></svg>
+              OpenPurpose
+            </span>
+            @if (session.agentOrgs().length > 1) {
+              <label class="agent-org">Agent in
+                <select [ngModel]="session.orgId()" (ngModelChange)="pickOrg($event)" aria-label="View as an agent in">
+                  @for (o of session.agentOrgs(); track o.id) { <option [value]="o.id">{{ o.name }}</option> }
+                </select>
+              </label>
+            } @else {
+              <span class="agent-org">Agent in <strong>{{ session.org()?.name }}</strong></span>
+            }
+            <button class="btn sm" type="button" (click)="toggleAgentMode()" [disabled]="switching()">Exit agent mode</button>
+          </header>
+          <main class="main" id="main">
+            @for (k of [session.view()]; track k) { <router-outlet /> }
+          </main>
+        </div>
+      } @else {
+      <div class="shell" [class.rail-open]="railOpen()">
         <nav class="rail" id="rail" aria-label="Main">
           <a class="brand" routerLink="/organization">
             <svg viewBox="0 0 40 40" width="22" height="22" aria-hidden="true"><use href="#openpurpose-mark"/></svg>
@@ -44,7 +68,7 @@ import { Palette } from './shared/palette';
             <button type="button" class="ws-button" (click)="wsOpen.set(!wsOpen())" [attr.aria-expanded]="wsOpen()" aria-haspopup="menu">
               @if (session.org(); as org) {
                 <span class="badge" [style.background]="session.orgColor(org.id)">{{ initials(org.name) }}</span>
-                <span class="ws-text"><strong>{{ org.name }}</strong><small>{{ me.agent_view ? 'Viewing as its agent' : me.group.name }}</small></span>
+                <span class="ws-text"><strong>{{ org.name }}</strong><small>{{ me.group.name }}</small></span>
               } @else {
                 <span class="badge group">{{ initials(me.group.name) }}</span>
                 <span class="ws-text"><strong>{{ me.group.name }}</strong><small>Choose an organization</small></span>
@@ -53,16 +77,7 @@ import { Palette } from './shared/palette';
             </button>
             @if (wsOpen()) {
               <div class="menu" role="menu">
-                @if (me.agent_view) {
-                  <div class="menu-label">View as an agent in</div>
-                  @for (o of session.agentOrgs(); track o.id) {
-                    <button type="button" class="menu-item" role="menuitemradio" [attr.aria-checked]="o.id === session.orgId()" (click)="pickOrg(o.id)">
-                      <span class="badge sm" [style.background]="session.orgColor(o.id)">{{ initials(o.name) }}</span>
-                      {{ o.name }}
-                      @if (o.id === session.orgId()) { <app-icon name="check" /> }
-                    </button>
-                  }
-                } @else if (session.readableOrgs().length) {
+                @if (session.readableOrgs().length) {
                   <div class="menu-label">Organizations in {{ me.group.name }}</div>
                   @for (o of session.readableOrgs(); track o.id) {
                     <button type="button" class="menu-item" role="menuitemradio" [attr.aria-checked]="o.id === session.orgId()" (click)="pickOrg(o.id)">
@@ -97,14 +112,12 @@ import { Palette } from './shared/palette';
             }
             <li><a routerLink="/projects" routerLinkActive="active"><app-icon name="repo" />Projects</a></li>
             <li><a routerLink="/map" routerLinkActive="active"><app-icon name="map" />Map</a></li>
-            @if (!me.agent_view) {
-              <li>
-                <a routerLink="/inbox" routerLinkActive="active">
-                  <app-icon name="inbox" />Inbox
-                  @if (me.pending_proposals; as n) { <span class="count" [attr.aria-label]="n + ' waiting for review'">{{ n }}</span> }
-                </a>
-              </li>
-            }
+            <li>
+              <a routerLink="/inbox" routerLinkActive="active">
+                <app-icon name="inbox" />Inbox
+                @if (me.pending_proposals; as n) { <span class="count" [attr.aria-label]="n + ' waiting for review'">{{ n }}</span> }
+              </a>
+            </li>
           </ul>
           <div class="nav-label">{{ me.group.name }}</div>
           <ul>
@@ -134,41 +147,24 @@ import { Palette } from './shared/palette';
               <app-icon name="search" /><span>Search or jump to…</span><kbd>{{ mac ? '⌘' : 'Ctrl' }} K</kbd>
             </button>
             <span class="tip-wrap">
-              <button type="button" class="agent-switch" role="switch" [attr.aria-checked]="!!me.agent_view" (click)="toggleAgentMode()"
+              <button type="button" class="agent-switch" role="switch" aria-checked="false" (click)="toggleAgentMode()"
                       aria-describedby="agent-tip" [disabled]="switching()">
                 <app-icon name="bot" [size]="15" /><span class="agent-switch-label">Agent mode</span><span class="track" aria-hidden="true"><span class="thumb"></span></span>
               </button>
               <span class="tip" role="tooltip" id="agent-tip">
                 <strong>Agent mode</strong>
-                See OpenPurpose exactly as an agent in {{ session.org()?.name ?? 'an organization' }} does: only the organizations, projects and
-                rules it can read, with the same edit modes it works under. Other organizations' projects appear as names only, like they do for the agent.
-                Read-only while it's on.
+                See exactly what an agent in {{ session.org()?.name ?? 'an organization' }} gets back from OpenPurpose: the text of
+                get_context and the other read tools, word for word, and nothing else.
               </span>
             </span>
           </header>
-          @if (me.agent_view) {
-            <div class="agent-banner" role="status">
-              <app-icon name="bot" [size]="16" />
-              <p>
-                <strong>Agent mode.</strong> You see what an agent in
-                <b>{{ session.org()?.name }}</b> reads: {{ agentReads() }}. Nothing can be changed.
-              </p>
-              @if (session.agentOrgs().length > 1) {
-                <label class="agent-org">Agent in
-                  <select [ngModel]="session.orgId()" (ngModelChange)="pickOrg($event)" aria-label="View as an agent in">
-                    @for (o of session.agentOrgs(); track o.id) { <option [value]="o.id">{{ o.name }}</option> }
-                  </select>
-                </label>
-              }
-              <button class="btn sm" type="button" (click)="toggleAgentMode()">Exit agent mode</button>
-            </div>
-          }
           <main class="main" id="main">
             @for (k of [session.view()]; track k) { <router-outlet /> }
           </main>
         </div>
       </div>
       @if (paletteOpen()) { <app-palette (close)="paletteOpen.set(false)" /> }
+      }
     } @else if (loadError()) {
       <main class="signin">
         <div class="signin-card">
@@ -215,6 +211,11 @@ export class App {
   constructor() {
     // Agent mode restyles the whole document (drawers and dialogs live outside the shell).
     effect(() => document.documentElement.classList.toggle('agent-mode', !!this.session.me()?.agent_view));
+    // Agent mode can also end without the switch (e.g. the organization went away): leave the console then.
+    effect(() => {
+      const me = this.session.me();
+      if (me && !me.agent_view && this.router.url.startsWith('/agent')) untracked(() => void this.router.navigate(['/organization']));
+    });
     effect(() => {
       if (this.session.token()) untracked(() => void this.refreshMe());
     });
@@ -226,7 +227,7 @@ export class App {
   }
 
   onKey(ev: KeyboardEvent): void {
-    if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'k' && this.session.me()) {
+    if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === 'k' && this.session.me() && !this.session.agentView()) {
       ev.preventDefault();
       this.paletteOpen.set(!this.paletteOpen());
     } else if (ev.key === 'Escape') {
@@ -236,20 +237,15 @@ export class App {
 
   readonly switching = signal(false);
 
-  /** Names of the organizations the simulated agent can read, plus "group-wide rules". */
-  agentReads(): string {
-    const v = this.session.agentView();
-    if (!v) return '';
-    const names = this.session.orgs().filter((o) => v.readable_organization_ids.includes(o.id)).map((o) => o.name);
-    return [`${this.session.group()?.name} group-wide rules`, ...names].join(', ');
-  }
-
   async toggleAgentMode(): Promise<void> {
     const on = !this.session.me()?.agent_view;
     this.switching.set(true);
+    // Turned on from a project page, the console starts with that project's context.
+    const project = /^\/projects\/([^/?#]+)/.exec(this.router.url)?.[1];
     try {
       await this.switcher.agentMode(on);
-      if (on && this.router.url.startsWith('/inbox')) await this.router.navigate(['/projects']);
+      if (on) await this.router.navigate(['/agent'], { queryParams: project ? { project } : {} });
+      else await this.router.navigate(['/organization']);
     } catch (e) {
       this.notices.error(e);
     }
@@ -259,7 +255,6 @@ export class App {
   roleLine(): string {
     const me = this.session.me();
     if (!me) return '';
-    if (me.agent_view) return 'Viewing as an agent';
     if (me.actor.is_superadmin) return 'Server admin';
     if (me.group.role) return `${ROLE_LABEL[me.group.role]}, ${me.group.name}`;
     const org = this.session.org();

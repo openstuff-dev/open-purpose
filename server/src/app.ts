@@ -8,7 +8,7 @@ import { Access, actorFromToken, agentViewOf, bearer, canViewAsAgent, groupsOf, 
 import type { Config } from './config.js';
 import { beginScope, endScope, type Pool } from './db.js';
 import { AppError, badRequest } from './errors.js';
-import { createMcpServer } from './mcp.js';
+import { callReadTool, createMcpServer } from './mcp.js';
 import * as admin from './service/admin.js';
 import * as apis from './service/apis.js';
 import * as content from './service/content.js';
@@ -461,6 +461,12 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       stacks: z.array(z.string()).optional(), manifests: z.array(manifest).optional(),
       scopes: z.array(z.string()).optional(), include_learnings: z.boolean().optional(),
     }), req.body)));
+    // Agent mode: run one read-only MCP tool as the simulated agent and return its text exactly.
+    api.post('/agent/tool', { config: { readOnly: true } }, async (req) => {
+      if (!req.person) throw new AppError('forbidden', 'Turn on agent mode to call agent tools.');
+      const body = parse(z.object({ name: z.string(), args: z.record(z.string(), z.unknown()).optional() }), req.body);
+      return callReadTool(pool, req.access, VERSION, config.apiSpecs, body.name, body.args ?? {});
+    });
     api.get('/search', async (req) => {
       const q = req.query as { q?: string; project_id?: string; organization_id?: string };
       if (!q.q) throw badRequest('q is required');

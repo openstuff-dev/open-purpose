@@ -251,8 +251,17 @@ html.agent-mode .tab-panel .danger-zone {
 html.agent-mode .agent-switch {
     border-style: dashed
 }
-html.agent-mode .agent-banner {
+html.agent-mode .agent-bar {
     border-bottom-style: dashed
+}
+html.agent-mode .call {
+    border-style: dashed
+}
+html.agent-mode .call-head {
+    border-bottom-style: dashed
+}
+html.agent-mode .call-next {
+    border-top-style: dashed
 }
 html.agent-mode .api-card {
     border-style: dashed

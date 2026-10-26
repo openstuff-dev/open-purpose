@@ -26,6 +26,9 @@ export class Api {
   }
 
   me = () => this.get<Me>('/me');
+  /** Agent mode: run one read-only MCP tool as the agent and get its text exactly. */
+  agentTool = (name: string, args: Record<string, unknown>) =>
+    this.send<{ text: string; is_error: boolean }>('POST', '/agent/tool', { name, args });
   renameMe = (name: string) => this.send('PATCH', '/me', { name });
   myTokens = () => this.get<TokenRow[]>('/me/tokens');
   createMyToken = (label: string) => this.send<{ token: string }>('POST', '/me/tokens', { label });

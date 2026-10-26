@@ -1,3 +1,5 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Access } from './auth.js';
@@ -57,7 +59,35 @@ type ToolResult = { content: Array<{ type: 'text'; text: string }>; isError?: bo
 const text = (t: string): ToolResult => ({ content: [{ type: 'text', text: t }] });
 const json = (v: unknown): ToolResult => text(JSON.stringify(v, null, 2));
 
-export function createMcpServer(pool: Pool, a: Access, version: string, apiConfig?: ApiSpecConfig): McpServer {
+/** Tools that only read. Agent mode in the UI may call these, and nothing else. */
+export const READ_TOOLS = [
+  'get_context', 'resolve_project', 'list_organizations', 'list_projects', 'list_scopes',
+  'get_related', 'get_api', 'search', 'read_section',
+] as const;
+
+/**
+ * Call one read tool in-process, through the same MCP server an agent talks to,
+ * so agent mode shows byte for byte what the agent gets. `a` is a simulated agent:
+ * it has no proposals of its own, so get_context leaves out review feedback.
+ */
+export async function callReadTool(pool: Pool, a: Access, version: string, apiConfig: ApiSpecConfig | undefined,
+  name: string, args: Record<string, unknown>): Promise<{ text: string; is_error: boolean }> {
+  if (!(READ_TOOLS as readonly string[]).includes(name)) throw new AppError('bad_request', `Agent mode can only call read tools: ${READ_TOOLS.join(', ')}`);
+  const server = createMcpServer(pool, a, version, apiConfig, { simulated: true });
+  const client = new Client({ name: 'openpurpose-agent-mode', version });
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+  try {
+    await server.connect(serverSide);
+    await client.connect(clientSide);
+    const r = await client.callTool({ name, arguments: args });
+    return { text: (r.content as Array<{ text?: string }>).map((c) => c.text ?? '').join('\n'), is_error: !!r.isError };
+  } finally {
+    await client.close();
+    await server.close();
+  }
+}
+
+export function createMcpServer(pool: Pool, a: Access, version: string, apiConfig?: ApiSpecConfig, opts: { simulated?: boolean } = {}): McpServer {
   const server = new McpServer(
     { name: 'openpurpose', version },
     { instructions: SERVER_INSTRUCTIONS, capabilities: { tools: {} } },
@@ -86,7 +116,7 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
     const built = await buildContext(db, a, args);
     if (apiConfig) refreshStale(pool, a.group.id, built.apis, apiConfig);
     const ctx = built.markdown;
-    const waiting = await waitingOn(db, a);
+    const waiting = opts.simulated ? [] : await waitingOn(db, a);
     if (!waiting.length) return text(ctx);
     const lines = waiting.map((w) => `- \`${w.id}\` "${w.heading}" in ${w.where}: ${w.status === 'changes_requested' ? 'changes requested' : 'new comments'}${w.open_threads ? `, ${w.open_threads} open thread${w.open_threads === 1 ? '' : 's'}` : ''}`);
     return text(`${ctx}\n\n---\n\n## Review feedback waiting on you\n\nReviewers responded to proposals you made. Read each with \`get_review\` and answer with \`reply_to_review\`, \`revise_proposal\` or \`apply_suggestion\`.\n\n${lines.join('\n')}`);
