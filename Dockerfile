@@ -1,4 +1,4 @@
-# Charter: one image with the API, the MCP endpoint and the Angular UI.
+# OpenPurpose: one image with the API, the MCP endpoint and the Angular UI.
 # The repository is one npm workspace (server, web, packages/contracts) with a single lockfile.
 
 FROM node:24-alpine AS manifests
@@ -25,8 +25,8 @@ RUN npm ci -w server --omit=dev && mkdir -p server/node_modules
 FROM node:24-alpine
 ENV NODE_ENV=production \
     PORT=8080 \
-    CHARTER_WEB_DIR=/app/web \
-    CHARTER_MIGRATIONS_DIR=/app/server/migrations
+    OPENPURPOSE_WEB_DIR=/app/web \
+    OPENPURPOSE_MIGRATIONS_DIR=/app/server/migrations
 WORKDIR /app/server
 COPY --from=server-deps /app/node_modules /app/node_modules
 # Anything npm had to nest under the server instead of hoisting (usually empty).

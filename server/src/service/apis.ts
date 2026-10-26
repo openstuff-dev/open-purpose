@@ -37,7 +37,7 @@ const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 
 /** Download a spec. Only http(s), with a timeout and a size cap. */
 export async function downloadSpec(url: string, cfg: ApiSpecConfig): Promise<string> {
-  if (!cfg.fetch) throw badRequest('Fetching URLs is turned off on this server (CHARTER_API_FETCH=off). Upload the file instead.');
+  if (!cfg.fetch) throw badRequest('Fetching URLs is turned off on this server (OPENPURPOSE_API_FETCH=off). Upload the file instead.');
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -49,7 +49,7 @@ export async function downloadSpec(url: string, cfg: ApiSpecConfig): Promise<str
   let res: Response;
   try {
     res = await fetch(parsed, {
-      headers: { accept: 'application/json, application/yaml;q=0.9, text/yaml;q=0.9, */*;q=0.5', 'user-agent': 'Charter (API spec fetch)' },
+      headers: { accept: 'application/json, application/yaml;q=0.9, text/yaml;q=0.9, */*;q=0.5', 'user-agent': 'OpenPurpose (API spec fetch)' },
       redirect: 'follow',
       signal: AbortSignal.timeout(cfg.timeoutMs),
     });

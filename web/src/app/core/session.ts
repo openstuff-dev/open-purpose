@@ -4,10 +4,10 @@ import { catchError, throwError } from 'rxjs';
 import type { Me, Organization } from './models';
 import { orgColor } from './theme';
 
-const TOKEN = 'charter.token';
-const GROUP = 'charter.group';
-const ORG = 'charter.org';
-const AGENT = 'charter.agent';
+const TOKEN = 'openpurpose.token';
+const GROUP = 'openpurpose.group';
+const ORG = 'openpurpose.org';
+const AGENT = 'openpurpose.agent';
 
 function read(key: string): string | null {
   try {
@@ -128,9 +128,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
     const group = session.groupChoice();
     const org = session.orgChoice();
-    if (group) headers['X-Charter-Group'] = group;
-    if (org) headers['X-Charter-Org'] = org;
-    if (session.agentMode()) headers['X-Charter-Agent-View'] = '1';
+    if (group) headers['X-OpenPurpose-Group'] = group;
+    if (org) headers['X-OpenPurpose-Org'] = org;
+    if (session.agentMode()) headers['X-OpenPurpose-Agent-View'] = '1';
     out = req.clone({ setHeaders: headers });
   }
   return next(out).pipe(
@@ -146,6 +146,6 @@ export function errorMessage(err: unknown): string {
   const e = err as HttpErrorResponse;
   const body = e?.error as { message?: string } | undefined;
   if (body?.message) return body.message;
-  if (e?.status === 0) return 'Cannot reach the Charter server.';
+  if (e?.status === 0) return 'Cannot reach the OpenPurpose server.';
   return e?.message ?? String(err);
 }

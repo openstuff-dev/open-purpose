@@ -14,7 +14,7 @@ import { addSection, editSection, getProposalDetail, listProposals, proposeLearn
 import { addComment, applySuggestion, getReview, renderReviewForAgent, reviseProposal, setResolved, waitingOn } from './service/review.js';
 import type { Level, Scope } from './service/types.js';
 
-export const SERVER_INSTRUCTIONS = `Charter holds shared context: purpose, business logic, glossary, engineering
+export const SERVER_INSTRUCTIONS = `OpenPurpose holds shared context: purpose, business logic, glossary, engineering
 guidelines and learnings. It is layered: the group (e.g. a whole company), your organization within it,
 the project, and the part of the project you work in (e.g. only the Angular frontend). Your token belongs
 to one organization; other organizations' content is private unless your organization was given read access.
@@ -59,7 +59,7 @@ const json = (v: unknown): ToolResult => text(JSON.stringify(v, null, 2));
 
 export function createMcpServer(pool: Pool, a: Access, version: string, apiConfig?: ApiSpecConfig): McpServer {
   const server = new McpServer(
-    { name: 'charter', version },
+    { name: 'openpurpose', version },
     { instructions: SERVER_INSTRUCTIONS, capabilities: { tools: {} } },
   );
 
@@ -94,7 +94,7 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
 
   server.registerTool('resolve_project', {
     title: 'Resolve project',
-    description: 'Find which Charter project a repository belongs to. Returns the project, or suggestions when unknown.',
+    description: 'Find which OpenPurpose project a repository belongs to. Returns the project, or suggestions when unknown.',
     inputSchema: { project: locate.project, remote_url: locate.remote_url },
   }, (args) => run(async (db) => {
     const r = await resolveProject(db, a, args);
@@ -251,7 +251,7 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
     });
     return r.status === 'applied'
       ? text(`Applied. Section is now at version ${r.section.version}.`)
-      : text(`Proposed for review (proposal ${r.proposal.id.slice(0, 8)}). A person will approve or reject it in Charter.`);
+      : text(`Proposed for review (proposal ${r.proposal.id.slice(0, 8)}). A person will approve or reject it in OpenPurpose.`);
   }));
 
   server.registerTool('add_section', {
@@ -388,7 +388,7 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
 
   server.registerTool('create_project', {
     title: 'Create project',
-    description: 'Create a new project in your organization when the user confirms the repository belongs to a project Charter does not know yet. Projects created by agents are flagged for review.',
+    description: 'Create a new project in your organization when the user confirms the repository belongs to a project OpenPurpose does not know yet. Projects created by agents are flagged for review.',
     inputSchema: {
       name: z.string(),
       slug: z.string().optional().describe('Lower-case, dashes; derived from name when omitted'),

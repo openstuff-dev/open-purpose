@@ -1,10 +1,10 @@
 -- API descriptions (OpenAPI 3 / Swagger 2) attached to a project, so agents can
--- look up its endpoints and DTOs. Added from a URL Charter re-fetches, or as an
+-- look up its endpoints and DTOs. Added from a URL OpenPurpose re-fetches, or as an
 -- uploaded file.
 
 CREATE TABLE api_specs (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  group_id       uuid NOT NULL DEFAULT charter_group() REFERENCES groups(id) ON DELETE CASCADE,
+  group_id       uuid NOT NULL DEFAULT openpurpose_group() REFERENCES groups(id) ON DELETE CASCADE,
   project_id     uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   -- Optional label, e.g. "Public API" when a project has several. Defaults to the spec's title.
   name           text NOT NULL DEFAULT '',
@@ -31,5 +31,5 @@ CREATE INDEX api_specs_project_idx ON api_specs (project_id);
 
 ALTER TABLE api_specs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE api_specs FORCE ROW LEVEL SECURITY;
-CREATE POLICY group_isolation ON api_specs USING (charter_bypass() OR group_id = charter_group())
-  WITH CHECK (charter_bypass() OR group_id = charter_group());
+CREATE POLICY group_isolation ON api_specs USING (openpurpose_bypass() OR group_id = openpurpose_group())
+  WITH CHECK (openpurpose_bypass() OR group_id = openpurpose_group());

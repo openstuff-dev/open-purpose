@@ -11,7 +11,7 @@ UPDATE proposals SET updated_at = COALESCE(reviewed_at, created_at);
 -- Every version of a proposal's text. Revision 1 is what was first proposed.
 CREATE TABLE proposal_revisions (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  group_id    uuid NOT NULL DEFAULT charter_group() REFERENCES groups(id) ON DELETE CASCADE,
+  group_id    uuid NOT NULL DEFAULT openpurpose_group() REFERENCES groups(id) ON DELETE CASCADE,
   proposal_id uuid NOT NULL REFERENCES proposals(id) ON DELETE CASCADE,
   revision    int NOT NULL,
   heading     text NOT NULL DEFAULT '',
@@ -28,7 +28,7 @@ SELECT group_id, id, 1, heading, body, created_by, created_at FROM proposals;
 CREATE TYPE review_event_kind AS ENUM ('proposed', 'revised', 'changes_requested', 'approved', 'rejected', 'commented');
 CREATE TABLE proposal_events (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  group_id    uuid NOT NULL DEFAULT charter_group() REFERENCES groups(id) ON DELETE CASCADE,
+  group_id    uuid NOT NULL DEFAULT openpurpose_group() REFERENCES groups(id) ON DELETE CASCADE,
   proposal_id uuid NOT NULL REFERENCES proposals(id) ON DELETE CASCADE,
   kind        review_event_kind NOT NULL,
   revision    int NOT NULL DEFAULT 1,
@@ -46,7 +46,7 @@ SELECT group_id, id, status::text::review_event_kind, review_note, reviewed_by, 
 -- A conversation, either about specific lines of a revision or about the whole proposal.
 CREATE TABLE review_threads (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  group_id    uuid NOT NULL DEFAULT charter_group() REFERENCES groups(id) ON DELETE CASCADE,
+  group_id    uuid NOT NULL DEFAULT openpurpose_group() REFERENCES groups(id) ON DELETE CASCADE,
   proposal_id uuid NOT NULL REFERENCES proposals(id) ON DELETE CASCADE,
   revision    int NOT NULL,
   line_start  int,
@@ -64,7 +64,7 @@ CREATE INDEX review_threads_idx ON review_threads (proposal_id, created_at);
 
 CREATE TABLE review_comments (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  group_id    uuid NOT NULL DEFAULT charter_group() REFERENCES groups(id) ON DELETE CASCADE,
+  group_id    uuid NOT NULL DEFAULT openpurpose_group() REFERENCES groups(id) ON DELETE CASCADE,
   thread_id   uuid NOT NULL REFERENCES review_threads(id) ON DELETE CASCADE,
   actor_id    uuid REFERENCES actors(id) ON DELETE SET NULL,
   body        text NOT NULL DEFAULT '',
@@ -83,7 +83,7 @@ BEGIN
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
-    EXECUTE format('CREATE POLICY group_isolation ON %I USING (charter_bypass() OR group_id = charter_group())
-                    WITH CHECK (charter_bypass() OR group_id = charter_group())', t);
+    EXECUTE format('CREATE POLICY group_isolation ON %I USING (openpurpose_bypass() OR group_id = openpurpose_group())
+                    WITH CHECK (openpurpose_bypass() OR group_id = openpurpose_group())', t);
   END LOOP;
 END $$;

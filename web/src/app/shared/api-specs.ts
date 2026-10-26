@@ -127,7 +127,7 @@ function ago(iso: string | null): string {
           <div class="form-actions"><button class="btn primary" type="submit" [disabled]="busy() || (mode() === 'url' ? !url.trim() : !file())"><app-icon name="plus" />Add API</button></div>
         </div>
         <p class="quiet api-add-hint">
-          @if (mode() === 'url') { Charter fetches the link now, and again in the background when agents read it and it's over an hour old. The server must be able to reach it. }
+          @if (mode() === 'url') { OpenPurpose fetches the link now, and again in the background when agents read it and it's over an hour old. The server must be able to reach it. }
           @else { OpenAPI 3 or Swagger 2, up to 20 MB. Upload a new version whenever the API changes. }
         </p>
       </form>

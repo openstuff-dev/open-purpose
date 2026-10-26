@@ -1,11 +1,11 @@
-/** Shapes identical on server and web live in @charter/contracts; the rest are API response shapes. */
-import type { Actor, DocKind, EditMode, GraphNode, GroupRef, ProposalKind, ProposalStatus, Repository, Role, Scope } from '@charter/contracts';
+/** Shapes identical on server and web live in @openpurpose/contracts; the rest are API response shapes. */
+import type { Actor, DocKind, EditMode, GraphNode, GroupRef, ProposalKind, ProposalStatus, Repository, Role, Scope } from '@openpurpose/contracts';
 
 export type {
   Actor, ActorKind, DocKind, EditMode, Graph, GraphEdge, GraphNode, GroupRef, LinkRef, LinkResolution, NodeType,
   ProposalCounts, ProposalKind, ProposalStatus, Repository, Review, ReviewComment, ReviewEvent, ReviewRevision,
   ReviewThread, Role, Scope,
-} from '@charter/contracts';
+} from '@openpurpose/contracts';
 
 export const EDIT_MODES: EditMode[] = ['locked', 'propose', 'open'];
 export const DOC_KINDS: DocKind[] = ['purpose', 'business_logic', 'glossary', 'guidelines', 'reference', 'learnings'];

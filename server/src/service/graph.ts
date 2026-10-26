@@ -2,7 +2,7 @@ import type { Access } from '../auth.js';
 import type { Queryable } from '../db.js';
 import { slugify } from '../domain/remote.js';
 import { normalizeTarget } from '../domain/links.js';
-import type { Graph, GraphEdge, GraphNode, LinkRef, LinkResolution } from '@charter/contracts';
+import type { Graph, GraphEdge, GraphNode, LinkRef, LinkResolution } from '@openpurpose/contracts';
 
 /**
  * The link graph behind the map. Nodes: the group, its organizations, projects
@@ -13,7 +13,7 @@ import type { Graph, GraphEdge, GraphNode, LinkRef, LinkResolution } from '@char
  * points into an organization the viewer can't read shows the target's name
  * only (restricted), never its content.
  */
-export type { Graph, GraphEdge, GraphNode, LinkRef, LinkResolution, NodeType } from '@charter/contracts';
+export type { Graph, GraphEdge, GraphNode, LinkRef, LinkResolution, NodeType } from '@openpurpose/contracts';
 
 export const GROUP_NODE = 'group';
 export const orgNode = (id: string) => `org:${id}`;

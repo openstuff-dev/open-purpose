@@ -1,5 +1,5 @@
 /**
- * Fill an empty Charter database with a realistic example: one group with two
+ * Fill an empty OpenPurpose database with a realistic example: one group with two
  * organizations, linked services, glossary terms, learnings and open proposals.
  *
  *   Acme Group                 group-wide: privacy and security rules, the word "Customer", all .NET code

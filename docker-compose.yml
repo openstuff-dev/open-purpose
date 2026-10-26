@@ -2,33 +2,33 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: charter
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-charter}
-      POSTGRES_DB: charter
+      POSTGRES_USER: openpurpose
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-openpurpose}
+      POSTGRES_DB: openpurpose
     volumes:
-      - charter-db:/var/lib/postgresql/data
+      - openpurpose-db:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U charter"]
+      test: ["CMD-SHELL", "pg_isready -U openpurpose"]
       interval: 5s
       timeout: 5s
       retries: 10
     restart: unless-stopped
 
-  charter:
+  openpurpose:
     build: .
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://charter:${POSTGRES_PASSWORD:-charter}@db:5432/charter
-      CHARTER_GROUP_NAME: ${CHARTER_GROUP_NAME:-Our company}
-      CHARTER_ORG_NAME: ${CHARTER_ORG_NAME:-Engineering}
-      CHARTER_PUBLIC_URL: ${CHARTER_PUBLIC_URL:-http://localhost:8080}
+      DATABASE_URL: postgres://openpurpose:${POSTGRES_PASSWORD:-openpurpose}@db:5432/openpurpose
+      OPENPURPOSE_GROUP_NAME: ${OPENPURPOSE_GROUP_NAME:-Our company}
+      OPENPURPOSE_ORG_NAME: ${OPENPURPOSE_ORG_NAME:-Engineering}
+      OPENPURPOSE_PUBLIC_URL: ${OPENPURPOSE_PUBLIC_URL:-http://localhost:8080}
       # Optional: fix the first admin's token instead of reading it from the log.
-      CHARTER_BOOTSTRAP_TOKEN: ${CHARTER_BOOTSTRAP_TOKEN:-}
+      OPENPURPOSE_BOOTSTRAP_TOKEN: ${OPENPURPOSE_BOOTSTRAP_TOKEN:-}
     ports:
       - "8080:8080"
     restart: unless-stopped
 
 volumes:
-  charter-db:
+  openpurpose-db:

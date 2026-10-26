@@ -1,6 +1,6 @@
-import type { DocKind, EditMode, ProposalKind, ProposalStatus } from '@charter/contracts';
+import type { DocKind, EditMode, ProposalKind, ProposalStatus } from '@openpurpose/contracts';
 
-export type { DocKind, EditMode, ProposalKind, ProposalStatus, Repository, Scope } from '@charter/contracts';
+export type { DocKind, EditMode, ProposalKind, ProposalStatus, Repository, Scope } from '@openpurpose/contracts';
 
 /** Still being worked on: waiting for a review, or for the author after changes were requested. */
 export const OPEN_STATUSES: ProposalStatus[] = ['pending', 'changes_requested'];

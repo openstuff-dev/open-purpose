@@ -145,13 +145,13 @@ CREATE INDEX documents_level_idx ON documents (group_id, organization_id, projec
 CREATE INDEX proposals_org_idx ON proposals (group_id, organization_id, status);
 
 -- ───────────────────────── row-level security ─────────────────────────
--- Every request runs in a transaction that sets charter.group_id. Rows of other
+-- Every request runs in a transaction that sets openpurpose.group_id. Rows of other
 -- groups are invisible, even to a query that forgets its WHERE clause.
--- charter.bypass is only set by migrations, bootstrap and server-admin operations.
-CREATE FUNCTION charter_group() RETURNS uuid
-  LANGUAGE sql STABLE AS $$ SELECT NULLIF(current_setting('charter.group_id', true), '')::uuid $$;
-CREATE FUNCTION charter_bypass() RETURNS boolean
-  LANGUAGE sql STABLE AS $$ SELECT COALESCE(current_setting('charter.bypass', true), '') = 'on' $$;
+-- openpurpose.bypass is only set by migrations, bootstrap and server-admin operations.
+CREATE FUNCTION openpurpose_group() RETURNS uuid
+  LANGUAGE sql STABLE AS $$ SELECT NULLIF(current_setting('openpurpose.group_id', true), '')::uuid $$;
+CREATE FUNCTION openpurpose_bypass() RETURNS boolean
+  LANGUAGE sql STABLE AS $$ SELECT COALESCE(current_setting('openpurpose.bypass', true), '') = 'on' $$;
 
 DO $$
 DECLARE t text;
@@ -161,18 +161,18 @@ BEGIN
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
-    EXECUTE format('ALTER TABLE %I ALTER COLUMN group_id SET DEFAULT charter_group()', t);
-    EXECUTE format('CREATE POLICY group_isolation ON %I USING (charter_bypass() OR group_id = charter_group())
-                    WITH CHECK (charter_bypass() OR group_id = charter_group())', t);
+    EXECUTE format('ALTER TABLE %I ALTER COLUMN group_id SET DEFAULT openpurpose_group()', t);
+    EXECUTE format('CREATE POLICY group_isolation ON %I USING (openpurpose_bypass() OR group_id = openpurpose_group())
+                    WITH CHECK (openpurpose_bypass() OR group_id = openpurpose_group())', t);
   END LOOP;
 END $$;
 
--- Superusers ignore row-level security, so when Charter connects as one (the
+-- Superusers ignore row-level security, so when OpenPurpose connects as one (the
 -- default in Docker), it switches to this role on every connection.
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'charter_app')
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'openpurpose_app')
      AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = current_user AND (rolsuper OR rolcreaterole)) THEN
-    CREATE ROLE charter_app NOLOGIN;
+    CREATE ROLE openpurpose_app NOLOGIN;
   END IF;
 END $$;

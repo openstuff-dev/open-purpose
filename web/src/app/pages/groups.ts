@@ -10,7 +10,7 @@ import { Notices } from '../shared/notice';
 import { Icon } from '../shared/icon';
 import { initials } from '../core/theme';
 
-/** Server admins: every group (tenant) on this Charter server. */
+/** Server admins: every group (tenant) on this OpenPurpose server. */
 @Component({
   selector: 'app-groups',
   imports: [FormsModule, DatePipe, Icon],

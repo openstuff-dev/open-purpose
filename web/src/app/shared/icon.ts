@@ -6,7 +6,7 @@ import {
   Users, X, MessageSquare, History, CircleDot, FileDiff, type IconNode,
 } from 'lucide';
 
-/** The icons Charter uses, by name. Lucide, ISC licensed. */
+/** The icons OpenPurpose uses, by name. Lucide, ISC licensed. */
 const ICONS: Record<string, IconNode> = {
   'arrow-right': ArrowRight,
   book: BookOpen,

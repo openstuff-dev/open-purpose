@@ -2,9 +2,9 @@ import crypto from 'node:crypto';
 import type { Pool } from './db.js';
 import { withScope } from './db.js';
 import { AppError, forbidden } from './errors.js';
-import type { Actor, ActorKind, GroupRef, Role } from '@charter/contracts';
+import type { Actor, ActorKind, GroupRef, Role } from '@openpurpose/contracts';
 
-export type { Actor, ActorKind, GroupRef, Role } from '@charter/contracts';
+export type { Actor, ActorKind, GroupRef, Role } from '@openpurpose/contracts';
 
 export interface Membership {
   group_id: string;

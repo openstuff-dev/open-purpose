@@ -92,7 +92,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
     let access: Access;
     try {
       const actor = await actorFromToken(pool, bearer(req.headers.authorization));
-      access = await resolveAccess(pool, actor, header(req, 'x-charter-group'), header(req, 'x-charter-org'));
+      access = await resolveAccess(pool, actor, header(req, 'x-openpurpose-group'), header(req, 'x-openpurpose-org'));
     } catch (e) {
       const status = e instanceof AppError ? e.status : 401;
       return reply.status(status).header('WWW-Authenticate', 'Bearer').send({
@@ -120,9 +120,9 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
     api.addHook('preHandler', async (req) => {
       req.actor = await actorFromToken(pool, bearer(req.headers.authorization));
       if (req.routeOptions.config.serverLevel) return;
-      req.access = await resolveAccess(pool, req.actor, header(req, 'x-charter-group'), header(req, 'x-charter-org'));
+      req.access = await resolveAccess(pool, req.actor, header(req, 'x-openpurpose-group'), header(req, 'x-openpurpose-org'));
       // Agent mode: answer as an agent in the chosen organization would see it. Read-only.
-      if (header(req, 'x-charter-agent-view') === '1' && !req.access.isAgent) {
+      if (header(req, 'x-openpurpose-agent-view') === '1' && !req.access.isAgent) {
         if (req.method !== 'GET' && req.method !== 'HEAD' && !req.routeOptions.config.readOnly) {
           throw new AppError('forbidden', 'Agent mode is read-only. Turn it off to make changes.');
         }

@@ -1,7 +1,7 @@
-## Charter (shared rules and learnings)
+## OpenPurpose (shared rules and learnings)
 
 We keep our purpose, business logic, glossary, guidelines and learnings in
-Charter, available through the `charter` MCP server. Rules come in layers: the
+OpenPurpose, available through the `openpurpose` MCP server. Rules come in layers: the
 group, our organization, the project and the part of the code you are in.
 
 1. Before you start a task, call `get_context` with:
@@ -18,7 +18,7 @@ group, our organization, the project and the part of the code you are in.
    `propose_learning` with the same remote/path/manifests. Say in one line that
    you did. Do not propose one-off preferences or task-specific details.
 5. Never try to change a section marked `locked`.
-6. `[[name]]` in Charter text links to another project or a glossary term, and
+6. `[[name]]` in OpenPurpose text links to another project or a glossary term, and
    `[[org/name]]` to a project in another organization. Use `get_related` when
    your task touches a linked service.
 7. If `get_context` lists "Review feedback waiting on you", read it with

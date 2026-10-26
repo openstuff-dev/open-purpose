@@ -9,9 +9,9 @@ import { tx } from '../db.js';
 import { AppError, badRequest, forbidden, notFound } from '../errors.js';
 import { AUTHOR_OWES_REPLY, addEvent, canReview, getProposal, insertRevision, isOpen } from './proposals.js';
 import type { Proposal } from './types.js';
-import type { Review, ReviewComment, ReviewEvent, ReviewRevision, ReviewThread } from '@charter/contracts';
+import type { Review, ReviewComment, ReviewEvent, ReviewRevision, ReviewThread } from '@openpurpose/contracts';
 
-export type { Review, ReviewComment, ReviewEvent, ReviewRevision, ReviewThread } from '@charter/contracts';
+export type { Review, ReviewComment, ReviewEvent, ReviewRevision, ReviewThread } from '@openpurpose/contracts';
 
 const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 

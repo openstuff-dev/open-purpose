@@ -29,7 +29,7 @@ async function main() {
     if (boot.token) {
       console.log(`Admin token (shown once, store it safely): ${boot.token}`);
     } else {
-      console.log('Sign in with the token from CHARTER_BOOTSTRAP_TOKEN.');
+      console.log('Sign in with the token from OPENPURPOSE_BOOTSTRAP_TOKEN.');
     }
     console.log('────────────────────────────────────────────────────────────');
   }

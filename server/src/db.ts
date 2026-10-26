@@ -8,12 +8,12 @@ export type Db = pg.Pool | pg.PoolClient;
 export type Queryable = Db;
 
 /**
- * Superusers ignore row-level security. When Charter connects as one (the
- * Docker default), every connection drops to the charter_app role first.
+ * Superusers ignore row-level security. When OpenPurpose connects as one (the
+ * Docker default), every connection drops to the openpurpose_app role first.
  */
 const DROP_PRIVILEGES = `DO $$ BEGIN
-  IF current_setting('is_superuser') = 'on' AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'charter_app') THEN
-    EXECUTE 'SET ROLE charter_app';
+  IF current_setting('is_superuser') = 'on' AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'openpurpose_app') THEN
+    EXECUTE 'SET ROLE openpurpose_app';
   END IF;
 END $$`;
 
@@ -94,7 +94,7 @@ export async function beginScope(pool: Pool, scope: Scope): Promise<pg.PoolClien
   try {
     await client.query('BEGIN');
     await client.query(
-      `SELECT set_config('charter.group_id', $1, true), set_config('charter.bypass', $2, true)`,
+      `SELECT set_config('openpurpose.group_id', $1, true), set_config('openpurpose.bypass', $2, true)`,
       [scope.groupId ?? '', scope.bypass ? 'on' : ''],
     );
     return client;
@@ -142,7 +142,7 @@ export async function migrate(databaseUrl: string, dir: string): Promise<string[
       try {
         // Serialise concurrent boots of several replicas.
         await client.query('SELECT pg_advisory_xact_lock(4242)');
-        await client.query(`SELECT set_config('charter.bypass', 'on', true)`);
+        await client.query(`SELECT set_config('openpurpose.bypass', 'on', true)`);
         const done = await client.query('SELECT 1 FROM schema_migrations WHERE name = $1', [file]);
         if (!done.rowCount) {
           await client.query(sql);
@@ -156,13 +156,13 @@ export async function migrate(databaseUrl: string, dir: string): Promise<string[
       }
     }
     // Keep the unprivileged role's grants in step with the schema.
-    const role = await client.query(`SELECT 1 FROM pg_roles WHERE rolname = 'charter_app'`);
+    const role = await client.query(`SELECT 1 FROM pg_roles WHERE rolname = 'openpurpose_app'`);
     if (role.rowCount) {
       await client.query(`
-        GRANT USAGE ON SCHEMA public TO charter_app;
-        GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO charter_app;
-        GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO charter_app;
-        GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO charter_app;`).catch(() => {});
+        GRANT USAGE ON SCHEMA public TO openpurpose_app;
+        GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO openpurpose_app;
+        GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO openpurpose_app;
+        GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO openpurpose_app;`).catch(() => {});
     }
   } finally {
     await client.end();

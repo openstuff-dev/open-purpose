@@ -1,7 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 
 export type ThemeChoice = 'system' | 'light' | 'dark';
-const KEY = 'charter.theme';
+const KEY = 'openpurpose.theme';
 
 /** Light, dark or follow the system. Stored per browser. */
 @Injectable({ providedIn: 'root' })

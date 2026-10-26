@@ -23,7 +23,7 @@ export interface Config {
 }
 
 export interface ApiSpecConfig {
-  /** Whether the server may fetch spec URLs at all (CHARTER_API_FETCH=off disables it; uploads still work). */
+  /** Whether the server may fetch spec URLs at all (OPENPURPOSE_API_FETCH=off disables it; uploads still work). */
   fetch: boolean;
   /** Re-fetch a URL spec in the background when an agent reads it and it's older than this. 0 = only on demand. */
   refreshMinutes: number;
@@ -37,17 +37,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     port,
     host: env.HOST ?? '0.0.0.0',
-    databaseUrl: env.DATABASE_URL ?? 'postgres://charter:charter@localhost:5432/charter',
-    bootstrapToken: env.CHARTER_BOOTSTRAP_TOKEN || undefined,
-    groupName: env.CHARTER_GROUP_NAME ?? env.CHARTER_ORG_NAME ?? 'Our company',
-    orgName: env.CHARTER_ORG_NAME ?? 'Engineering',
-    webDir: env.CHARTER_WEB_DIR ?? path.resolve(here, '../../web/dist/web/browser'),
-    migrationsDir: env.CHARTER_MIGRATIONS_DIR ?? path.resolve(here, '../migrations'),
-    publicUrl: env.CHARTER_PUBLIC_URL ?? `http://localhost:${port}`,
+    databaseUrl: env.DATABASE_URL ?? 'postgres://openpurpose:openpurpose@localhost:5432/openpurpose',
+    bootstrapToken: env.OPENPURPOSE_BOOTSTRAP_TOKEN || undefined,
+    groupName: env.OPENPURPOSE_GROUP_NAME ?? env.OPENPURPOSE_ORG_NAME ?? 'Our company',
+    orgName: env.OPENPURPOSE_ORG_NAME ?? 'Engineering',
+    webDir: env.OPENPURPOSE_WEB_DIR ?? path.resolve(here, '../../web/dist/web/browser'),
+    migrationsDir: env.OPENPURPOSE_MIGRATIONS_DIR ?? path.resolve(here, '../migrations'),
+    publicUrl: env.OPENPURPOSE_PUBLIC_URL ?? `http://localhost:${port}`,
     apiSpecs: {
-      fetch: (env.CHARTER_API_FETCH ?? 'on').toLowerCase() !== 'off',
-      refreshMinutes: Number(env.CHARTER_API_REFRESH_MINUTES ?? 60),
-      maxBytes: Number(env.CHARTER_API_MAX_MB ?? 20) * 1024 * 1024,
+      fetch: (env.OPENPURPOSE_API_FETCH ?? 'on').toLowerCase() !== 'off',
+      refreshMinutes: Number(env.OPENPURPOSE_API_REFRESH_MINUTES ?? 60),
+      maxBytes: Number(env.OPENPURPOSE_API_MAX_MB ?? 20) * 1024 * 1024,
       timeoutMs: 15_000,
     },
   };

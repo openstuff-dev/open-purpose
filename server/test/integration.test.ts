@@ -10,7 +10,7 @@ import { bootstrap } from '../src/service/admin.js';
 import { createServer } from 'node:http';
 import { BILLING_SWAGGER_YAML, ORDER_API } from '../src/demo-specs.js';
 
-const DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgres://charter:charter@localhost:5432/charter_test';
+const DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgres://openpurpose:openpurpose@localhost:5432/openpurpose_test';
 const ADMIN = 'chr_test_admin_token_0123456789';
 
 let pool: Pool;
@@ -25,9 +25,9 @@ async function api<T = any>(method: string, path: string, body?: unknown, who: W
     method,
     headers: {
       authorization: `Bearer ${who.token}`,
-      ...(who.group ? { 'x-charter-group': who.group } : {}),
-      ...(who.org ? { 'x-charter-org': who.org } : {}),
-      ...(who.agent ? { 'x-charter-agent-view': '1' } : {}),
+      ...(who.group ? { 'x-openpurpose-group': who.group } : {}),
+      ...(who.org ? { 'x-openpurpose-org': who.org } : {}),
+      ...(who.agent ? { 'x-openpurpose-agent-view': '1' } : {}),
       ...(body ? { 'content-type': 'application/json' } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
@@ -78,7 +78,7 @@ afterAll(async () => {
   await pool?.end();
 });
 
-describe('Charter with groups and organizations', () => {
+describe('OpenPurpose with groups and organizations', () => {
   const t: Record<string, string> = {}; // tokens
   const o: Record<string, string> = {}; // organization ids
   let projectId: string;
@@ -567,7 +567,7 @@ describe('upgrade from v1', () => {
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
     const os = await import('node:os');
-    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'charter-v1-'));
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'openpurpose-v1-'));
     const migrations = loadConfig({}).migrationsDir;
     await fs.copyFile(path.join(migrations, '001_init.sql'), path.join(dir, '001_init.sql'));
     await migrate(DATABASE_URL, dir);

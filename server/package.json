@@ -1,5 +1,5 @@
 {
-  "name": "@charter/server",
+  "name": "@openpurpose/server",
   "version": "0.2.0",
   "private": true,
   "type": "module",
@@ -21,7 +21,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@charter/contracts": "*",
+    "@openpurpose/contracts": "*",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
     "@types/picomatch": "^4.0.3",

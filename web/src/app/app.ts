@@ -21,8 +21,8 @@ import { Palette } from './shared/palette';
     @if (!session.token()) {
       <main class="signin">
         <form class="signin-card" (ngSubmit)="signIn()">
-          <svg class="signin-mark" viewBox="0 0 40 40" aria-hidden="true"><use href="#charter-mark"/></svg>
-          <h1>Sign in to Charter</h1>
+          <svg class="signin-mark" viewBox="0 0 40 40" aria-hidden="true"><use href="#openpurpose-mark"/></svg>
+          <h1>Sign in to OpenPurpose</h1>
           <p>The shared rules, purpose and learnings your people and coding agents work from.</p>
           <label for="token">Access token</label>
           <input id="token" name="token" type="password" autocomplete="current-password" [(ngModel)]="tokenInput"
@@ -36,8 +36,8 @@ import { Palette } from './shared/palette';
       <div class="shell" [class.rail-open]="railOpen()" [class.agent-mode]="!!me.agent_view">
         <nav class="rail" id="rail" aria-label="Main">
           <a class="brand" routerLink="/organization">
-            <svg viewBox="0 0 40 40" width="22" height="22" aria-hidden="true"><use href="#charter-mark"/></svg>
-            Charter
+            <svg viewBox="0 0 40 40" width="22" height="22" aria-hidden="true"><use href="#openpurpose-mark"/></svg>
+            OpenPurpose
           </a>
 
           <div class="ws" (click)="$event.stopPropagation()">
@@ -140,7 +140,7 @@ import { Palette } from './shared/palette';
               </button>
               <span class="tip" role="tooltip" id="agent-tip">
                 <strong>Agent mode</strong>
-                See Charter exactly as an agent in {{ session.org()?.name ?? 'an organization' }} does: only the organizations, projects and
+                See OpenPurpose exactly as an agent in {{ session.org()?.name ?? 'an organization' }} does: only the organizations, projects and
                 rules it can read, with the same edit modes it works under. Other organizations' projects appear as names only, like they do for the agent.
                 Read-only while it's on.
               </span>
@@ -172,7 +172,7 @@ import { Palette } from './shared/palette';
     } @else if (loadError()) {
       <main class="signin">
         <div class="signin-card">
-          <h1>Charter</h1>
+          <h1>OpenPurpose</h1>
           <p role="alert">{{ loadError() }}</p>
           <button class="btn" type="button" (click)="signOut()">Sign out</button>
         </div>
@@ -187,7 +187,7 @@ import { Palette } from './shared/palette';
       }
     </div>
     <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-      <symbol id="charter-mark" viewBox="0 0 40 40">
+      <symbol id="openpurpose-mark" viewBox="0 0 40 40">
         <rect x="5" y="3" width="26" height="34" rx="5" fill="none" stroke="currentColor" stroke-width="2.6"/>
         <path d="M12 12h12M12 18.5h12M12 25h6" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>
         <circle cx="31" cy="30" r="7" fill="var(--accent)"/>
@@ -288,8 +288,8 @@ export class App {
 
   private forgetChoices(): void {
     try {
-      localStorage.removeItem('charter.group');
-      localStorage.removeItem('charter.org');
+      localStorage.removeItem('openpurpose.group');
+      localStorage.removeItem('openpurpose.org');
     } catch {
       /* ignore */
     }

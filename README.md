@@ -1,8 +1,8 @@
-# Charter
+# OpenPurpose
 
 Shared, scoped context for people and coding agents.
 
-Charter holds purpose, business logic, glossary, engineering guidelines and
+OpenPurpose holds purpose, business logic, glossary, engineering guidelines and
 learnings, in layers. An agent always gets the general rules first and the most
 specific ones last:
 
@@ -98,7 +98,7 @@ A small company simply has one group with one organization.
   so it's never mistaken for the normal view.
 - **What agents see** on every project: the exact merged context an agent gets
   for each part of the code, layer by layer. **Settings → Test a repository**
-  does the same for any git remote, including ones Charter doesn't know yet.
+  does the same for any git remote, including ones OpenPurpose doesn't know yet.
 - Personal and per-agent **tokens** with revocation, and Postgres full-text search.
 - **Settings** for your account and personal tokens, light/dark theme, agent setup
   instructions, organizations and read access, people and agents, and (for server
@@ -107,9 +107,9 @@ A small company simply has one group with one organization.
 ## Run it
 
 ```bash
-cp .env.example .env        # set POSTGRES_PASSWORD, CHARTER_GROUP_NAME and CHARTER_ORG_NAME
+cp .env.example .env        # set POSTGRES_PASSWORD, OPENPURPOSE_GROUP_NAME and OPENPURPOSE_ORG_NAME
 docker compose up -d --build
-docker compose logs charter | grep "Admin token"
+docker compose logs openpurpose | grep "Admin token"
 ```
 
 Open http://localhost:8080 and sign in with the admin token. Then go to
@@ -119,7 +119,7 @@ To try it with example data (a group with two organizations, nine linked
 services, learnings and pending proposals). This wipes the database:
 
 ```bash
-docker compose exec charter node dist/seed-demo.js --reset
+docker compose exec openpurpose node dist/seed-demo.js --reset
 ```
 
 ### Upgrading from v0.1
@@ -138,35 +138,35 @@ the shared types:
 ```bash
 npm ci
 npm run build -w web
-DATABASE_URL=postgres://user:pass@localhost:5432/charter npm run dev -w server
+DATABASE_URL=postgres://user:pass@localhost:5432/openpurpose npm run dev -w server
 ```
 
 The server serves the built UI from `web/dist/web/browser`, the API under
 `/api` and MCP at `/mcp`.
 
-If the database user is a superuser (the Docker default), Charter creates a
-`charter_app` role and switches to it on every connection, because superusers
+If the database user is a superuser (the Docker default), OpenPurpose creates a
+`openpurpose_app` role and switches to it on every connection, because superusers
 ignore row-level security. With a non-superuser owner, row-level security is
 forced on the owner instead. Either way works without configuration.
 
 | Variable | Default | |
 |---|---|---|
-| `DATABASE_URL` | `postgres://charter:charter@localhost:5432/charter` | |
+| `DATABASE_URL` | `postgres://openpurpose:openpurpose@localhost:5432/openpurpose` | |
 | `PORT` | `8080` | |
-| `CHARTER_GROUP_NAME` | `Our company` | first group, created on first boot only |
-| `CHARTER_ORG_NAME` | `Engineering` | first organization in that group, first boot only |
-| `CHARTER_PUBLIC_URL` | `http://localhost:PORT` | shown in MCP setup snippets |
-| `CHARTER_BOOTSTRAP_TOKEN` | random | first admin's token; otherwise printed once in the log |
-| `CHARTER_API_FETCH` | `on` | `off` stops the server from fetching API spec URLs (uploads still work) |
-| `CHARTER_API_REFRESH_MINUTES` | `60` | re-fetch linked API specs older than this when agents read them; `0` = only on demand |
-| `CHARTER_API_MAX_MB` | `20` | largest API spec accepted |
+| `OPENPURPOSE_GROUP_NAME` | `Our company` | first group, created on first boot only |
+| `OPENPURPOSE_ORG_NAME` | `Engineering` | first organization in that group, first boot only |
+| `OPENPURPOSE_PUBLIC_URL` | `http://localhost:PORT` | shown in MCP setup snippets |
+| `OPENPURPOSE_BOOTSTRAP_TOKEN` | random | first admin's token; otherwise printed once in the log |
+| `OPENPURPOSE_API_FETCH` | `on` | `off` stops the server from fetching API spec URLs (uploads still work) |
+| `OPENPURPOSE_API_REFRESH_MINUTES` | `60` | re-fetch linked API specs older than this when agents read them; `0` = only on demand |
+| `OPENPURPOSE_API_MAX_MB` | `20` | largest API spec accepted |
 
 Migrations run automatically on start.
 
 Linked API specs are fetched by the server, so it must be able to reach those URLs.
 Only editors can add a link, and only http(s) URLs without credentials are accepted;
 if the server sits next to things editors shouldn't be able to probe, set
-`CHARTER_API_FETCH=off` and upload spec files instead.
+`OPENPURPOSE_API_FETCH=off` and upload spec files instead.
 
 ## Connect an agent
 
@@ -174,14 +174,14 @@ Create an agent in its organization under **Settings → People and agents**. Th
 UI shows the setup command (also under **Settings → Connect an agent**), e.g. for Claude Code:
 
 ```bash
-claude mcp add --transport http charter https://charter.example.com/mcp \
+claude mcp add --transport http openpurpose https://openpurpose.example.com/mcp \
   --header "Authorization: Bearer chr_..."
 ```
 
 The token decides the group and organization, so there is nothing else to
 configure. Any MCP client that supports streamable HTTP works (Cursor, VS Code,
 Codex, ...). Personal tokens work over MCP too; if the person belongs to several
-organizations, add `--header "X-Charter-Org: <org-slug>"` (and `X-Charter-Group`
+organizations, add `--header "X-OpenPurpose-Org: <org-slug>"` (and `X-OpenPurpose-Group`
 if they belong to several groups).
 
 The server sends its workflow as MCP instructions, but agents follow it more
@@ -213,7 +213,7 @@ agent/                Instruction snippet and .agentcontext.json example for rep
 ```
 
 Run the tests with a Postgres available at `TEST_DATABASE_URL`
-(default `postgres://charter:charter@localhost:5432/charter_test`; the test
+(default `postgres://openpurpose:openpurpose@localhost:5432/openpurpose_test`; the test
 wipes that database). They cover group isolation at the database level and the
 upgrade from v0.1:
 

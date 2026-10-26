@@ -1,4 +1,4 @@
--- Charter: shared, scoped context for humans and coding agents.
+-- OpenPurpose: shared, scoped context for humans and coding agents.
 --
 -- Hierarchy:  organization (implicit, one per instance)
 --               └─ scopes with project_id IS NULL      (org-wide, e.g. "all .NET code")

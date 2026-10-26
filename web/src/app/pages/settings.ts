@@ -14,10 +14,10 @@ import { PreviewPage } from './preview';
 
 type Tab = 'account' | 'appearance' | 'connect' | 'test' | 'group' | 'people' | 'server';
 
-const AGENTS_SNIPPET = `## Charter (shared rules and learnings)
+const AGENTS_SNIPPET = `## OpenPurpose (shared rules and learnings)
 
 We keep our purpose, business logic, glossary, guidelines and learnings in
-Charter, available through the \`charter\` MCP server. Rules come in layers: the
+OpenPurpose, available through the \`openpurpose\` MCP server. Rules come in layers: the
 group, our organization, the project and the part of the code you are in.
 
 1. Before you start a task, call \`get_context\` with:
@@ -34,7 +34,7 @@ group, our organization, the project and the part of the code you are in.
    \`propose_learning\` with the same remote/path/manifests. Say in one line that
    you did. Do not propose one-off preferences or task-specific details.
 5. Never try to change a section marked \`locked\`.
-6. \`[[name]]\` in Charter text links to another project or a glossary term, and
+6. \`[[name]]\` in OpenPurpose text links to another project or a glossary term, and
    \`[[org/name]]\` to a project in another organization. Use \`get_related\` when
    your task touches a linked service.`;
 
@@ -171,7 +171,7 @@ group, our organization, the project and the part of the code you are in.
                 </div></li>
                 <li><div>
                   <h3>Optional: pin a repository to a project</h3>
-                  <p>Charter finds the project from the git remote. To override that, for example in a fork, add <code>.agentcontext.json</code> to the repository root. Each project page shows its own.</p>
+                  <p>OpenPurpose finds the project from the git remote. To override that, for example in a fork, add <code>.agentcontext.json</code> to the repository root. Each project page shows its own.</p>
                   <pre><code>{{ agentContext }}</code></pre>
                   <p><a routerLink="/settings/test">Test a repository</a> to check what an agent there will get.</p>
                 </div></li>
@@ -328,8 +328,8 @@ export class SettingsPage {
   newOrg = { name: '', slug: '', summary: '' };
 
   private readonly base = this.session.me()?.public_url ?? location.origin;
-  readonly claudeCommand = `claude mcp add --transport http charter ${this.base}/mcp \\\n  --header "Authorization: Bearer <agent token>"`;
-  readonly mcpJson = JSON.stringify({ mcpServers: { charter: { type: 'http', url: `${this.base}/mcp`, headers: { Authorization: 'Bearer <agent token>' } } } }, null, 2);
+  readonly claudeCommand = `claude mcp add --transport http openpurpose ${this.base}/mcp \\\n  --header "Authorization: Bearer <agent token>"`;
+  readonly mcpJson = JSON.stringify({ mcpServers: { openpurpose: { type: 'http', url: `${this.base}/mcp`, headers: { Authorization: 'Bearer <agent token>' } } } }, null, 2);
   readonly agentsSnippet = AGENTS_SNIPPET;
   readonly agentContext = JSON.stringify({ project: `${this.session.org()?.slug ?? 'org'}/project-slug` }, null, 2);
 

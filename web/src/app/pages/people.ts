@@ -221,11 +221,11 @@ export class PeoplePage {
   }
 
   claudeCommand(token: string): string {
-    return `claude mcp add --transport http charter ${this.base}/mcp \\\n  --header "Authorization: Bearer ${token}"`;
+    return `claude mcp add --transport http openpurpose ${this.base}/mcp \\\n  --header "Authorization: Bearer ${token}"`;
   }
 
   mcpJson(token: string): string {
-    return JSON.stringify({ mcpServers: { charter: { type: 'http', url: `${this.base}/mcp`, headers: { Authorization: `Bearer ${token}` } } } }, null, 2);
+    return JSON.stringify({ mcpServers: { openpurpose: { type: 'http', url: `${this.base}/mcp`, headers: { Authorization: `Bearer ${token}` } } } }, null, 2);
   }
 
   async create(): Promise<void> {

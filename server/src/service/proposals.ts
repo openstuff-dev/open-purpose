@@ -7,7 +7,7 @@ import {
   insertSection, loadSection, resolveLevel, type SectionChange, type SectionInput,
 } from './content.js';
 import type { EditMode, Level, Proposal, ProposalStatus, Section } from './types.js';
-import type { ProposalCounts } from '@charter/contracts';
+import type { ProposalCounts } from '@openpurpose/contracts';
 
 const PROPOSAL_COLS = `x.id, x.kind, x.status, x.organization_id, x.project_id, x.scope_id, x.document_id, x.section_id,
   x.base_version, x.heading, x.body, x.rationale, x.context, x.created_by, a.name AS created_by_name,
@@ -80,7 +80,7 @@ export interface ProposalListItem extends Proposal {
   can_review: boolean;
 }
 
-export type { ProposalCounts } from '@charter/contracts';
+export type { ProposalCounts } from '@openpurpose/contracts';
 
 /**
  * Proposals the actor can read. `level`: 'group' for group-wide proposals only,

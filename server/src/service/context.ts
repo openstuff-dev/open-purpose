@@ -196,7 +196,7 @@ const shortId = (id: string) => id.slice(0, 8);
 
 export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
   const out: string[] = [];
-  out.push(`# Context from Charter`);
+  out.push(`# Context from OpenPurpose`);
   const projectLine = ctx.project
     ? `**${ctx.project.name}** (\`${ctx.organization ? ctx.organization.slug + '/' : ''}${ctx.project.slug}\`, found via ${ctx.resolution.via === 'project' ? 'project name' : 'git remote'})`
     : '_none resolved_';
