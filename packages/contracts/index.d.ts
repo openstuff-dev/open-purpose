@@ -405,22 +405,69 @@ export interface ExportProposal {
   }>;
 }
 
+/** How a changed section in a merge is handled. */
+export type ImportChangePolicy = 'propose' | 'file' | 'keep';
+
+/** What to do with one organization of the file. */
+export type ImportOrgChoice =
+  | { action: 'new'; slug?: string }
+  | { action: 'merge'; into: string }
+  | { action: 'skip' };
+
+export interface ImportOptions {
+  /** By organization key. Without a choice, an organization is imported as new (left out for non-group-admins). */
+  organizations?: Record<string, ImportOrgChoice>;
+  /** Merge the file's group-wide content into this group's. A new group always gets it. */
+  group_content?: boolean;
+  /** For sections that differ. Default: propose. */
+  changes?: ImportChangePolicy;
+  /** Per section, by section key; overrides `changes`. */
+  section_changes?: Record<string, ImportChangePolicy>;
+  /** In merged organizations: delete sections, documents and scopes, and archive projects, that aren't in the file. */
+  remove_missing?: boolean;
+}
+
+/** A section in a merged document. */
+export interface ImportChange {
+  /** The section's key in the file; null when it is only here. */
+  key: string | null;
+  target_id: string | null;
+  /** "Organization › Project › Document". */
+  place: string;
+  status: 'new' | 'changed' | 'only_in_target' | 'conflict';
+  action: 'add' | 'propose' | 'file' | 'keep' | 'remove' | 'skip';
+  reason: string | null;
+  before: { heading: string; body: string; mode: EditMode } | null;
+  after: { heading: string; body: string; mode: EditMode } | null;
+}
+
 /** What an import does (or, as a preview, would do). */
 export interface ImportReport {
-  /** false when a conflict blocks the import; `organizations` says which slug to change. */
+  /** false when a conflict blocks the import; `organizations` and `group` say which slug to change. */
   ok: boolean;
   applied: boolean;
   source: ExportFile['source'] & { exported_at: string };
+  /** Set when the file becomes a new group. */
+  group: { id: string | null; name: string; slug: string; conflict: string | null; suggested_slug: string | null } | null;
   organizations: Array<{
     key: string;
     name: string;
+    /** The slug in the file. */
     slug: string;
-    /** Why `slug` can't be used here, with `suggested_slug` as a free one. */
+    action: ImportOrgChoice['action'];
+    /** The slug a new organization gets. */
+    new_slug: string | null;
+    into: { id: string; name: string } | null;
+    /** An organization here that already answers to the file's slug: the natural one to merge into. */
+    existing: { id: string; name: string } | null;
     conflict: string | null;
     suggested_slug: string | null;
     /** Set once applied. */
     id: string | null;
   }>;
+  /** Group-wide content in the file, and whether it is imported. */
+  group_content: { documents: number; scopes: number; proposals: number; included: boolean };
+  /** New rows. */
   counts: {
     people: number;
     projects: number;
@@ -432,6 +479,23 @@ export interface ImportReport {
     section_versions: number;
     proposals: number;
   };
-  /** Things left out, and why. */
+  /** Rows matched to ones already here, and what happened to them. */
+  merged: {
+    people: number;
+    projects: number;
+    api_specs: number;
+    scopes: number;
+    documents: number;
+    sections: number;
+    unchanged: number;
+    proposed: number;
+    updated: number;
+    kept: number;
+    removed: number;
+    conflicts: number;
+  };
+  /** Sections of merged documents that are new, changed, only here or in conflict. */
+  changes: ImportChange[];
+  /** Things left out or worth knowing, and why. */
   warnings: string[];
 }

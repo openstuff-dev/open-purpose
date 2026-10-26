@@ -40,6 +40,12 @@ export type {
   SlugKind,
   SlugRename,
   SlugRenameRef,
+  ExportIncludes,
+  ImportChange,
+  ImportChangePolicy,
+  ImportOptions,
+  ImportOrgChoice,
+  ImportReport,
 } from '@openpurpose/contracts';
 
 export const EDIT_MODES: EditMode[] = ['locked', 'propose', 'open'];

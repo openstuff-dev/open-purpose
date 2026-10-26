@@ -19,9 +19,11 @@ import * as proposals from './service/proposals.js';
 import * as review from './service/review.js';
 import { deleteAlias, listAliases } from './service/aliases.js';
 import { renameSlug } from './service/slugs.js';
-import * as transfer from './service/transfer.js';
+import { DEFAULT_INCLUDES, exportContent } from './service/transfer/export.js';
+import { importAsGroup, importContent } from './service/transfer/import.js';
+import { exportZip, readExportZip } from './service/transfer/markdown.js';
 import { DOC_KINDS, EDIT_MODES } from './service/types.js';
-import type { ExportIncludes } from '@openpurpose/contracts';
+import type { ExportIncludes, ImportReport } from '@openpurpose/contracts';
 
 export const VERSION = '0.2.0';
 
@@ -196,6 +198,28 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       }), req.body);
       return reply.status(201).send(await admin.createGroup(pool, req.actor, body));
     });
+    // The file as JSON, or an exported zip as base64.
+    const upload = { file: z.unknown().optional(), zip: z.string().optional() };
+    const unpack = async <T extends { file?: unknown; zip?: string }>(
+      body: T, run: (file: unknown, rest: Omit<T, 'file' | 'zip'>) => Promise<ImportReport>,
+    ) => {
+      const { file, zip, ...rest } = body;
+      if (!zip) return run(file, rest);
+      const unzipped = readExportZip(Buffer.from(zip, 'base64'), config.importMaxBytes);
+      const report = await run(unzipped.file, rest);
+      if (unzipped.markdownEdited) {
+        report.warnings.unshift('The Markdown files in the zip were changed after the export. Only manifest.json is imported, so those changes are left out.');
+      }
+      return report;
+    };
+    // base64 makes an uploaded zip a third larger.
+    const importLimit = { bodyLimit: Math.ceil(config.importMaxBytes * 1.4) };
+    const groupImport = z.object({ ...upload, name: z.string().optional(), slug: z.string().optional() });
+    const groupImportConfig = { config: { serverLevel: true }, bodyLimit: importLimit.bodyLimit };
+    api.post('/groups/import/preview', groupImportConfig, async (req) =>
+      unpack(parse(groupImport, req.body), (file, opts) => importAsGroup(pool, req.actor, file, { ...opts, dryRun: true })));
+    api.post('/groups/import', groupImportConfig, async (req, reply) => reply.status(201).send(
+      await unpack(parse(groupImport, req.body), (file, opts) => importAsGroup(pool, req.actor, file, { ...opts, dryRun: false }))));
     api.put('/group', async (req) => {
       await admin.renameGroup(req.db, req.access, parse(z.object({ name: z.string().min(1).max(200) }), req.body).name);
       return { ok: true };
@@ -603,31 +627,42 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
 
     // export and import (also the backup)
     api.get('/export', async (req, reply) => {
-      const q = req.query as Partial<Record<'organization_id' | keyof ExportIncludes, string>>;
+      const q = req.query as Partial<Record<'organization_id' | 'format' | keyof ExportIncludes, string>>;
       const flag = (v: string | undefined, fallback: boolean) => (v === undefined ? fallback : v === '1' || v === 'true');
-      const d = transfer.DEFAULT_INCLUDES;
-      const file = await transfer.exportContent(req.db, req.access, qid(q.organization_id), {
+      const d = DEFAULT_INCLUDES;
+      const file = await exportContent(req.db, req.access, qid(q.organization_id), {
         history: flag(q.history, d.history), proposals: flag(q.proposals, d.proposals),
         people: flag(q.people, d.people), api_specs: flag(q.api_specs, d.api_specs),
       }, VERSION);
       const name = file.source.organization
         ? file.organizations.find((o) => o.key === file.source.organization)!.slug
         : file.source.group.slug;
+      const filename = `${name}-${file.exported_at.slice(0, 10)}.openpurpose`;
+      if (q.format === 'zip') {
+        return reply.header('content-disposition', `attachment; filename="${filename}.zip"`).type('application/zip').send(exportZip(file));
+      }
       return reply
-        .header('content-disposition', `attachment; filename="${name}-${file.exported_at.slice(0, 10)}.openpurpose.json"`)
+        .header('content-disposition', `attachment; filename="${filename}.json"`)
         .type('application/json')
         .send(JSON.stringify(file, null, 2));
     });
-    const importBody = z.object({ file: z.unknown(), renames: z.record(z.string(), z.string()).optional() });
-    const importLimit = { bodyLimit: config.importMaxBytes };
-    api.post('/import/preview', importLimit, async (req) => {
-      const body = parse(importBody, req.body);
-      return transfer.importContent(req.db, req.access, body.file, { renames: body.renames, dryRun: true });
+    const policy = z.enum(['propose', 'file', 'keep']);
+    const importBody = z.object({
+      ...upload,
+      organizations: z.record(z.string(), z.discriminatedUnion('action', [
+        z.object({ action: z.literal('new'), slug: z.string().optional() }),
+        z.object({ action: z.literal('merge'), into: z.string() }),
+        z.object({ action: z.literal('skip') }),
+      ])).optional(),
+      group_content: z.boolean().optional(),
+      changes: policy.optional(),
+      section_changes: z.record(z.string(), policy).optional(),
+      remove_missing: z.boolean().optional(),
     });
-    api.post('/import', importLimit, async (req, reply) => {
-      const body = parse(importBody, req.body);
-      return reply.status(201).send(await transfer.importContent(req.db, req.access, body.file, { renames: body.renames, dryRun: false }));
-    });
+    api.post('/import/preview', importLimit, async (req) =>
+      unpack(parse(importBody, req.body), (file, opts) => importContent(req.db, req.access, file, { ...opts, dryRun: true })));
+    api.post('/import', importLimit, async (req, reply) => reply.status(201).send(
+      await unpack(parse(importBody, req.body), (file, opts) => importContent(req.db, req.access, file, { ...opts, dryRun: false }))));
   }, { prefix: '/api' });
 
   // ───────────────────────────── Angular app ─────────────────────────────

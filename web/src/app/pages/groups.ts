@@ -21,7 +21,8 @@ import { initials } from '../core/theme';
       <p class="quiet">
         Each group is walled off from the others in the database: its people, agents and rules never
         see another group's. Use one per company or client. A group starts as one organization; its
-        admins can add more later.
+        admins can add more later. Export downloads a full backup of a group, people included;
+        restore one under Settings › Export and import.
       </p>
     </section>
 
@@ -48,6 +49,9 @@ import { initials } from '../core/theme';
             ><span class="badge sm group">{{ initials(g.name) }}</span
             ><strong>{{ g.name }}</strong> <code class="quiet">{{ g.slug }}</code></span
           >
+          <button class="btn sm" type="button" (click)="exportGroup(g)">
+            <app-icon name="download" />Export
+          </button>
           @if (g.id !== session.group()?.id) {
             <button class="btn sm" type="button" (click)="open(g.id)">Switch to it</button>
           } @else {
@@ -132,6 +136,26 @@ export class GroupsPage {
       });
       this.draft = { name: '', organization_name: '', admin_name: '' };
       await this.load();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  /** Everything in the group, as a backup: the same file as Settings › Export and import. */
+  async exportGroup(g: GroupRow): Promise<void> {
+    try {
+      const { blob, name } = await this.api.exportFile({
+        organizationId: null,
+        format: 'json',
+        groupId: g.id,
+        includes: { history: true, proposals: true, api_specs: true, people: true },
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) {
       this.notices.error(e);
     }

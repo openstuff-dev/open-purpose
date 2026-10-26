@@ -165,3 +165,19 @@ describe('rewriteLinks', () => {
     expect(rewriteLinks(md, rename('customer-portal', 'portal'))).toBe(md);
   });
 });
+
+describe('zip', () => {
+  it('reads back what it writes, unpacking only the files asked for', async () => {
+    const { readZip, writeZip } = await import('../src/domain/zip.js');
+    const zip = writeZip([
+      { name: 'manifest.json', data: Buffer.from('{"a":1}') },
+      { name: 'æøå/doc.md', data: Buffer.from('# Ærlig\n'.repeat(1000)) },
+      { name: 'skip.txt', data: Buffer.from('no') },
+    ]);
+    const files = readZip(zip, (n) => n !== 'skip.txt', 1024 * 1024);
+    expect(files.map((f) => [f.name, f.data.length])).toEqual([['manifest.json', 7], ['æøå/doc.md', 9000]]);
+    expect(files[1].data.toString('utf8').startsWith('# Ærlig')).toBe(true);
+    expect(() => readZip(zip, () => true, 100)).toThrow();
+    expect(() => readZip(Buffer.from('not a zip at all, really'), () => true, 100)).toThrow('not a readable zip file');
+  });
+});

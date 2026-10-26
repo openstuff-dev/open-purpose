@@ -139,7 +139,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
     const group = session.groupChoice();
     const org = session.orgChoice();
-    if (group) headers['X-OpenPurpose-Group'] = group;
+    // A request may name its group itself (e.g. exporting another group).
+    if (group && !req.headers.has('X-OpenPurpose-Group')) headers['X-OpenPurpose-Group'] = group;
     if (org) headers['X-OpenPurpose-Org'] = org;
     if (session.agentMode()) headers['X-OpenPurpose-Agent-View'] = '1';
     out = req.clone({ setHeaders: headers });

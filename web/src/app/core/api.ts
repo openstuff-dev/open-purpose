@@ -1,4 +1,4 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, type Observable } from 'rxjs';
 import type {
@@ -38,7 +38,13 @@ import type {
   Repository,
   SlugKind,
   SlugRename,
+  ExportIncludes,
+  ImportOptions,
+  ImportReport,
 } from './models';
+
+/** An export to import: parsed JSON, or a zip as base64. */
+export type ImportUpload = { file: unknown } | { zip: string };
 
 const lv = (id: string | null | undefined) => id ?? 'group';
 
@@ -81,6 +87,34 @@ export class Api {
       '/groups',
       body,
     );
+
+  /** Download an export of the current group (or `groupId`), or of one organization. */
+  exportFile = async (opts: {
+    organizationId: string | null;
+    format: 'json' | 'zip';
+    includes: ExportIncludes;
+    groupId?: string;
+  }): Promise<{ blob: Blob; name: string }> => {
+    let params = new HttpParams().set('format', opts.format);
+    if (opts.organizationId) params = params.set('organization_id', opts.organizationId);
+    for (const [k, v] of Object.entries(opts.includes)) params = params.set(k, v ? '1' : '0');
+    const headers = opts.groupId
+      ? new HttpHeaders({ 'X-OpenPurpose-Group': opts.groupId })
+      : undefined;
+    const res = await firstValueFrom(
+      this.http.get('/api/export', { params, headers, responseType: 'blob', observe: 'response' }),
+    );
+    const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1];
+    return { blob: res.body!, name: name ?? `export.openpurpose.${opts.format}` };
+  };
+  previewImport = (upload: ImportUpload, opts: ImportOptions) =>
+    this.send<ImportReport>('POST', '/import/preview', { ...upload, ...opts });
+  runImport = (upload: ImportUpload, opts: ImportOptions) =>
+    this.send<ImportReport>('POST', '/import', { ...upload, ...opts });
+  previewGroupImport = (upload: ImportUpload, opts: { name?: string; slug?: string }) =>
+    this.send<ImportReport>('POST', '/groups/import/preview', { ...upload, ...opts });
+  runGroupImport = (upload: ImportUpload, opts: { name?: string; slug?: string }) =>
+    this.send<ImportReport>('POST', '/groups/import', { ...upload, ...opts });
 
   organizations = () => this.get<Organization[]>('/organizations');
   createOrganization = (body: {

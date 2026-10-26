@@ -106,8 +106,8 @@ second organization under Settings › Organizations.
   does the same for any git remote, including ones OpenPurpose doesn't know yet.
 - Personal and per-agent **tokens** with revocation, and Postgres full-text search.
 - **Settings** for your account and personal tokens, light/dark theme, agent setup
-  instructions, organizations and read access, people and agents, and (for server
-  admins) all groups. Press ⌘K / Ctrl+K anywhere to jump to a page or project, or search rules.
+  instructions, organizations and read access, people and agents, export and import,
+  and (for server admins) all groups. Press ⌘K / Ctrl+K anywhere to jump to a page or project, or search rules.
 
 ## Run it
 
@@ -133,6 +133,34 @@ Just start the new version. The migration moves everything into one group with
 one organization (both named after your old organization), turns v0.1 admins
 into group admins and server admins, and keeps editors, viewers and agents in
 that organization.
+
+### Backup, export and import
+
+**Settings → Export and import** downloads the whole group or one organization as
+one JSON file: every document and section, projects, repositories, scopes, API specs
+and, if you choose, section history, proposals with their reviews, and the names and
+roles of people and agents. Tokens are never exported. A group export is a complete
+backup. The Markdown (.zip) format adds a readable `.md` file per document next to
+the same JSON (`manifest.json`).
+
+Importing shows a preview first, and then runs in one transaction. Each organization
+in the file can be added as a new organization, merged into one that is already here,
+or left out. A merge matches projects and scopes by slug (old slugs too), documents by
+slug and sections by heading. New content is added. For changed sections you choose
+whether they become proposals in the inbox (the default), are updated right away, or
+stay as they are. Nothing is deleted unless you tick "Remove what's not in the file".
+Server admins can also restore a file as a new group, with its group-wide content.
+Imported people arrive disabled and without tokens.
+
+For scheduled backups, run the export on the server:
+
+```bash
+docker compose exec openpurpose node dist/export-cli.js --group my-group --out /tmp/backup.json
+# Options: --organization <slug>, --zip, --people, --no-history, --no-proposals, --no-api-specs
+```
+
+Without Docker, use `npm run -s export -w server -- --group my-group --out backup.json`.
+For a backup of the whole server, every group at once, use `pg_dump`.
 
 ### Without Docker
 
@@ -165,6 +193,7 @@ forced on the owner instead. Either way works without configuration.
 | `OPENPURPOSE_API_FETCH` | `on` | `off` stops the server from fetching API spec URLs (uploads still work) |
 | `OPENPURPOSE_API_REFRESH_MINUTES` | `60` | re-fetch linked API specs older than this when agents read them; `0` = only on demand |
 | `OPENPURPOSE_API_MAX_MB` | `20` | largest API spec accepted |
+| `OPENPURPOSE_IMPORT_MAX_MB` | `100` | largest export file accepted by an import |
 
 Migrations run automatically on start.
 
@@ -233,4 +262,4 @@ npm test
 - Sign-in through Entra ID / OIDC (tokens only for now)
 - Notifications when something lands in the inbox
 - Size budgeting for very large contexts (all matching sections are sent)
-- Markdown import/export of whole documents
+- Importing edited Markdown (exports include a Markdown copy, but imports read only its `manifest.json`)

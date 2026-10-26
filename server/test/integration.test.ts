@@ -676,6 +676,8 @@ definitions:`);
     expect((await api('GET', '/me', undefined, { token: t.jonas })).status).toBe(401);
   });
 
+  let copyOrg = '';
+
   it('exports an organization and imports it again as a new one', async () => {
     // Only admins of the organization or the group may export it.
     expect((await api('GET', `/export?organization_id=${o.logistics}`, undefined, { token: t.ida })).status).toBe(403);
@@ -708,23 +710,26 @@ definitions:`);
     expect((await api('POST', '/import', { file: { ...file, version: 2 } })).status).toBe(400);
     const broken = { ...file, projects: [{ ...file.projects[0], organization: 'nope' }, ...file.projects.slice(1)] };
     expect((await api('POST', '/import', { file: broken })).status).toBe(400);
-    expect((await api('POST', '/import', { file, renames: { [file.organizations[0].key]: 'copy' } }, { token: t.ida })).status).toBe(403);
+    const asNew = (slug: string) => ({ [file.organizations[0].key]: { action: 'new', slug } });
+    expect((await api('POST', '/import', { file, organizations: asNew('copy') }, { token: t.ida })).status).toBe(403);
     expect(await orgCount()).toBe(before);
 
-    const imported = await api('POST', '/import', { file, renames: { [file.organizations[0].key]: 'logistics-copy' } });
+    const imported = await api('POST', '/import', { file, organizations: asNew('logistics-copy') });
     expect(imported.status).toBe(201);
     expect(imported.data).toMatchObject({ ok: true, applied: true });
     const copy = imported.data.organizations[0].id;
+    copyOrg = copy;
     expect(await orgCount()).toBe(before + 1);
-    // People come in disabled, without tokens.
-    const members = (await api('GET', '/members')).data.filter((m: any) => m.memberships.some((x: any) => x.organization_id === copy));
-    expect(members.length).toBeGreaterThan(0);
-    expect(members.every((m: any) => m.disabled_at && m.tokens.length === 0)).toBe(true);
+    // Everyone in the file is already in this group, so they are matched by name and get no new roles.
+    expect(imported.data.counts.people).toBe(0);
+    expect(imported.data.merged.people).toBe(file.people.length);
 
     // Exported again, the copy holds the same content. Repositories stay with the original (one per group).
     const again = (await api('GET', `/export?organization_id=${copy}&people=1`)).data;
     expect(again.organizations[0].slug).toBe('logistics-copy');
-    expect(comparable(again)).toEqual(comparable(file));
+    // People who are only members (not authors) stay out: matched people get no roles from a file.
+    expect(comparable({ ...again, people: [] })).toEqual(comparable({ ...file, people: [] }));
+    expect(again.people.map((p: any) => p.name)).toEqual(file.people.filter((p: any) => p.name !== 'Anders H.').map((p: any) => p.name));
     const links = (orgId: string) => withScope(pool, { groupId: null, bypass: true }, async (c) =>
       (await c.query<{ n: number }>(
         `SELECT count(*)::int AS n FROM section_links l JOIN sections s ON s.id = l.section_id
@@ -744,6 +749,118 @@ definitions:`);
     expect(res.data.warnings.join('\n')).toContain('already registered in this group');
     expect((await api('GET', '/organizations')).data.length).toBe(acme);
     expect((await api('GET', '/organizations', undefined, other)).data.map((x: any) => x.slug).sort()).toEqual(['logistics', 'other']);
+  });
+
+  it('merges a file into an organization, section by section', async () => {
+    const who: Who = { token: ADMIN, org: copyOrg };
+    const doc = (await api('POST', '/documents', { organization_id: copyOrg, kind: 'guidelines', title: 'Merge rules', mode: 'propose' }, who)).data;
+    for (const heading of ['Alpha', 'Beta', 'Gamma', 'Dup']) {
+      expect((await api('POST', `/documents/${doc.id}/sections`, { heading, body: `${heading} as it is here.` }, who)).status).toBe(201);
+    }
+    const file = (await api('GET', `/export?organization_id=${copyOrg}`)).data;
+    const d = file.documents.find((x: any) => x.key === doc.id);
+    const [alpha, beta] = d.sections;
+    alpha.body = 'Alpha from the file.';
+    beta.body = 'Beta from the file, see [[term:Customer]].';
+    beta.key = 'not-from-here'; // Matched by its heading instead.
+    d.sections = [alpha, beta,
+      { ...alpha, key: 'delta', heading: 'Delta', body: 'Only in the file.' },
+      { ...alpha, key: 'dup-1', heading: 'Dup', body: 'One' },
+      { ...alpha, key: 'dup-2', heading: 'Dup', body: 'Two' }];
+    const into = { [file.organizations[0].key]: { action: 'merge', into: copyOrg } };
+
+    // Only admins of the organization may merge into it.
+    expect((await api('POST', '/import/preview', { file, organizations: into }, { token: t.ida })).status).toBe(403);
+    const options = { file, organizations: into, section_changes: { [alpha.key]: 'file' }, remove_missing: true };
+    const preview = await api('POST', '/import/preview', options);
+    expect(preview.status).toBe(200);
+    const byHeading = (r: any) => Object.fromEntries(r.changes.filter((c: any) => c.place.endsWith('Merge rules'))
+      .map((c: any) => [`${(c.after ?? c.before).heading}:${c.status}`, c.action]));
+    expect(byHeading(preview.data)).toEqual({
+      'Alpha:changed': 'file', 'Beta:changed': 'propose', 'Delta:new': 'add',
+      'Dup:conflict': 'skip', 'Gamma:only_in_target': 'remove', 'Dup:only_in_target': 'remove',
+    });
+    expect(preview.data.merged.conflicts).toBe(2);
+    expect(preview.data.counts.proposals).toBe(0); // The file's own proposals are already here.
+    const sectionsNow = async () => (await api('GET', `/documents/${doc.id}`, undefined, who)).data.sections;
+    expect((await sectionsNow()).map((x: any) => x.heading)).toEqual(['Alpha', 'Beta', 'Gamma', 'Dup']);
+
+    const done = await api('POST', '/import', options);
+    expect(done.status).toBe(201);
+    const after = await sectionsNow();
+    expect(after.map((x: any) => x.heading)).toEqual(['Alpha', 'Beta', 'Delta']);
+    expect(after[0]).toMatchObject({ body: 'Alpha from the file.', version: 2 });
+    expect(after[1]).toMatchObject({ body: 'Beta as it is here.', version: 1 });
+    const pending = (await api('GET', `/proposals?status=pending&organization_id=${copyOrg}`)).data;
+    const proposal = (Array.isArray(pending) ? pending : pending.items).find((x: any) => x.section_id === after[1].id);
+    expect(proposal).toMatchObject({ kind: 'edit_section', body: 'Beta from the file, see [[term:Customer]].', base_version: 1 });
+
+    // Importing the same file again doesn't propose the same change twice. The two "Dup" sections no longer clash.
+    const again = await api('POST', '/import/preview', { file, organizations: into });
+    expect(again.data.counts).toMatchObject({ documents: 0, sections: 2, proposals: 0 });
+    expect(again.data.merged.proposed).toBe(0);
+    expect(byHeading(again.data)['Beta:changed']).toBe('skip');
+  });
+
+  it('lets an organization admin merge an export back into their own organization', async () => {
+    const ida: Who = { token: t.ida };
+    const file = (await api('GET', `/export?organization_id=${o.payments}`, undefined, ida)).data;
+    const into = { [file.organizations[0].key]: { action: 'merge', into: o.payments } };
+    expect((await api('POST', '/import', { file, organizations: into, group_content: true }, ida)).status).toBe(403);
+    const res = await api('POST', '/import', { file, organizations: into }, ida);
+    expect(res.status).toBe(201);
+    const sections = file.documents.flatMap((d: any) => d.sections).length;
+    expect(res.data.counts).toMatchObject({ projects: 0, documents: 0, sections: 0, proposals: 0 });
+    expect(res.data.merged).toMatchObject({ sections, unchanged: sections, proposed: 0, updated: 0 });
+  });
+
+  it('restores a whole group as a new group', async () => {
+    const file = (await api('GET', '/export?people=1')).data;
+    expect(file.source.kind).toBe('group');
+    expect((await api('POST', '/groups/import/preview', { file }, { token: t.ida })).status).toBe(403);
+    const preview = await api('POST', '/groups/import/preview', { file });
+    expect(preview.data).toMatchObject({ ok: false, applied: false, group: { slug: 'acme-group', suggested_slug: 'acme-group-2', id: null } });
+    expect((await api('GET', '/groups')).data.map((g: any) => g.slug)).not.toContain('acme-group-2');
+    expect((await api('POST', '/groups/import', { file })).status).toBe(409);
+
+    const res = await api('POST', '/groups/import', { file, slug: 'acme-restored', name: 'Acme restored' });
+    expect(res.status).toBe(201);
+    expect(res.data.warnings.join('\n')).not.toContain('Group-wide content is left out');
+    const restored: Who = { token: ADMIN, group: 'acme-restored' };
+    const again = (await api('GET', '/export?people=1', undefined, restored)).data;
+    expect(again.source.group).toEqual({ slug: 'acme-restored', name: 'Acme restored' });
+    expect(comparable(again)).toEqual(comparable(file));
+    // People are there, disabled and without tokens, with their roles.
+    const members = (await api('GET', '/members', undefined, restored)).data;
+    const anders = members.find((m: any) => m.name === 'Anders H.');
+    expect(anders).toMatchObject({ tokens: [] });
+    expect(anders.disabled_at).toBeTruthy();
+    expect(anders.memberships.map((m: any) => m.role)).toEqual(['viewer']);
+  });
+
+  it('exports a folder of Markdown files and imports it from the zip', async () => {
+    const res = await fetch(`${base}/api/export?organization_id=${o.payments}&format=zip`, { headers: { authorization: `Bearer ${ADMIN}` } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-disposition')).toMatch(/payments-\d{4}-\d{2}-\d{2}\.openpurpose\.zip/);
+    const zip = Buffer.from(await res.arrayBuffer());
+    const { readZip, writeZip } = await import('../src/domain/zip.js');
+    const files = readZip(zip, () => true, 10 * 1024 * 1024);
+    const names = files.map((f) => f.name);
+    expect(names.slice(0, 2)).toEqual(['README.md', 'manifest.json']);
+    expect(names).toContain('payments/purpose.md');
+    expect(files.find((f) => f.name === 'payments/purpose.md')!.data.toString()).toMatch(/^# Organization purpose\n\n## /);
+
+    const other: Who = { token: ADMIN, group: 'other-corp' };
+    const preview = await api('POST', '/import/preview', { zip: zip.toString('base64') }, other);
+    expect(preview.status).toBe(200);
+    expect(preview.data).toMatchObject({ ok: true, applied: false });
+    expect(preview.data.warnings.join('\n')).not.toContain('Markdown files in the zip were changed');
+
+    // Edited Markdown isn't imported, and the preview says so.
+    const edited = writeZip(files.map((f) => f.name === 'payments/purpose.md' ? { ...f, data: Buffer.from('# Changed\n') } : f));
+    const warned = await api('POST', '/import/preview', { zip: edited.toString('base64') }, other);
+    expect(warned.data.warnings[0]).toContain('Markdown files in the zip were changed');
+    expect((await api('POST', '/import/preview', { zip: Buffer.from('nope').toString('base64') }, other)).status).toBe(400);
   });
 
   it('exports from the command line', async () => {
@@ -771,8 +888,12 @@ function comparable(file: any): unknown {
     }
     return typeof v === 'string' && uuid.test(v) ? '<id>' : v;
   };
-  const { exported_at: _, source: __, organizations, ...rest } = file;
-  return walk({ ...rest, organizations: organizations.map(({ slug: ___, aliases: ____, ...o }: any) => o) });
+  const { exported_at: _, source: __, organizations, people, ...rest } = file;
+  return walk({
+    ...rest,
+    organizations: organizations.map(({ slug: ___, aliases: ____, ...o }: any) => o),
+    people: people.map(({ memberships: _____, ...p }: any) => p),
+  });
 }
 
 describe('upgrade from v1', () => {

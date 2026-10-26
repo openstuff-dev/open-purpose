@@ -20,8 +20,10 @@ import { SlugRenameField } from '../shared/slug-rename';
 import { GroupsPage } from './groups';
 import { PeoplePage } from './people';
 import { PreviewPage } from './preview';
+import { TransferPage } from './transfer';
 
-type Tab = 'account' | 'appearance' | 'connect' | 'test' | 'group' | 'people' | 'server';
+type Tab =
+  'account' | 'appearance' | 'connect' | 'test' | 'group' | 'people' | 'transfer' | 'server';
 
 const AGENTS_SNIPPET = `## OpenPurpose (shared rules and learnings)
 
@@ -59,6 +61,7 @@ organization, the project and the part of the code you are in (a repository or a
     GroupsPage,
     PreviewPage,
     SlugRenameField,
+    TransferPage,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -90,6 +93,9 @@ organization, the project and the part of the code you are in (a repository or a
           >
           <a routerLink="/settings/people" routerLinkActive="active"
             ><app-icon name="users" />People and agents</a
+          >
+          <a routerLink="/settings/transfer" routerLinkActive="active"
+            ><app-icon name="transfer" />Export and import</a
           >
         }
         @if (session.isSuperadmin) {
@@ -539,6 +545,9 @@ organization, the project and the part of the code you are in (a repository or a
           @case ('people') {
             <app-people />
           }
+          @case ('transfer') {
+            <app-transfer />
+          }
           @case ('server') {
             <app-groups />
           }
@@ -559,7 +568,7 @@ export class SettingsPage {
   readonly current = computed<Tab>(() => {
     const t = (this.tab() ?? 'account') as Tab;
     const allowed: Tab[] = ['account', 'appearance', 'connect', 'test'];
-    if (this.session.adminsAnything) allowed.push('group', 'people');
+    if (this.session.adminsAnything) allowed.push('group', 'people', 'transfer');
     if (this.session.isSuperadmin) allowed.push('server');
     return allowed.includes(t) ? t : 'account';
   });

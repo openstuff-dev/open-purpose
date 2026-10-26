@@ -4898,3 +4898,103 @@ mark {
 .av-apis li .icon {
   color: var(--accent-text);
 }
+
+/* Settings › Export and import */
+.transfer-includes,
+.transfer-policies {
+  display: grid;
+  gap: 0.5rem;
+}
+.transfer-policies label.check,
+.setting-row label.check {
+  align-items: flex-start;
+}
+.transfer-policies label.check input,
+.setting-row label.check input[type='checkbox'] {
+  margin-top: 0.3rem;
+}
+.transfer-policies .quiet,
+.setting-row label.check .quiet {
+  display: block;
+  font-size: var(--fs-sm);
+}
+.transfer-source {
+  margin-top: 1rem;
+}
+.transfer-orgs,
+.transfer-changes,
+.transfer-warnings {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 1rem;
+  display: grid;
+  gap: 0.5rem;
+}
+.transfer-orgs li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+.transfer-orgs li > div {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.transfer-orgs .field-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+.transfer-slug {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--fs-sm);
+}
+.transfer-slug input {
+  width: 12rem;
+}
+.transfer-group-content {
+  margin-top: 1rem;
+}
+.transfer-warnings li {
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--r-md);
+  background: var(--propose-soft);
+  font-size: var(--fs-sm);
+}
+.transfer-changes li {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.transfer-changes summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  padding: 0.6rem 0.9rem;
+  cursor: pointer;
+}
+.transfer-changes details > :not(summary) {
+  margin: 0 0.9rem 0.75rem;
+}
+.transfer-place {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.transfer-override {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--fs-sm);
+}
+@media (max-width: 40rem) {
+  .transfer-slug,
+  .transfer-slug input {
+    width: 100%;
+  }
+}

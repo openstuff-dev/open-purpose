@@ -61,6 +61,9 @@ import {
   ListChecks,
   Quote,
   Brackets,
+  Download,
+  Upload,
+  ArrowLeftRight,
   type IconNode,
 } from 'lucide';
 
@@ -118,6 +121,9 @@ const ICONS: Record<string, IconNode> = {
   'list-ul': List,
   'list-ol': ListOrdered,
   'list-task': ListChecks,
+  download: Download,
+  upload: Upload,
+  transfer: ArrowLeftRight,
   quote: Quote,
   brackets: Brackets,
 };

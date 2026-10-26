@@ -5,7 +5,8 @@
  *   node dist/export-cli.js --group acme-group --out backup.json
  *   node dist/export-cli.js --group acme-group --organization payments --people --no-history > payments.json
  *
- * Options: --organization <slug>, --out <file>, --people, --no-history, --no-proposals, --no-api-specs.
+ * Options: --organization <slug>, --out <file>, --zip (Markdown files plus manifest.json, needs --out),
+ * --people, --no-history, --no-proposals, --no-api-specs.
  * With npm, pass -s so npm's own output stays out of the file: npm run -s export -w server -- --group acme-group
  */
 import fs from 'node:fs/promises';
@@ -14,13 +15,15 @@ import { resolveAccess, type Actor } from './auth.js';
 import { VERSION } from './app.js';
 import { loadConfig } from './config.js';
 import { createPool, withScope } from './db.js';
-import { DEFAULT_INCLUDES, exportContent } from './service/transfer.js';
+import { DEFAULT_INCLUDES, exportContent } from './service/transfer/export.js';
+import { exportZip } from './service/transfer/markdown.js';
 
 const { values: args } = parseArgs({
   options: {
     group: { type: 'string' },
     organization: { type: 'string' },
     out: { type: 'string' },
+    zip: { type: 'boolean', default: false },
     people: { type: 'boolean', default: DEFAULT_INCLUDES.people },
     'no-history': { type: 'boolean', default: false },
     'no-proposals': { type: 'boolean', default: false },
@@ -33,6 +36,7 @@ const pool = createPool(config.databaseUrl);
 
 async function main() {
   if (!args.group) throw new Error('--group <slug> is required');
+  if (args.zip && !args.out) throw new Error('--zip needs --out <file>');
   const { rows } = await pool.query<Actor>(
     `SELECT id, name, kind, is_superadmin FROM actors WHERE is_superadmin AND disabled_at IS NULL ORDER BY created_at LIMIT 1`);
   if (!rows[0]) throw new Error('No server admin found to export as.');
@@ -44,7 +48,7 @@ async function main() {
   }, VERSION));
   const text = JSON.stringify(file, null, 2);
   if (args.out) {
-    await fs.writeFile(args.out, text);
+    await fs.writeFile(args.out, args.zip ? exportZip(file) : text);
     process.stderr.write(`Exported ${file.organizations.length} organizations to ${args.out}\n`);
   } else {
     process.stdout.write(text + '\n');
