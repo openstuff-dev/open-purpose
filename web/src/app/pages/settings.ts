@@ -1,0 +1,482 @@
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { Api } from '../core/api';
+import type { Organization, TokenRow } from '../core/models';
+import { Session } from '../core/session';
+import { Theme, initials, type ThemeChoice } from '../core/theme';
+import { Icon } from '../shared/icon';
+import { Notices } from '../shared/notice';
+import { GroupsPage } from './groups';
+import { PeoplePage } from './people';
+import { PreviewPage } from './preview';
+
+type Tab = 'account' | 'appearance' | 'connect' | 'test' | 'group' | 'people' | 'server';
+
+const AGENTS_SNIPPET = `## Charter (shared rules and learnings)
+
+We keep our purpose, business logic, glossary, guidelines and learnings in
+Charter, available through the \`charter\` MCP server. Rules come in layers: the
+group, our organization, the project and the part of the code you are in.
+
+1. Before you start a task, call \`get_context\` with:
+   - \`project\` from \`.agentcontext.json\` if that file exists, otherwise
+     \`remote_url\` from \`git remote get-url origin\`
+   - \`path\`: the file or folder you are about to work on
+   - \`manifests\`: the nearest \`package.json\`, \`*.csproj\` or similar, with its content
+   Follow what it returns. More specific rules override general ones.
+2. When you move to a different part of the repo (for example from \`frontend/\`
+   to \`backend/\`), call \`get_context\` again with the new path and manifest.
+3. If no project is found, ask me which project this repo belongs to, then call
+   \`register_repository\` (or \`create_project\`) and create \`.agentcontext.json\`.
+4. When I correct you and the correction should apply next time, call
+   \`propose_learning\` with the same remote/path/manifests. Say in one line that
+   you did. Do not propose one-off preferences or task-specific details.
+5. Never try to change a section marked \`locked\`.
+6. \`[[name]]\` in Charter text links to another project or a glossary term, and
+   \`[[org/name]]\` to a project in another organization. Use \`get_related\` when
+   your task touches a linked service.`;
+
+@Component({
+  selector: 'app-settings',
+  imports: [FormsModule, DatePipe, RouterLink, RouterLinkActive, Icon, PeoplePage, GroupsPage, PreviewPage],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <header class="page-head">
+      <h1>Settings</h1>
+    </header>
+
+    <div class="settings">
+      <nav class="settings-nav" aria-label="Settings">
+        <div class="nav-label">You</div>
+        <a routerLink="/settings/account" routerLinkActive="active"><app-icon name="user" />Account and tokens</a>
+        <a routerLink="/settings/appearance" routerLinkActive="active"><app-icon name="palette" />Appearance</a>
+        <a routerLink="/settings/connect" routerLinkActive="active"><app-icon name="plug" />Connect an agent</a>
+        <a routerLink="/settings/test" routerLinkActive="active"><app-icon name="eye" />Test a repository</a>
+        @if (session.adminsAnything) {
+          <div class="nav-label">{{ session.group()?.name }}</div>
+          <a routerLink="/settings/group" routerLinkActive="active"><app-icon name="building" />Organizations</a>
+          <a routerLink="/settings/people" routerLinkActive="active"><app-icon name="users" />People and agents</a>
+        }
+        @if (session.isSuperadmin) {
+          <div class="nav-label">Server</div>
+          <a routerLink="/settings/server" routerLinkActive="active"><app-icon name="server" />All groups</a>
+        }
+      </nav>
+
+      <div class="settings-body">
+        @switch (current()) {
+          @case ('account') {
+            <section>
+              <h2>Account</h2>
+              <div class="setting-card">
+                <div class="setting-row">
+                  <div><h3>Name</h3><p>Shown in history, the inbox and on proposals your agents make.</p></div>
+                  <form (ngSubmit)="saveName()">
+                    <input name="name" [(ngModel)]="name" aria-label="Your name" required>
+                    <button class="btn" type="submit" [disabled]="!name.trim() || name.trim() === session.me()?.actor?.name">Save</button>
+                  </form>
+                </div>
+                <div class="setting-row">
+                  <div><h3>Your access</h3><p>{{ accessLine() }}</p></div>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <h2>Personal tokens</h2>
+              <p class="quiet">Use one per device. A personal token also works over MCP, for scripts or an agent that acts as you.</p>
+              @if (freshToken(); as t) {
+                <div class="callout token-callout" role="alert">
+                  <strong>Copy your new token now. It is not shown again.</strong>
+                  <div class="copy-block" style="width:100%"><pre><code>{{ t }}</code></pre>
+                    <button class="btn sm" type="button" (click)="copy(t)"><app-icon name="copy" [size]="13" />Copy</button></div>
+                  <button class="link-btn" type="button" (click)="freshToken.set(null)">Done</button>
+                </div>
+              }
+              <div class="setting-card">
+                @for (t of tokens(); track t.id) {
+                  <div class="setting-row" [style.opacity]="t.revoked_at ? 0.55 : 1">
+                    <div>
+                      <h3><app-icon name="key" [size]="14" /> {{ t.label }} <code class="quiet">{{ t.prefix }}…</code></h3>
+                      <p>
+                        Created {{ t.created_at | date: 'd MMM y' }} ·
+                        @if (t.revoked_at) { revoked {{ t.revoked_at | date: 'd MMM y' }} }
+                        @else if (t.last_used_at) { last used {{ t.last_used_at | date: 'd MMM y, HH:mm' }} }
+                        @else { never used }
+                        @if (isCurrent(t)) { · <strong>this browser</strong> }
+                      </p>
+                    </div>
+                    @if (!t.revoked_at) { <button class="btn danger sm" type="button" (click)="revoke(t)">Revoke</button> }
+                  </div>
+                }
+                <div class="setting-row">
+                  <form (ngSubmit)="newToken()">
+                    <input name="label" [(ngModel)]="tokenLabel" placeholder="Label, e.g. work laptop" aria-label="Token label">
+                    <button class="btn" type="submit"><app-icon name="plus" />Create token</button>
+                  </form>
+                </div>
+              </div>
+            </section>
+          }
+
+          @case ('appearance') {
+            <section>
+              <h2>Appearance</h2>
+              <p class="quiet">Stored in this browser only.</p>
+              <div class="setting-card">
+                <div class="setting-row stack">
+                  <div><h3>Theme</h3></div>
+                  <div class="theme-options" role="radiogroup" aria-label="Theme">
+                    @for (o of themes; track o.value) {
+                      <button type="button" class="theme-option" role="radio" [attr.aria-checked]="theme.choice() === o.value" (click)="theme.set(o.value)">
+                        <div class="theme-swatch" [class]="'theme-swatch ' + o.value"><i></i><i></i></div>
+                        <span><app-icon [name]="o.icon" [size]="14" />{{ o.label }}</span>
+                      </button>
+                    }
+                  </div>
+                </div>
+              </div>
+            </section>
+          }
+
+          @case ('connect') {
+            <section>
+              <h2>Connect an agent</h2>
+              <p class="quiet">Any MCP client that supports streamable HTTP works: Claude Code, Cursor, VS Code, Codex and others.</p>
+              <ol class="steps">
+                <li><div>
+                  <h3>Get an agent token</h3>
+                  @if (session.adminsAnything) {
+                    <p>Create one agent per developer and tool under <a routerLink="/settings/people">People and agents</a>. The token decides which organization the agent works in.</p>
+                  } @else {
+                    <p>Ask an admin of {{ session.org()?.name ?? 'your organization' }} for an agent token. One per developer and tool keeps history readable.</p>
+                  }
+                </div></li>
+                <li><div>
+                  <h3>Add the server to your client</h3>
+                  <p>Claude Code:</p>
+                  <div class="copy-block"><pre><code>{{ claudeCommand }}</code></pre>
+                    <button class="btn sm" type="button" (click)="copy(claudeCommand)"><app-icon name="copy" [size]="13" />Copy</button></div>
+                  <p>Other clients (mcp.json):</p>
+                  <div class="copy-block"><pre><code>{{ mcpJson }}</code></pre>
+                    <button class="btn sm" type="button" (click)="copy(mcpJson)"><app-icon name="copy" [size]="13" />Copy</button></div>
+                </div></li>
+                <li><div>
+                  <h3>Tell agents to use it</h3>
+                  <p>Agents follow the server's instructions more reliably when the repository says so too. Add this to <code>AGENTS.md</code> or <code>CLAUDE.md</code>.</p>
+                  <div class="copy-block"><pre><code>{{ agentsSnippet }}</code></pre>
+                    <button class="btn sm" type="button" (click)="copy(agentsSnippet)"><app-icon name="copy" [size]="13" />Copy</button></div>
+                </div></li>
+                <li><div>
+                  <h3>Optional: pin a repository to a project</h3>
+                  <p>Charter finds the project from the git remote. To override that, for example in a fork, add <code>.agentcontext.json</code> to the repository root. Each project page shows its own.</p>
+                  <pre><code>{{ agentContext }}</code></pre>
+                  <p><a routerLink="/settings/test">Test a repository</a> to check what an agent there will get.</p>
+                </div></li>
+              </ol>
+            </section>
+          }
+
+          @case ('group') {
+            @if (session.canAdmin(null)) {
+              <section>
+                <h2>Group</h2>
+                <div class="setting-card">
+                  <div class="setting-row">
+                    <div><h3>Group name</h3><p>Shown to everyone in {{ session.group()?.name }}, and to agents as the top layer of their context.</p></div>
+                    <form (ngSubmit)="renameGroup()">
+                      <input name="gname" [(ngModel)]="groupName" aria-label="Group name" required>
+                      <button class="btn" type="submit" [disabled]="!groupName.trim() || groupName.trim() === session.group()?.name">Save</button>
+                    </form>
+                  </div>
+                </div>
+              </section>
+            }
+
+            <section>
+              <div class="block-head">
+                <div>
+                  <h2>Organizations</h2>
+                  <p class="quiet">Each keeps its own rules, projects and inbox, and is private to its members unless shared below.</p>
+                </div>
+              </div>
+              <div class="setting-card">
+                @for (o of manageableOrgs(); track o.id) {
+                  <div class="setting-row" [style.opacity]="o.archived_at ? 0.6 : 1">
+                    @if (editingOrg() === o.id) {
+                      <form class="inline-form" style="margin:0;grid-column:1/-1" (ngSubmit)="saveOrg(o)">
+                        <label class="grow">Name <input name="oname" [(ngModel)]="orgDraft.name" required></label>
+                        @if (session.canAdmin(null)) { <label>Slug <input name="oslug" class="mono" [(ngModel)]="orgDraft.slug" required></label> }
+                        <label class="full">Summary <input name="osum" [(ngModel)]="orgDraft.summary"></label>
+                        @if (session.canAdmin(null) && orgDraft.slug !== o.slug) {
+                          <p class="quiet full">Changing the slug breaks <code>[[{{ o.slug }}/…]]</code> links and <code>.agentcontext.json</code> files that use it.</p>
+                        }
+                        <div class="form-actions full">
+                          <button class="btn primary" type="submit">Save</button>
+                          <button class="btn" type="button" (click)="editingOrg.set(null)">Cancel</button>
+                        </div>
+                      </form>
+                    } @else {
+                      <div style="display:flex;gap:0.75rem;align-items:center;min-width:0">
+                        <span class="badge" [style.background]="session.orgColor(o.id)">{{ initials(o.name) }}</span>
+                        <div style="min-width:0">
+                          <h3>{{ o.name }} <code class="quiet">{{ o.slug }}</code>
+                            @if (o.archived_at) { <span class="flag muted">Archived</span> }</h3>
+                          <p>{{ o.summary || 'No summary' }}</p>
+                        </div>
+                      </div>
+                      <div class="form-actions">
+                        <button class="btn sm" type="button" (click)="editOrg(o)"><app-icon name="pencil" [size]="13" />Edit</button>
+                        @if (session.canAdmin(null)) {
+                          <button class="btn sm ghost" type="button" (click)="toggleArchive(o)">{{ o.archived_at ? 'Restore' : 'Archive' }}</button>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+                @if (session.canAdmin(null)) {
+                  <div class="setting-row">
+                    @if (addingOrg()) {
+                      <form class="inline-form" style="margin:0;grid-column:1/-1" (ngSubmit)="createOrg()">
+                        <label class="grow">Name <input name="nname" [(ngModel)]="newOrg.name" required placeholder="Acme Payments"></label>
+                        <label>Slug <input name="nslug" class="mono" [(ngModel)]="newOrg.slug" placeholder="payments"></label>
+                        <label class="full">Summary <input name="nsum" [(ngModel)]="newOrg.summary"></label>
+                        <p class="quiet full">The slug is what people write in links to its projects, like <code>[[payments/payment-gateway]]</code>.</p>
+                        <div class="form-actions full">
+                          <button class="btn primary" type="submit" [disabled]="!newOrg.name.trim()">Create organization</button>
+                          <button class="btn" type="button" (click)="addingOrg.set(false)">Cancel</button>
+                        </div>
+                      </form>
+                    } @else {
+                      <button class="btn" type="button" (click)="addingOrg.set(true)"><app-icon name="plus" />New organization</button>
+                    }
+                  </div>
+                }
+              </div>
+            </section>
+
+            @if (session.canAdmin(null) && activeOrgs().length > 1) {
+              <section>
+                <h2>Who can read what</h2>
+                <p class="quiet">Tick a box to let members and agents of the organization on the left read the one at the top. Reading only: agents never write outside their own organization. People with a role in the group read everything.</p>
+                <div class="setting-card" style="overflow-x:auto">
+                  <table class="matrix">
+                    <thead><tr><th scope="col">Members of…</th>@for (t of activeOrgs(); track t.id) { <th scope="col">may read {{ t.name }}</th> }</tr></thead>
+                    <tbody>
+                      @for (r of activeOrgs(); track r.id) {
+                        <tr>
+                          <th scope="row"><span class="badge sm" [style.background]="session.orgColor(r.id)" style="margin-right:0.5rem">{{ initials(r.name) }}</span>{{ r.name }}</th>
+                          @for (t of activeOrgs(); track t.id) {
+                            <td>
+                              @if (r.id === t.id) { <span class="self" title="Always">—</span> }
+                              @else { <input type="checkbox" [checked]="t.readers.includes(r.id)" (change)="share(t, r, $any($event.target).checked)" [attr.aria-label]="r.name + ' may read ' + t.name"> }
+                            </td>
+                          }
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            }
+          }
+
+          @case ('test') { <app-preview /> }
+          @case ('people') { <app-people /> }
+          @case ('server') { <app-groups /> }
+        }
+      </div>
+    </div>
+  `,
+})
+export class SettingsPage {
+  readonly tab = input<string | undefined>();
+  readonly session = inject(Session);
+  readonly theme = inject(Theme);
+  private api = inject(Api);
+  private notices = inject(Notices);
+  private router = inject(Router);
+  readonly initials = initials;
+
+  readonly current = computed<Tab>(() => {
+    const t = (this.tab() ?? 'account') as Tab;
+    const allowed: Tab[] = ['account', 'appearance', 'connect', 'test'];
+    if (this.session.adminsAnything) allowed.push('group', 'people');
+    if (this.session.isSuperadmin) allowed.push('server');
+    return allowed.includes(t) ? t : 'account';
+  });
+
+  readonly themes: Array<{ value: ThemeChoice; label: string; icon: string }> = [
+    { value: 'system', label: 'System', icon: 'monitor' },
+    { value: 'light', label: 'Light', icon: 'sun' },
+    { value: 'dark', label: 'Dark', icon: 'moon' },
+  ];
+
+  readonly tokens = signal<TokenRow[]>([]);
+  readonly freshToken = signal<string | null>(null);
+  readonly editingOrg = signal<string | null>(null);
+  readonly addingOrg = signal(false);
+  readonly manageableOrgs = computed(() =>
+    (this.session.me()?.organizations ?? []).filter((o) => this.session.canAdmin(o.id)));
+  readonly activeOrgs = computed(() => this.session.orgs());
+  name = '';
+  tokenLabel = '';
+  groupName = '';
+  orgDraft = { name: '', slug: '', summary: '' };
+  newOrg = { name: '', slug: '', summary: '' };
+
+  private readonly base = this.session.me()?.public_url ?? location.origin;
+  readonly claudeCommand = `claude mcp add --transport http charter ${this.base}/mcp \\\n  --header "Authorization: Bearer <agent token>"`;
+  readonly mcpJson = JSON.stringify({ mcpServers: { charter: { type: 'http', url: `${this.base}/mcp`, headers: { Authorization: 'Bearer <agent token>' } } } }, null, 2);
+  readonly agentsSnippet = AGENTS_SNIPPET;
+  readonly agentContext = JSON.stringify({ project: `${this.session.org()?.slug ?? 'org'}/project-slug` }, null, 2);
+
+  constructor() {
+    effect(() => {
+      const me = this.session.me();
+      if (me) {
+        this.name = me.actor.name;
+        this.groupName = me.group.name;
+      }
+    });
+    effect(() => {
+      if (this.current() === 'account') void this.loadTokens();
+    });
+    effect(() => {
+      if (this.tab() && this.tab() !== this.current()) void this.router.navigate(['/settings', this.current()], { replaceUrl: true });
+    });
+  }
+
+  accessLine(): string {
+    const me = this.session.me();
+    if (!me) return '';
+    const parts: string[] = [];
+    if (me.actor.is_superadmin) parts.push('server admin');
+    if (me.group.role) parts.push(`${me.group.role} of ${me.group.name} (every organization)`);
+    for (const o of me.organizations) {
+      if (o.role && !me.group.role) parts.push(`${o.role} in ${o.name}`);
+    }
+    const shared = me.organizations.filter((o) => o.readable && !o.role).map((o) => o.name);
+    if (shared.length) parts.push(`can read ${shared.join(', ')}`);
+    const s = parts.join('; ');
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) + '.' : 'No roles yet.';
+  }
+
+  isCurrent(t: TokenRow): boolean {
+    return !!this.session.token()?.startsWith(t.prefix);
+  }
+
+  private async loadTokens(): Promise<void> {
+    try {
+      this.tokens.set(await this.api.myTokens());
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  private async reloadMe(): Promise<void> {
+    this.session.me.set(await this.api.me());
+  }
+
+  async saveName(): Promise<void> {
+    await this.run(async () => {
+      await this.api.renameMe(this.name.trim());
+      await this.reloadMe();
+    }, 'Saved your name');
+  }
+
+  async newToken(): Promise<void> {
+    try {
+      const r = await this.api.createMyToken(this.tokenLabel.trim());
+      this.freshToken.set(r.token);
+      this.tokenLabel = '';
+      await this.loadTokens();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  async revoke(t: TokenRow): Promise<void> {
+    const current = this.isCurrent(t);
+    if (!confirm(current ? 'This is the token you are signed in with. Revoke it and sign out?' : `Revoke "${t.label}"? Anything using it stops working immediately.`)) return;
+    try {
+      await this.api.revokeMyToken(t.id);
+      if (current) {
+        this.session.setToken(null);
+        return;
+      }
+      this.notices.ok('Revoked token');
+      await this.loadTokens();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  async renameGroup(): Promise<void> {
+    await this.run(async () => {
+      await this.api.renameGroup(this.groupName.trim());
+      await this.reloadMe();
+    }, 'Renamed group');
+  }
+
+  editOrg(o: Organization): void {
+    this.orgDraft = { name: o.name, slug: o.slug, summary: o.summary };
+    this.editingOrg.set(o.id);
+  }
+
+  async saveOrg(o: Organization): Promise<void> {
+    await this.run(async () => {
+      await this.api.updateOrganization(o.id, {
+        name: this.orgDraft.name.trim(), summary: this.orgDraft.summary,
+        slug: this.session.canAdmin(null) && this.orgDraft.slug !== o.slug ? this.orgDraft.slug.trim() : undefined,
+      });
+      this.editingOrg.set(null);
+      await this.reloadMe();
+    }, `Saved ${this.orgDraft.name.trim()}`);
+  }
+
+  async toggleArchive(o: Organization): Promise<void> {
+    const archive = !o.archived_at;
+    if (archive && !confirm(`Archive ${o.name}? It disappears from menus, lists and the map; its content stays and can be restored.`)) return;
+    await this.run(async () => {
+      await this.api.updateOrganization(o.id, { archived: archive });
+      await this.reloadMe();
+    }, archive ? `Archived ${o.name}` : `Restored ${o.name}`);
+  }
+
+  async createOrg(): Promise<void> {
+    await this.run(async () => {
+      await this.api.createOrganization({ name: this.newOrg.name.trim(), slug: this.newOrg.slug.trim() || undefined, summary: this.newOrg.summary.trim() || undefined });
+      this.newOrg = { name: '', slug: '', summary: '' };
+      this.addingOrg.set(false);
+      await this.reloadMe();
+    }, 'Created organization. Add people and agents to it under People and agents.');
+  }
+
+  async share(target: Organization, reader: Organization, allowed: boolean): Promise<void> {
+    await this.run(async () => {
+      await this.api.setReader(target.id, reader.id, allowed);
+      await this.reloadMe();
+    }, allowed ? `${reader.name} can now read ${target.name}` : `${reader.name} can no longer read ${target.name}`);
+  }
+
+  async copy(text: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(text);
+      this.notices.ok('Copied');
+    } catch {
+      this.notices.error('Copying is blocked in this browser. Select the text instead.');
+    }
+  }
+
+  private async run(fn: () => Promise<unknown>, ok: string): Promise<void> {
+    try {
+      await fn();
+      this.notices.ok(ok);
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+}

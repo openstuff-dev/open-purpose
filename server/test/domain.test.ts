@@ -1,0 +1,117 @@
+import { describe, expect, it } from 'vitest';
+import { parseRemote, slugify } from '../src/domain/remote.js';
+import { detectStacks } from '../src/domain/stacks.js';
+import { matchScopes, mostSpecific, normalizePath } from '../src/domain/scopes.js';
+import { extractLinks } from '../src/domain/links.js';
+
+describe('parseRemote', () => {
+  const key = 'azure:acme/big project/portal-frontend';
+  it.each([
+    'https://dev.azure.com/acme/Big%20Project/_git/portal-frontend',
+    'https://jonas@dev.azure.com/acme/Big%20Project/_git/portal-frontend',
+    'https://dev.azure.com/acme/Big%20Project/_git/portal-frontend/',
+    'git@ssh.dev.azure.com:v3/acme/Big%20Project/portal-frontend',
+    'https://acme.visualstudio.com/Big%20Project/_git/portal-frontend',
+    'https://acme.visualstudio.com/DefaultCollection/Big%20Project/_git/portal-frontend',
+    'acme@vs-ssh.visualstudio.com:v3/acme/Big%20Project/portal-frontend',
+    'https://dev.azure.com/ACME/Big%20Project/_git/Portal-Frontend',
+  ])('maps %s to the same key', (url) => {
+    expect(parseRemote(url).key).toBe(key);
+  });
+
+  it('keeps org, project and repo', () => {
+    expect(parseRemote('git@ssh.dev.azure.com:v3/acme/Big%20Project/portal-frontend')).toMatchObject({
+      org: 'acme', project: 'Big Project', repo: 'portal-frontend',
+    });
+  });
+
+  it.each([
+    ['https://github.com/acme/api.git', 'github.com/acme/api'],
+    ['git@github.com:acme/api.git', 'github.com/acme/api'],
+    ['ssh://git@gitlab.corp:2222/team/sub/api.git', 'gitlab.corp/team/sub/api'],
+    ['https://tfs.corp/tfs/DefaultCollection/Proj/_git/Api', 'tfs.corp/tfs/defaultcollection/proj/api'],
+  ])('generic remote %s', (url, expected) => {
+    expect(parseRemote(url).key).toBe(expected);
+  });
+
+  it('rejects garbage', () => {
+    expect(() => parseRemote('not a url')).toThrow();
+    expect(() => parseRemote('')).toThrow();
+  });
+
+  it('slugifies', () => {
+    expect(slugify('Portal.Frontend (v2)')).toBe('portal-frontend-v2');
+    expect(slugify('Kundeportal Østjylland')).toBe('kundeportal-oestjylland');
+    expect(slugify('Café Gåsetårn')).toBe('cafe-gaasetaarn');
+  });
+});
+
+describe('detectStacks', () => {
+  it('detects an Angular frontend', () => {
+    const tags = detectStacks([{ path: 'frontend/package.json', content: JSON.stringify({
+      dependencies: { '@angular/core': '^20.0.0', rxjs: '^7' }, devDependencies: { typescript: '^5' },
+    }) }]);
+    expect(tags).toEqual(['angular', 'frontend', 'node', 'rxjs', 'typescript']);
+  });
+
+  it('detects an ASP.NET Core backend with EF Core', () => {
+    const tags = detectStacks([{ path: 'src/Api/Api.csproj', content: `<Project Sdk="Microsoft.NET.Sdk.Web">
+      <ItemGroup><PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.0" /></ItemGroup>
+    </Project>` }]);
+    expect(tags).toEqual(['aspnetcore', 'backend', 'csharp', 'dotnet', 'efcore']);
+  });
+
+  it('handles Windows paths and broken JSON', () => {
+    expect(detectStacks([{ path: 'web\\package.json', content: '{oops' }])).toEqual(['node']);
+  });
+});
+
+describe('matchScopes', () => {
+  const scopes = [
+    { id: '1', slug: 'frontend', name: 'Frontend', project_id: 'p', path_globs: ['frontend/**'], stacks: [] },
+    { id: '2', slug: 'backend', name: 'Backend', project_id: 'p', path_globs: ['backend/**', 'src/Api/**'], stacks: [] },
+    { id: '3', slug: 'angular', name: 'Angular', project_id: null, path_globs: [], stacks: ['angular'] },
+    { id: '4', slug: 'dotnet', name: '.NET', project_id: null, path_globs: [], stacks: ['dotnet'] },
+  ];
+
+  it('matches by path and by stack', () => {
+    const m = matchScopes(scopes, { path: 'frontend/src/app/editor.ts', stacks: ['Angular', 'frontend'] });
+    expect(m.map((x) => x.scope.slug)).toEqual(['frontend', 'angular']);
+  });
+
+  it('keeps frontend rules away from backend code', () => {
+    const m = matchScopes(scopes, { path: 'src\\Api\\Controllers\\Orders.cs', stacks: ['dotnet'] });
+    expect(m.map((x) => x.scope.slug)).toEqual(['backend', 'dotnet']);
+  });
+
+  it('matches the folder itself', () => {
+    expect(matchScopes(scopes, { path: './frontend/' }).map((x) => x.scope.slug)).toEqual(['frontend']);
+  });
+
+  it('picks the most specific scope for learnings', () => {
+    const m = matchScopes(scopes, { path: 'frontend/x.ts', stacks: ['angular'] });
+    expect(mostSpecific(m)?.slug).toBe('frontend');
+    expect(mostSpecific(matchScopes(scopes, { stacks: ['angular'] }))?.slug).toBe('angular');
+    expect(mostSpecific([])).toBeNull();
+  });
+
+  it('normalises paths', () => {
+    expect(normalizePath('.\\frontend\\src\\')).toBe('frontend/src');
+    expect(normalizePath('/a/b')).toBe('a/b');
+  });
+});
+
+describe('extractLinks', () => {
+  it('finds wikilinks with prefixes, labels and anchors', () => {
+    const links = extractLinks('Uses [[billing-service]] and [[term:Order]], see [[Customer Portal|the portal]] and [[billing-service#Auth]].');
+    expect(links).toEqual([
+      { kind: 'any', target: 'billing-service', label: '', raw: '[[billing-service]]' },
+      { kind: 'term', target: 'order', label: '', raw: '[[term:Order]]' },
+      { kind: 'any', target: 'customer portal', label: 'the portal', raw: '[[Customer Portal|the portal]]' },
+    ]);
+  });
+
+  it('ignores code', () => {
+    expect(extractLinks('`[[a]]`\n```\n[[b]]\n```\n[[c]]').map((l) => l.target)).toEqual(['c']);
+  });
+});

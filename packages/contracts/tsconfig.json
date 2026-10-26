@@ -1,0 +1,13 @@
+{
+  // The apps use skipLibCheck, which also skips this package's .d.ts, so check it here.
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": false,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "types": []
+  },
+  "files": ["index.d.ts"]
+}

@@ -1,0 +1,78 @@
+import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, input } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
+import { Router } from '@angular/router';
+import DOMPurify from 'dompurify';
+import { Marked, type TokenizerAndRendererExtension } from 'marked';
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+}
+
+/** [[target]], [[target|label]], [[project:x]], [[term:x]] → links handled by the /go route. */
+const wikilink: TokenizerAndRendererExtension = {
+  name: 'wikilink',
+  level: 'inline',
+  start: (src: string) => src.indexOf('[['),
+  tokenizer(src: string) {
+    const m = /^\[\[([^\[\]\n|]+?)(?:\|([^\[\]\n]+?))?\]\]/.exec(src);
+    if (!m) return undefined;
+    return { type: 'wikilink', raw: m[0], target: m[1].trim(), label: (m[2] ?? '').trim() };
+  },
+  renderer(token) {
+    const target = String(token['target']);
+    const shown = String(token['label'] || target.replace(/^(project|term)\s*:\s*/i, ''));
+    const kind = /^term\s*:/i.test(target) ? 'term' : /^project\s*:/i.test(target) ? 'project' : 'any';
+    return `<a class="wikilink wikilink-${kind}" href="/go/${encodeURIComponent(target)}" data-wikilink="${escapeHtml(target)}">${escapeHtml(shown)}</a>`;
+  },
+};
+
+// Raw HTML in rules is shown as text: "Result<T>" must not become a tag.
+const marked = new Marked({
+  gfm: true,
+  breaks: false,
+  extensions: [wikilink],
+  renderer: { html: ({ text }) => escapeHtml(text) },
+});
+
+export function renderMarkdown(src: string): string {
+  const html = marked.parse(src ?? '', { async: false }) as string;
+  return DOMPurify.sanitize(html, { ADD_ATTR: ['data-wikilink'] });
+}
+
+@Component({
+  selector: 'app-md',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'prose', '(click)': 'onClick($event)' },
+  template: `<div [innerHTML]="html()"></div>`,
+})
+export class MarkdownView {
+  readonly text = input<string>('');
+  /** Project the text belongs to, so [[Term]] prefers that project's glossary. */
+  readonly fromProject = input<string | null>(null);
+  /** Organization the text belongs to (null = group-wide), for resolving bare [[links]]. */
+  readonly fromOrganization = input<string | null>(null);
+  private sanitizer = inject(DomSanitizer);
+  private router = inject(Router);
+  private el = inject(ElementRef<HTMLElement>);
+
+  readonly html = computed(() => this.sanitizer.bypassSecurityTrustHtml(renderMarkdown(this.text())));
+
+  onClick(ev: MouseEvent): void {
+    const a = (ev.target as HTMLElement).closest('a');
+    if (!a || !this.el.nativeElement.contains(a)) return;
+    const target = a.getAttribute('data-wikilink');
+    if (target && !ev.metaKey && !ev.ctrlKey) {
+      ev.preventDefault();
+      const queryParams: Record<string, string> = {};
+      if (this.fromProject()) queryParams['from'] = this.fromProject()!;
+      if (this.fromOrganization()) queryParams['org'] = this.fromOrganization()!;
+      void this.router.navigate(['/go', target], { queryParams });
+      return;
+    }
+    const href = a.getAttribute('href') ?? '';
+    if (href.startsWith('http')) {
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener');
+    }
+  }
+}

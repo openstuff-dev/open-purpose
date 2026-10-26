@@ -1,0 +1,348 @@
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
+import { Api } from '../core/api';
+import { KIND_LABEL, MODE_HELP, MODE_LABEL, type DocDetail, type EditMode, type GraphNode, type LinkRef, type Section, type SectionVersion } from '../core/models';
+import { Session } from '../core/session';
+import { MarkdownView } from '../shared/markdown';
+import { MarkdownEditor } from '../shared/md-editor';
+import { ModeBadge, ModePicker } from '../shared/mode';
+import { Notices } from '../shared/notice';
+import { Icon } from '../shared/icon';
+
+interface Draft { heading: string; body: string; note: string }
+
+@Component({
+  selector: 'app-document',
+  imports: [FormsModule, RouterLink, DatePipe, MarkdownView, MarkdownEditor, ModeBadge, ModePicker, Icon],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    @if (doc(); as d) {
+      <header class="page-head doc-head">
+        <nav class="crumbs" aria-label="Breadcrumb">
+          <a routerLink="/group">{{ session.group()?.name }}</a>
+          @if (d.organization; as o) { <a routerLink="/organization">{{ o.name }}</a> }
+          @if (d.project; as p) { <a [routerLink]="['/projects', p.id]">{{ p.name }}</a> }
+          @if (d.scope; as s) { <a [routerLink]="['/scopes', s.id]">{{ s.name }}</a> }
+        </nav>
+        @if (editingTitle()) {
+          <form class="title-form" (ngSubmit)="saveTitle()">
+            <input name="title" [(ngModel)]="titleDraft" aria-label="Document title" required>
+            <button class="btn primary" type="submit">Save</button>
+            <button class="btn" type="button" (click)="editingTitle.set(false)">Cancel</button>
+          </form>
+        } @else {
+          <div class="title-row">
+            <h1>{{ d.title }}</h1>
+            @if (d.can_edit) {
+              <button class="btn" type="button" (click)="titleDraft = d.title; editingTitle.set(true)"><app-icon name="pencil" />Rename</button>
+              <button class="btn danger" type="button" (click)="removeDoc()" aria-label="Delete document"><app-icon name="trash" /></button>
+            }
+          </div>
+        }
+        <p class="meta">
+          <span class="chip">{{ kindLabel[d.kind] }}</span>
+          <span>{{ where() }}</span>
+          <span>{{ d.sections.length }} {{ d.sections.length === 1 ? 'section' : 'sections' }}</span>
+        </p>
+        @if (d.kind === 'glossary') {
+          <p class="quiet">Each section is one term. Anyone can link to it with <code>[[Term name]]</code>, and it shows up on the map.</p>
+        }
+        <div class="doc-mode">
+          <span>New sections from agents</span>
+          @if (d.can_edit) {
+            <app-mode-picker [mode]="d.mode" (changed)="setDocMode($event)" label="What agents may do when adding sections" />
+          } @else {
+            <app-mode-badge [mode]="d.mode" />
+          }
+          <span class="quiet">{{ modeHelp[d.mode] }}</span>
+        </div>
+      </header>
+
+      <div class="sections">
+        @for (s of d.sections; track s.id; let first = $first; let last = $last) {
+          <article class="section" [attr.data-mode]="s.mode" [id]="'s-' + s.id.slice(0, 8)">
+            @if (editing() === s.id) {
+              <form class="section-edit" (ngSubmit)="saveSection(s)">
+                <label>Heading <input name="heading" [(ngModel)]="draft.heading" required></label>
+                <app-md-editor [(value)]="draft.body" [rows]="10" label="Section text" [fromProject]="d.project_id" [fromOrganization]="d.organization_id" />
+                <label>Note for history <span class="quiet">(optional)</span><input name="note" [(ngModel)]="draft.note" placeholder="What changed and why"></label>
+                <div class="form-actions">
+                  <button class="btn primary" type="submit" [disabled]="!draft.heading.trim()">Save section</button>
+                  <button class="btn" type="button" (click)="editing.set(null)">Cancel</button>
+                </div>
+              </form>
+            } @else {
+              <header class="section-head">
+                <h2>{{ s.heading }}</h2>
+                @if (d.can_edit) {
+                  <app-mode-picker [mode]="s.mode" (changed)="setSectionMode(s, $event)" [label]="'What agents may do with ' + s.heading" />
+                } @else {
+                  <app-mode-badge [mode]="s.mode" />
+                }
+              </header>
+              <app-md [text]="s.body" [fromProject]="d.project_id" [fromOrganization]="d.organization_id" />
+              <footer class="section-foot">
+                <span>Version {{ s.version }}@if (s.updated_by_name) {, by {{ s.updated_by_name }}}, {{ s.updated_at | date: 'd MMM y, HH:mm' }}</span>
+                <code class="sid" title="Section id agents use">s:{{ s.id.slice(0, 8) }}</code>
+                <span class="section-actions">
+                  @if (d.can_edit) {
+                    <button class="link-btn" type="button" (click)="startEdit(s)">Edit</button>
+                  }
+                  <button class="link-btn" type="button" (click)="toggleHistory(s)" [attr.aria-expanded]="historyFor() === s.id">History</button>
+                  @if (d.kind === 'glossary') {
+                    <button class="link-btn" type="button" (click)="toggleRefs(s)" [attr.aria-expanded]="refsFor() === s.id">References</button>
+                  }
+                  @if (d.can_edit) {
+                    <button class="link-btn" type="button" [disabled]="first" (click)="move(s, -1)" aria-label="Move up">Up</button>
+                    <button class="link-btn" type="button" [disabled]="last" (click)="move(s, 1)" aria-label="Move down">Down</button>
+                    <button class="link-btn danger" type="button" (click)="removeSection(s)">Delete</button>
+                  }
+                </span>
+              </footer>
+              @if (historyFor() === s.id) {
+                <ol class="history" reversed>
+                  @for (v of versions(); track v.id) {
+                    <li>
+                      <details>
+                        <summary>
+                          Version {{ v.version }}, {{ v.actor_name ?? 'system' }}, {{ v.created_at | date: 'd MMM y, HH:mm' }}
+                          @if (v.note) { <span class="quiet">: {{ v.note }}</span> }
+                        </summary>
+                        <p class="quiet">{{ v.heading }}, {{ modeNames[v.mode] }}</p>
+                        <app-md [text]="v.body" />
+                        @if (d.can_edit && v.version !== s.version) {
+                          <button class="btn" type="button" (click)="revert(s, v.version)">Restore version {{ v.version }}</button>
+                        }
+                      </details>
+                    </li>
+                  }
+                </ol>
+              }
+              @if (refsFor() === s.id) {
+                <div class="refs">
+                  @for (r of refs(); track r.source.id) {
+                    <p><a [routerLink]="r.source.type === 'project' ? ['/projects', r.source.project_id] : r.source.type === 'group' ? ['/group'] : ['/organization']">{{ r.source.label }}</a>
+                      <span class="quiet">in {{ refText(r.refs) }}</span></p>
+                  } @empty { <p class="empty">Nothing links to this term yet.</p> }
+                </div>
+              }
+            }
+          </article>
+        } @empty {
+          <p class="empty">This document has no sections yet.</p>
+        }
+      </div>
+
+      @if (d.can_edit) {
+        @if (adding()) {
+          <form class="section-edit add" (ngSubmit)="addSection()">
+            <label>Heading <input name="heading" [(ngModel)]="newDraft.heading" required [placeholder]="d.kind === 'glossary' ? 'Term, e.g. Order' : 'One rule or topic per section'"></label>
+            <app-md-editor [(value)]="newDraft.body" [rows]="8" label="Section text" [fromProject]="d.project_id" [fromOrganization]="d.organization_id" />
+            <div class="doc-mode">
+              <span>Agents may</span>
+              <app-mode-picker [mode]="newMode()" (changed)="newMode.set($event)" label="What agents may do with the new section" />
+            </div>
+            <div class="form-actions">
+              <button class="btn primary" type="submit" [disabled]="!newDraft.heading.trim()">Add section</button>
+              <button class="btn" type="button" (click)="adding.set(false)">Cancel</button>
+            </div>
+          </form>
+        } @else {
+          <button class="btn" type="button" (click)="startAdd()"><app-icon name="plus" />Add section</button>
+        }
+      }
+    }
+  `,
+})
+export class DocumentPage {
+  readonly id = input.required<string>();
+  readonly session = inject(Session);
+  private api = inject(Api);
+  private router = inject(Router);
+  private notices = inject(Notices);
+  readonly doc = signal<DocDetail | null>(null);
+  readonly editing = signal<string | null>(null);
+  readonly historyFor = signal<string | null>(null);
+  readonly refsFor = signal<string | null>(null);
+  readonly versions = signal<SectionVersion[]>([]);
+  readonly refs = signal<Array<{ source: GraphNode; refs: LinkRef[] }>>([]);
+  readonly adding = signal(false);
+  readonly editingTitle = signal(false);
+  readonly newMode = signal<EditMode>('propose');
+  readonly kindLabel = KIND_LABEL;
+  readonly modeHelp = MODE_HELP;
+  readonly modeNames = MODE_LABEL;
+  draft: Draft = { heading: '', body: '', note: '' };
+  newDraft = { heading: '', body: '' };
+  titleDraft = '';
+
+  readonly where = computed(() => {
+    const d = this.doc();
+    if (!d) return '';
+    const org = d.organization?.name;
+    if (d.scope) return d.project ? `Only in ${d.project.name} › ${d.scope.name}` : org ? `${d.scope.name}, across ${org}` : `${d.scope.name}, in every organization`;
+    if (d.project) return `All of ${d.project.name}`;
+    return org ? `Every project in ${org}` : `Every organization in ${this.session.group()?.name ?? 'the group'}`;
+  });
+
+  constructor() {
+    effect(() => void this.load(this.id()));
+  }
+
+  private async load(id: string): Promise<void> {
+    try {
+      this.doc.set(await this.api.document(id));
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  private async reload(): Promise<void> {
+    await this.load(this.id());
+  }
+
+  startEdit(s: Section): void {
+    this.draft = { heading: s.heading, body: s.body, note: '' };
+    this.historyFor.set(null);
+    this.editing.set(s.id);
+  }
+
+  startAdd(): void {
+    this.newDraft = { heading: '', body: '' };
+    this.newMode.set(this.doc()!.mode);
+    this.adding.set(true);
+  }
+
+  async saveSection(s: Section): Promise<void> {
+    try {
+      await this.api.updateSection(s.id, {
+        heading: this.draft.heading, body: this.draft.body, note: this.draft.note || undefined, expected_version: s.version,
+      });
+      this.editing.set(null);
+      this.notices.ok('Saved section');
+      await this.reload();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  async setSectionMode(s: Section, mode: EditMode): Promise<void> {
+    try {
+      await this.api.updateSection(s.id, { mode, expected_version: s.version, note: `Mode set to ${mode}` });
+      this.notices.ok(`${s.heading}: ${MODE_HELP[mode]}`);
+      await this.reload();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  async setDocMode(mode: EditMode): Promise<void> {
+    try {
+      await this.api.updateDocument(this.id(), { mode });
+      await this.reload();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  async saveTitle(): Promise<void> {
+    try {
+      await this.api.updateDocument(this.id(), { title: this.titleDraft.trim() });
+      this.editingTitle.set(false);
+      await this.reload();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  async addSection(): Promise<void> {
+    try {
+      await this.api.addSection(this.id(), { heading: this.newDraft.heading.trim(), body: this.newDraft.body, mode: this.newMode() });
+      this.adding.set(false);
+      this.notices.ok('Added section');
+      await this.reload();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  async toggleHistory(s: Section): Promise<void> {
+    if (this.historyFor() === s.id) {
+      this.historyFor.set(null);
+      return;
+    }
+    try {
+      this.versions.set(await this.api.versions(s.id));
+      this.historyFor.set(s.id);
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  async toggleRefs(s: Section): Promise<void> {
+    if (this.refsFor() === s.id) {
+      this.refsFor.set(null);
+      return;
+    }
+    try {
+      this.refs.set(await this.api.backlinks({ node: `term:${s.id}` }));
+      this.refsFor.set(s.id);
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  refText(refs: LinkRef[]): string {
+    return refs.map((r) => `“${r.heading}”`).join(', ');
+  }
+
+  async revert(s: Section, version: number): Promise<void> {
+    try {
+      await this.api.revert(s.id, version);
+      this.historyFor.set(null);
+      this.notices.ok(`Restored version ${version}`);
+      await this.reload();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  async move(s: Section, delta: number): Promise<void> {
+    const ids = this.doc()!.sections.map((x) => x.id);
+    const i = ids.indexOf(s.id);
+    const j = i + delta;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    try {
+      await this.api.reorder(this.id(), ids);
+      await this.reload();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  async removeSection(s: Section): Promise<void> {
+    if (!confirm(`Delete “${s.heading}”? Its history is deleted too.`)) return;
+    try {
+      await this.api.deleteSection(s.id);
+      this.notices.ok('Deleted section');
+      await this.reload();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  async removeDoc(): Promise<void> {
+    const d = this.doc()!;
+    if (!confirm(`Delete “${d.title}” and all its sections?`)) return;
+    try {
+      await this.api.deleteDocument(d.id);
+      this.notices.ok(`Deleted ${d.title}`);
+      await this.router.navigate(d.scope ? ['/scopes', d.scope.id] : d.project ? ['/projects', d.project.id] : d.organization ? ['/organization'] : ['/group']);
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+}

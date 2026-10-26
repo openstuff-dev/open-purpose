@@ -1,0 +1,52 @@
+import { buildApp } from './app.js';
+import { loadConfig } from './config.js';
+import { createPool, migrate } from './db.js';
+import { bootstrap } from './service/admin.js';
+
+async function main() {
+  const config = loadConfig();
+  const db = createPool(config.databaseUrl);
+
+  // Postgres may still be starting when the container comes up.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await db.query('SELECT 1');
+      break;
+    } catch (err) {
+      if (attempt >= 30) throw err;
+      console.log(`Waiting for Postgres (${attempt}/30)…`);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+
+  const applied = await migrate(config.databaseUrl, config.migrationsDir);
+  if (applied.length) console.log(`Applied migrations: ${applied.join(', ')}`);
+
+  const boot = await bootstrap(db, { groupName: config.groupName, orgName: config.orgName, token: config.bootstrapToken });
+  if (boot.createdAdmin) {
+    console.log('────────────────────────────────────────────────────────────');
+    console.log('Created the first admin.');
+    if (boot.token) {
+      console.log(`Admin token (shown once, store it safely): ${boot.token}`);
+    } else {
+      console.log('Sign in with the token from CHARTER_BOOTSTRAP_TOKEN.');
+    }
+    console.log('────────────────────────────────────────────────────────────');
+  }
+
+  const app = await buildApp(db, config);
+  await app.listen({ port: config.port, host: config.host });
+
+  const shutdown = async () => {
+    await app.close();
+    await db.end();
+    process.exit(0);
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

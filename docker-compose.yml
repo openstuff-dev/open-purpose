@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: charter
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-charter}
+      POSTGRES_DB: charter
+    volumes:
+      - charter-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U charter"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  charter:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://charter:${POSTGRES_PASSWORD:-charter}@db:5432/charter
+      CHARTER_GROUP_NAME: ${CHARTER_GROUP_NAME:-Our company}
+      CHARTER_ORG_NAME: ${CHARTER_ORG_NAME:-Engineering}
+      CHARTER_PUBLIC_URL: ${CHARTER_PUBLIC_URL:-http://localhost:8080}
+      # Optional: fix the first admin's token instead of reading it from the log.
+      CHARTER_BOOTSTRAP_TOKEN: ${CHARTER_BOOTSTRAP_TOKEN:-}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  charter-db:
