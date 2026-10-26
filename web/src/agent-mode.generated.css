@@ -83,6 +83,12 @@ html.agent-mode .editor-tabs {
 html.agent-mode .editor-tabs button {
     border-bottom-style: dashed
 }
+html.agent-mode .editor-tool-group + .editor-tool-group {
+    border-left-style: dashed
+}
+html.agent-mode .editor-hint {
+    border-top-style: dashed
+}
 html.agent-mode .suggest {
     border-style: dashed
 }

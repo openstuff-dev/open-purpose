@@ -3,7 +3,8 @@ import {
   ArrowRight, BookOpen, Bot, Building2, Check, ChevronDown, ChevronsUpDown, CircleUser, Copy, Eye, FileText,
   FolderGit2, GitBranch, Inbox, KeyRound, Layers, LayoutGrid, Link2, Lock, LockOpen, LogOut, Map as MapIcon,
   Menu, Monitor, Moon, Network, Palette, Pencil, Plug, Plus, Search, Server, Settings, Share2, Sun, Trash2,
-  Users, X, MessageSquare, History, CircleDot, FileDiff, type IconNode,
+  Users, X, MessageSquare, History, CircleDot, FileDiff, Heading2, Heading3, Bold, Italic, Strikethrough, Code,
+  SquareCode, List, ListOrdered, ListChecks, Quote, Brackets, type IconNode,
 } from 'lucide';
 
 /** The icons OpenPurpose uses, by name. Lucide, ISC licensed. */
@@ -50,6 +51,18 @@ const ICONS: Record<string, IconNode> = {
   history: History,
   dot: CircleDot,
   diff: FileDiff,
+  h2: Heading2,
+  h3: Heading3,
+  bold: Bold,
+  italic: Italic,
+  strike: Strikethrough,
+  code: Code,
+  'code-block': SquareCode,
+  'list-ul': List,
+  'list-ol': ListOrdered,
+  'list-task': ListChecks,
+  quote: Quote,
+  brackets: Brackets,
 };
 
 function esc(v: unknown): string {
