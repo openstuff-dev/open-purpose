@@ -223,11 +223,6 @@ import { Palette } from './shared/palette';
                   >
                 </li>
               }
-              <li>
-                <a routerLink="/search" routerLinkActive="active"
-                  ><app-icon name="search" />Search</a
-                >
-              </li>
             </ul>
 
             <div class="rail-foot">
@@ -272,7 +267,7 @@ import { Palette } from './shared/palette';
               <button
                 class="search-trigger"
                 type="button"
-                (click)="paletteOpen.set(true)"
+                (click)="session.palette.set('')"
                 aria-label="Search and go to (Ctrl+K)"
               >
                 <app-icon name="search" /><span>Search or jump to…</span
@@ -307,8 +302,8 @@ import { Palette } from './shared/palette';
             </main>
           </div>
         </div>
-        @if (paletteOpen()) {
-          <app-palette (close)="paletteOpen.set(false)" />
+        @if (session.palette() !== null) {
+          <app-palette (close)="session.palette.set(null)" />
         }
       }
     } @else if (loadError()) {
@@ -375,7 +370,6 @@ export class App {
   readonly theme = inject(Theme);
   readonly railOpen = signal(false);
   readonly wsOpen = signal(false);
-  readonly paletteOpen = signal(false);
   readonly signinError = signal('');
   readonly loadError = signal('');
   readonly initials = initials;
@@ -411,7 +405,7 @@ export class App {
       !this.session.agentView()
     ) {
       ev.preventDefault();
-      this.paletteOpen.set(!this.paletteOpen());
+      this.session.palette.set(this.session.palette() === null ? '' : null);
     } else if (ev.key === 'Escape') {
       this.wsOpen.set(false);
     }

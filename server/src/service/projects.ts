@@ -229,10 +229,10 @@ export async function deleteRepository(db: Db, a: Access, id: string): Promise<v
 
 export interface Resolution {
   project: Project | null;
-  /** How the project was found: an explicit slug (e.g. from .agentcontext.json) or the git remote. */
+  /** How the project was found: an explicit slug (e.g. from .openpurpose.json) or the git remote. */
   via: 'project' | 'remote' | null;
   remote: RemoteInfo | null;
-  /** The project was asked for by an old slug (e.g. in .agentcontext.json); `current` is what to use now. */
+  /** The project was asked for by an old slug (e.g. in .openpurpose.json); `current` is what to use now. */
   renamed: { asked: string; current: string } | null;
   /** When nothing matched: projects whose name looks like the repo, for the agent to offer the user. */
   suggestions: Array<{ slug: string; name: string; summary: string; organization_slug: string }>;

@@ -53,7 +53,7 @@ second organization under Settings › Organizations.
 
 - **Project identity from the git remote.** All Azure DevOps URL forms (HTTPS,
   SSH, `visualstudio.com`) map to the same key, `azure:{org}/{project}/{repo}`.
-  A `.agentcontext.json` with `{"project": "org/slug"}` overrides it. Unknown
+  A `.openpurpose.json` with `{"project": "org/slug"}` overrides it. Unknown
   repos make the agent ask the user and register the repo. One project can span
   many repos, and the same repo can belong to projects in different groups.
 - **Scopes** match by repository, by path glob (`frontend/**`) or by stack tag
@@ -115,7 +115,10 @@ second organization under Settings › Organizations.
 - Personal and per-agent **tokens** with revocation, and Postgres full-text search.
 - **Settings** for your account and personal tokens, light/dark theme, agent setup
   instructions, organizations, read access and context budgets, people and agents, export and import,
-  and (for server admins) all groups. Press ⌘K / Ctrl+K anywhere to jump to a page or project, or search rules.
+  and (for server admins) all groups.
+- **Search** is ⌘K / Ctrl+K, anywhere: jump to a page or project, or search rules, terms and
+  learnings. What belongs to the project (or organization) on screen comes first; Tab narrows the
+  search to just that project or organization.
 
 ## Run it
 
@@ -251,7 +254,7 @@ into your repo's `AGENTS.md` or `CLAUDE.md`.
 server/               Fastify + TypeScript 7 + pg. REST API, MCP endpoint, migrations, tests
 web/                  Angular 22 + TypeScript 6 (standalone components, signals)
 packages/contracts/   Types the server sends and the web reads, defined once (declarations only)
-agent/                Instruction snippet and .agentcontext.json example for repos
+agent/                Instruction snippet and .openpurpose.json example for repos
 ```
 
 Run the tests with a Postgres available at `TEST_DATABASE_URL`

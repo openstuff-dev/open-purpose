@@ -1,9 +1,13 @@
 import { inject } from '@angular/core';
-import { Router, type Routes } from '@angular/router';
+import { type ActivatedRouteSnapshot, Router, type Routes } from '@angular/router';
 import { Session } from './core/session';
 
 /** In agent mode the agent console is the only page; outside it, there is no console. */
 const agentOnly = () => inject(Session).agentMode() || inject(Router).parseUrl('/organization');
+const openSearch = (route: ActivatedRouteSnapshot) => {
+  inject(Session).palette.set(route.queryParamMap.get('q') ?? '');
+  return inject(Router).parseUrl('/organization');
+};
 const notInAgentMode = () => !inject(Session).agentMode() || inject(Router).parseUrl('/agent');
 
 export const routes: Routes = [
@@ -59,10 +63,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/map').then((m) => m.MapPage),
       },
       { path: 'preview', redirectTo: 'settings/test' },
+      // Search lives in ⌘K; old /search?q= links open it with their query.
       {
         path: 'search',
-        title: 'Search',
-        loadComponent: () => import('./pages/search').then((m) => m.SearchPage),
+        canActivate: [openSearch],
+        children: [],
       },
       { path: 'settings', pathMatch: 'full', redirectTo: 'settings/account' },
       {

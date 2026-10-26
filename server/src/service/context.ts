@@ -10,7 +10,7 @@ import { apisOfProjects, type ApiSpecMeta } from './apis.js';
 import { KIND_ORDER, type Document, type Level, type Project, type Scope, type Section } from './types.js';
 
 export interface ContextRequest {
-  /** Project slug ("slug" or "org/slug"), e.g. from .agentcontext.json. Wins over remote_url. */
+  /** Project slug ("slug" or "org/slug"), e.g. from .openpurpose.json. Wins over remote_url. */
   project?: string | null;
   remote_url?: string | null;
   /** Repo-relative path of the file or folder being worked on. */
@@ -322,7 +322,7 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
 
   if (ctx.resolution.renamed) {
     const { asked, current } = ctx.resolution.renamed;
-    out.push(`> **\`${asked}\` is an old slug of this project.** Use \`${current}\` from now on. If \`.agentcontext.json\` in this repository still says \`${asked}\`, update it (ask the user first if you can't edit files).`);
+    out.push(`> **\`${asked}\` is an old slug of this project.** Use \`${current}\` from now on. If \`.openpurpose.json\` in this repository still says \`${asked}\`, update it (ask the user first if you can't edit files).`);
     out.push('');
   }
 

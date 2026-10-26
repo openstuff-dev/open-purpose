@@ -1225,7 +1225,6 @@ pre {
 .scope-list,
 .project-list,
 .repo-list,
-.hits,
 .actor-list,
 .org-list,
 .group-list {
@@ -1980,18 +1979,7 @@ a.wikilink:hover {
   border-bottom: 0;
 }
 
-/* ─── Search ─── */
-.hits li {
-  padding: 0.85rem 1rem;
-}
-.hits li > a {
-  font-weight: 500;
-  margin-right: 0.6rem;
-}
-.hits p {
-  margin: 0.2rem 0;
-  font-size: var(--fs-sm);
-}
+/* ─── Search snippets ─── */
 .snippet {
   color: var(--ink-2);
 }
@@ -2495,6 +2483,48 @@ mark {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 45%;
+}
+.palette-text {
+  flex: 1;
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.palette-text .mode-icon {
+  color: var(--faint);
+  vertical-align: -1px;
+}
+.palette-snippet {
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.palette-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+  max-width: 40%;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--ground);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.palette-scope:hover {
+  color: var(--ink);
+}
+.palette-scope[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 .palette-item.active {
   background: var(--hover);

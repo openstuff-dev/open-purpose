@@ -202,7 +202,7 @@ export interface SlugRename {
   rewrite: SlugRenameRef[];
   /** Sections that use the old slug but the viewer can't edit. They keep working through the alias. */
   cannot_edit: SlugRenameRef[];
-  /** Repositories mapped to the project(s), whose .agentcontext.json may name the old slug. */
+  /** Repositories mapped to the project(s), whose .openpurpose.json may name the old slug. */
   repositories: number;
   /** Open proposals that mention the old slug. They are not rewritten. */
   open_proposals: number;

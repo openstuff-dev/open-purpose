@@ -391,6 +391,34 @@ describe('OpenPurpose with groups and organizations', () => {
     await client.close();
   });
 
+  it('ranks search hits near the searcher first, and narrows to the project or organization on request', async () => {
+    const add = async (docId: string, heading: string) =>
+      (await api('POST', `/documents/${docId}/sections`, { heading, body: 'Every quokka must be counted twice.' })).data.section;
+    const groupDoc = (await api('GET', '/documents?organization_id=group')).data.find((d: any) => d.kind === 'guidelines');
+    const payDoc = (await api('GET', `/documents?organization_id=${o.payments}`)).data.find((d: any) => d.kind === 'guidelines');
+    const orgDoc = (await api('GET', `/documents?organization_id=${o.logistics}`)).data.find((d: any) => d.kind === 'guidelines');
+    const projDoc = (await api('POST', '/documents', { scope_id: frontendScopeId, kind: 'guidelines', title: 'Quokka handling' })).data;
+    const made = [
+      await add(groupDoc.id, 'Group quokkas'), await add(payDoc.id, 'Payments quokkas'),
+      await add(orgDoc.id, 'Logistics quokkas'), await add(projDoc.id, 'Portal quokkas'),
+    ];
+    const headings = async (query: string) => (await api('GET', `/search?q=quokka${query}`)).data.map((h: any) => h.heading);
+
+    const near = await headings(`&near_project_id=${projectId}`);
+    expect(near.slice(0, 2)).toEqual(['Portal quokkas', 'Logistics quokkas']);
+    expect([...near].sort()).toEqual(['Group quokkas', 'Logistics quokkas', 'Payments quokkas', 'Portal quokkas']);
+    expect((await headings(`&near_organization_id=${o.payments}`))[0]).toBe('Payments quokkas');
+    expect(await headings(`&near_project_id=${projectId}&within=project`)).toEqual(['Portal quokkas']);
+    expect(await headings(`&near_project_id=${projectId}&within=organization`)).toEqual(['Portal quokkas', 'Logistics quokkas']);
+    const hit = (await api('GET', `/search?q=quokka&near_organization_id=${o.payments}&within=organization`)).data;
+    expect(hit.map((h: any) => [h.heading, h.organization_id])).toEqual([['Payments quokkas', o.payments]]);
+    expect((await api('GET', '/search?q=quokka&within=project')).status).toBe(400);
+    expect((await api('GET', '/search?q=quokka&within=anywhere')).status).toBe(400);
+
+    for (const x of made) await api('DELETE', `/sections/${x.id}`);
+    await api('DELETE', `/documents/${projDoc.id}`);
+  });
+
   it('uses the organization\'s budget while the group has one organization', async () => {
     const solo = await api('POST', '/groups', { name: 'Solo Shop', organization_name: 'Solo', admin_name: 'Sol' });
     expect(solo.status).toBe(201);

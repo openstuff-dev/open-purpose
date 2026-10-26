@@ -284,8 +284,15 @@ export class Api {
     scopes?: string[];
     manifests?: Array<{ path: string; content: string }>;
   }) => this.send<ContextResult>('POST', '/context', body);
-  search = (q: string, organizationId?: string | null) =>
-    this.get<SearchHit[]>('/search', { q, organization_id: organizationId ?? undefined });
+  /** near_*: where the searcher is, ranked first; within narrows to that place. */
+  search = (
+    q: string,
+    near: {
+      near_project_id?: string;
+      near_organization_id?: string;
+      within?: 'project' | 'organization';
+    } = {},
+  ) => this.get<SearchHit[]>('/search', { q, ...near });
 
   graph = (opts: { focus?: string; depth?: number; missing?: boolean } = {}) =>
     this.get<Graph>('/graph', {

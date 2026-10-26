@@ -22,7 +22,7 @@ import {
   type Section,
   type SectionVersion,
 } from '../core/models';
-import { Session } from '../core/session';
+import { Session, provideHere } from '../core/session';
 import { MarkdownView } from '../shared/markdown';
 import { MarkdownEditor } from '../shared/md-editor';
 import { ModeBadge, ModePicker } from '../shared/mode';
@@ -355,6 +355,10 @@ export class DocumentPage {
 
   constructor() {
     effect(() => void this.load(this.id()));
+    provideHere(() => {
+      const x = this.doc();
+      return x ? { project: x.project, organization: x.organization } : null;
+    });
   }
 
   private async load(id: string): Promise<void> {

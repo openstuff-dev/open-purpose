@@ -428,6 +428,7 @@ export interface SearchHit {
   mode: EditMode;
   document_id: string;
   document_title: string;
+  organization_id: string | null;
   organization_slug: string | null;
   project_id: string | null;
   project_slug: string | null;
@@ -435,23 +436,35 @@ export interface SearchHit {
   rank: number;
 }
 
-/**
- * Full-text search over everything the actor can read. With a project: that
- * project, its organization and the group-wide content.
- */
-export async function searchSections(
-  db: Queryable, a: Access, query: string, opts: { projectId?: string | null; organizationId?: string | null; limit?: number } = {},
-): Promise<SearchHit[]> {
+export interface SearchOptions {
+  /** Only that project, its organization and the group-wide content. */
+  projectId?: string | null;
+  organizationId?: string | null;
+  /** Where the searcher is: hits there rank first (the project, then its organization). Nothing is left out. */
+  nearProjectId?: string | null;
+  nearOrganizationId?: string | null;
+  /** Only hits in the near project, or in the near organization (with its projects). */
+  within?: 'project' | 'organization';
+  limit?: number;
+}
+
+/** Full-text search over everything the actor can read. */
+export async function searchSections(db: Queryable, a: Access, query: string, opts: SearchOptions = {}): Promise<SearchHit[]> {
   const q = query.trim();
   if (!q) return [];
   const limit = Math.min(Math.max(opts.limit ?? 20, 1), 100);
   let orgFilter: string | null = opts.organizationId ?? null;
   if (opts.projectId) orgFilter = (await resolveLevel(db, { project_id: opts.projectId })).organization_id;
+  const nearProject = opts.nearProjectId ?? null;
+  const nearOrg = nearProject ? (await resolveLevel(db, { project_id: nearProject })).organization_id : opts.nearOrganizationId ?? null;
+  if (opts.within === 'project' && !nearProject) throw badRequest('within=project needs near_project_id');
+  if (opts.within === 'organization' && !nearOrg) throw badRequest('within=organization needs near_project_id or near_organization_id');
   const { rows } = await db.query<SearchHit>(
     `WITH q AS (SELECT websearch_to_tsquery('simple', $1) AS tsq)
      SELECT s.id AS section_id, s.heading, s.mode, d.id AS document_id, d.title AS document_title,
-            o.slug AS organization_slug, d.project_id, p.slug AS project_slug, sc.slug AS scope_slug,
-            ts_rank(s.search, q.tsq) + CASE WHEN s.heading ILIKE '%' || $1 || '%' THEN 0.5 ELSE 0 END AS rank,
+            d.organization_id, o.slug AS organization_slug, d.project_id, p.slug AS project_slug, sc.slug AS scope_slug,
+            ts_rank(s.search, q.tsq) + CASE WHEN s.heading ILIKE '%' || $1 || '%' THEN 0.5 ELSE 0 END
+              + CASE WHEN d.project_id = $6::uuid THEN 2 WHEN d.organization_id = $7::uuid THEN 1 ELSE 0 END AS rank,
             ts_headline('simple', s.body, q.tsq, 'MaxWords=30, MinWords=10, StartSel=**, StopSel=**') AS snippet
        FROM sections s
        JOIN documents d ON d.id = s.document_id
@@ -463,9 +476,11 @@ export async function searchSections(
         AND (d.organization_id IS NULL OR d.organization_id = ANY($2::uuid[]))
         AND ($3::uuid IS NULL OR d.organization_id IS NULL OR d.organization_id = $3::uuid)
         AND ($4::uuid IS NULL OR d.project_id IS NULL OR d.project_id = $4::uuid)
+        AND ($8::text IS DISTINCT FROM 'project' OR d.project_id = $6::uuid)
+        AND ($8::text IS DISTINCT FROM 'organization' OR d.organization_id = $7::uuid)
       ORDER BY rank DESC, s.updated_at DESC
       LIMIT $5`,
-    [q, a.readableOrgIds(), orgFilter, opts.projectId ?? null, limit],
+    [q, a.readableOrgIds(), orgFilter, opts.projectId ?? null, limit, nearProject, nearOrg, opts.within ?? null],
   );
   return rows;
 }

@@ -1,5 +1,13 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
-import { Injectable, computed, inject, signal } from '@angular/core';
+import {
+  DestroyRef,
+  Injectable,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 import type { Me, Organization } from './models';
 import { orgColor } from './theme';
@@ -24,6 +32,12 @@ function write(key: string, value: string | null): void {
   } catch {
     /* storage unavailable: keep it in memory only */
   }
+}
+
+/** The project and organization the page on screen belongs to, for ⌘K to search near. */
+export interface Here {
+  project: { id: string; name: string } | null;
+  organization: { id: string; name: string } | null;
 }
 
 /**
@@ -51,6 +65,10 @@ export class Session {
   readonly orgId = computed(() => this.me()?.current_organization_id ?? null);
   /** Agent mode: the UI shows exactly what an agent in the current organization reads. */
   readonly agentMode = signal(read(AGENT) === '1');
+  /** Set by project, scope and document pages while they are open. */
+  readonly here = signal<Here | null>(null);
+  /** ⌘K: null = closed, otherwise the query it opens with. */
+  readonly palette = signal<string | null>(null);
   readonly agentView = computed(() => this.me()?.agent_view ?? null);
   /** Organizations whose agents this person may look through the eyes of. */
   readonly agentOrgs = computed(() => {
@@ -184,4 +202,20 @@ export function errorMessage(err: unknown): string {
   if (body?.message) return body.message;
   if (e?.status === 0) return 'Cannot reach the OpenPurpose server.';
   return e?.message ?? String(err);
+}
+
+/** Tells ⌘K which project and organization this page is about, until the page closes. */
+export function provideHere(source: () => Here | null): void {
+  const session = inject(Session);
+  let mine: Here | null = null;
+  effect(() => {
+    const here = source();
+    untracked(() => {
+      mine = here;
+      session.here.set(here);
+    });
+  });
+  inject(DestroyRef).onDestroy(() => {
+    if (mine && session.here() === mine) session.here.set(null);
+  });
 }

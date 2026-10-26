@@ -7,26 +7,44 @@ import {
   inject,
   output,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { Api } from '../core/api';
-import type { Project, SearchHit } from '../core/models';
+import type { EditMode, Project, ProjectDetail, SearchHit } from '../core/models';
 import { Session } from '../core/session';
 import { Icon } from './icon';
+import { ModeIcon } from './mode';
 
 interface Item {
   group: string;
   icon: string;
   label: string;
   hint?: string;
+  /** Search hits: the matching words, ** marks the hits. */
+  snippet?: string;
+  mode?: EditMode;
   run: () => void;
 }
 
-/** ⌘K: jump to a page or project, or search every rule you can read. */
+/** Shown before "Show more"; the server returns up to 20. */
+const FIRST_HITS = 12;
+
+function escapeHtml(s: string): string {
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
+}
+
+/**
+ * ⌘K: jump to a page or project, or search every rule you can read. What is in
+ * the project (or organization) on screen comes first, and Tab narrows to it.
+ */
 @Component({
   selector: 'app-palette',
-  imports: [Icon],
+  imports: [Icon, ModeIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="palette-backdrop" (click)="close.emit()" (keydown.escape)="close.emit()">
@@ -51,6 +69,21 @@ interface Item {
             (input)="onInput($any($event.target).value)"
             (keydown)="onKey($event)"
           />
+          @if (near(); as n) {
+            <button
+              type="button"
+              class="palette-scope"
+              [attr.aria-pressed]="narrow()"
+              [attr.aria-label]="narrow() ? 'Searching ' + n.label + ' only. Search everywhere' : 'Searching everywhere. Search ' + n.label + ' only'"
+              (click)="toggleNarrow()"
+            >
+              @if (narrow()) {
+                <app-icon [name]="n.icon" [size]="13" />{{ n.label }}
+              } @else {
+                Everywhere
+              }
+            </button>
+          }
           <kbd>Esc</kbd>
         </div>
         @if (items().length) {
@@ -69,7 +102,19 @@ interface Item {
                 (click)="pick(it)"
               >
                 <app-icon [name]="it.icon" />
-                <span>{{ it.label }}</span>
+                @if (it.snippet !== undefined) {
+                  <span class="palette-text">
+                    <span
+                      >{{ it.label }}
+                      @if (it.mode && it.mode !== 'open') {
+                        <app-mode-icon [mode]="it.mode" />
+                      }
+                    </span>
+                    <span class="palette-snippet" [innerHTML]="marked(it.snippet)"></span>
+                  </span>
+                } @else {
+                  <span>{{ it.label }}</span>
+                }
                 @if (it.hint) {
                   <small>{{ it.hint }}</small>
                 }
@@ -81,6 +126,12 @@ interface Item {
         }
         <div class="palette-foot">
           <span><kbd>↑</kbd> <kbd>↓</kbd> to move</span><span><kbd>Enter</kbd> to open</span>
+          @if (near(); as n) {
+            <span
+              ><kbd>Tab</kbd>
+              {{ narrow() ? 'to search everywhere' : 'to search ' + n.label + ' only' }}</span
+            >
+          }
         </div>
       </div>
     </div>
@@ -96,9 +147,30 @@ export class Palette {
   readonly query = signal('');
   readonly active = signal(0);
   readonly searching = signal(false);
+  /** Search only the project or organization on screen. */
+  readonly narrow = signal(false);
+  private readonly more = signal(false);
   private projects = signal<Project[]>([]);
   private hits = signal<SearchHit[]>([]);
+  /** The scopes and documents of the project on screen. */
+  private local = signal<ProjectDetail | null>(null);
   private timer: ReturnType<typeof setTimeout> | undefined;
+
+  /** The project on screen, else its (or the current) organization. */
+  private readonly here = computed(() => {
+    const h = this.session.here();
+    const org = h?.organization ?? (h?.project ? null : this.session.org());
+    return { project: h?.project ?? null, organization: org };
+  });
+
+  /** What Tab narrows to: the project, or the organization when there are others to leave out. */
+  readonly near = computed(() => {
+    const { project, organization } = this.here();
+    if (project) return { kind: 'project' as const, id: project.id, label: project.name, icon: 'repo' };
+    if (organization && this.session.groupShown())
+      return { kind: 'organization' as const, id: organization.id, label: organization.name, icon: 'layers' };
+    return null;
+  });
 
   private go(path: unknown[], extras: Record<string, unknown> = {}): () => void {
     return () => {
@@ -109,14 +181,19 @@ export class Palette {
 
   private readonly pages = computed<Item[]>(() => {
     const s = this.session;
+    // A group with one organization is just that organization: no group page to go to.
     const pages: Item[] = [
-      {
-        group: 'Pages',
-        icon: 'building',
-        label: s.group()?.name ?? 'Group',
-        hint: 'Group overview',
-        run: this.go(['/group']),
-      },
+      ...(s.groupShown()
+        ? [
+            {
+              group: 'Pages',
+              icon: 'building',
+              label: s.group()?.name ?? 'Group',
+              hint: 'Group overview',
+              run: this.go(['/group']),
+            },
+          ]
+        : []),
       ...(s.org()
         ? [
             {
@@ -161,7 +238,7 @@ export class Palette {
       pages.push({
         group: 'Settings',
         icon: 'building',
-        label: 'Group and organizations',
+        label: s.groupShown() ? 'Group and organizations' : 'Organizations',
         run: this.go(['/settings', 'group']),
       });
     if (s.adminsAnything)
@@ -184,29 +261,81 @@ export class Palette {
   readonly items = computed<Item[]>(() => {
     const q = this.query().trim().toLowerCase();
     const match = (t: string) => !q || t.toLowerCase().includes(q);
-    const pages = this.pages().filter((p) => match(p.label) || match(p.hint ?? ''));
-    const projects = this.projects()
-      .filter((p) => match(p.name) || match(p.slug))
-      .slice(0, q ? 8 : 5)
-      .map<Item>((p) => ({
-        group: 'Projects',
-        icon: 'repo',
-        label: p.name,
-        hint: p.organization_name,
-        run: this.go(['/projects', p.id]),
-      }));
-    const rules = this.hits()
-      .slice(0, 8)
+    const { project: hereProject, organization: hereOrg } = this.here();
+    const narrow = this.narrow() ? this.near() : null;
+
+    const local = this.local();
+    const inProject: Item[] = local
+      ? [
+          ...local.scopes.map<Item>((sc) => ({
+            group: 'In ' + local.name,
+            icon: 'grid',
+            label: sc.name,
+            hint: 'Scope',
+            run: this.go(['/scopes', sc.id]),
+          })),
+          ...local.documents.map<Item>((d) => ({
+            group: 'In ' + local.name,
+            icon: 'file',
+            label: d.title,
+            hint: 'Document',
+            run: this.go(['/documents', d.id]),
+          })),
+        ]
+          .filter((it) => match(it.label))
+          .slice(0, q ? 6 : 4)
+      : [];
+
+    const pages = narrow ? [] : this.pages().filter((p) => match(p.label) || match(p.hint ?? ''));
+    const orgId = narrow?.kind === 'organization' ? narrow.id : hereOrg?.id;
+    const projects =
+      narrow?.kind === 'project'
+        ? []
+        : this.projects()
+            .filter((p) => narrow?.kind !== 'organization' || p.organization_id === narrow.id)
+            .filter((p) => p.id !== hereProject?.id && (match(p.name) || match(p.slug)))
+            // The organization on screen first; sort is stable, so the server's order stays within each.
+            .sort((a, b) => +(b.organization_id === orgId) - +(a.organization_id === orgId))
+            .slice(0, q ? 8 : 5)
+            .map<Item>((p) => ({
+              group: 'Projects',
+              icon: 'repo',
+              label: p.name,
+              hint: p.organization_name,
+              run: this.go(['/projects', p.id]),
+            }));
+
+    const where = (h: SearchHit): string => {
+      if (hereProject && h.project_id === hereProject.id) return 'In ' + hereProject.name;
+      if (hereOrg && h.organization_id === hereOrg.id) return 'In ' + hereOrg.name;
+      return hereProject || hereOrg ? 'Elsewhere' : 'Rules and terms';
+    };
+    const order = (g: string) => (g === 'Elsewhere' ? 2 : g === 'In ' + hereOrg?.name ? 1 : 0);
+    const all = this.hits();
+    const shown = this.more() ? all : all.slice(0, FIRST_HITS);
+    const rules = shown
       .map<Item>((h) => ({
-        group: 'Rules and terms',
+        group: where(h),
         icon: 'file',
         label: h.heading,
+        snippet: h.snippet,
+        mode: h.mode,
         hint: [h.organization_slug ?? this.session.group()?.name, h.project_slug, h.document_title]
           .filter(Boolean)
           .join(' · '),
         run: this.go(['/documents', h.document_id], { fragment: 's-' + h.section_id.slice(0, 8) }),
-      }));
+      }))
+      .sort((a, b) => order(a.group) - order(b.group));
+    if (all.length > shown.length)
+      rules.push({
+        group: rules[rules.length - 1].group,
+        icon: 'plus',
+        label: `Show ${all.length - shown.length} more`,
+        run: () => this.more.set(true),
+      });
+
     return [
+      ...inProject,
       ...pages.filter((p) => p.group === 'Pages'),
       ...projects,
       ...pages.filter((p) => p.group !== 'Pages'),
@@ -214,28 +343,57 @@ export class Palette {
     ];
   });
 
+  marked(snippet: string): string {
+    return escapeHtml(snippet).replace(/\*\*(.+?)\*\*/g, '<mark>$1</mark>');
+  }
+
   constructor() {
     void this.api
       .projects({})
       .then((p) => this.projects.set(p))
       .catch(() => {});
+    const project = untracked(this.here).project;
+    if (project)
+      void this.api
+        .project(project.id)
+        .then((p) => this.local.set(p))
+        .catch(() => {});
     effect(() => queueMicrotask(() => this.input().nativeElement.focus()));
+    const start = untracked(this.session.palette);
+    if (start) this.onInput(start);
   }
 
   onInput(v: string): void {
     this.query.set(v);
+    this.search();
+  }
+
+  toggleNarrow(): void {
+    this.narrow.set(!this.narrow());
+    this.search();
+    this.input().nativeElement.focus();
+  }
+
+  private search(): void {
     this.active.set(0);
+    this.more.set(false);
     clearTimeout(this.timer);
-    const q = v.trim();
+    const q = this.query().trim();
     if (q.length < 2) {
       this.hits.set([]);
       return;
     }
+    const { project, organization } = this.here();
+    const near = {
+      near_project_id: project?.id,
+      near_organization_id: project ? undefined : organization?.id,
+      within: this.narrow() ? this.near()?.kind : undefined,
+    };
     this.searching.set(true);
     this.timer = setTimeout(async () => {
       try {
-        const hits = await this.api.search(q);
-        if (this.query().trim() === q) this.hits.set(hits);
+        const hits = await this.api.search(q, near);
+        if (this.query().trim() === q && this.narrow() === !!near.within) this.hits.set(hits);
       } catch {
         this.hits.set([]);
       }
@@ -255,6 +413,9 @@ export class Palette {
       ev.preventDefault();
       const it = this.items()[this.active()];
       if (it) this.pick(it);
+    } else if (ev.key === 'Tab' && this.near()) {
+      ev.preventDefault();
+      this.toggleNarrow();
     } else if (ev.key === 'Escape') {
       this.close.emit();
     }

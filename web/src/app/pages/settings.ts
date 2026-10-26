@@ -33,14 +33,14 @@ organization, the project and the part of the code you are in (a repository or a
 
 1. Before you start a task, call \`get_context\` with:
    - \`remote_url\` from \`git remote get-url origin\`
-   - \`project\` from \`.agentcontext.json\` if that file exists
+   - \`project\` from \`.openpurpose.json\` if that file exists
    - \`path\`: the file or folder you are about to work on
    - \`manifests\`: the nearest \`package.json\`, \`*.csproj\` or similar, with its content
    Follow what it returns. More specific rules override general ones.
 2. When you move to a different part of the repo (for example from \`frontend/\`
    to \`backend/\`), call \`get_context\` again with the new path and manifest.
 3. If no project is found, ask me which project this repo belongs to, then call
-   \`register_repository\` (or \`create_project\`) and create \`.agentcontext.json\`.
+   \`register_repository\` (or \`create_project\`) and create \`.openpurpose.json\`.
 4. When I correct you and the correction should apply next time, call
    \`propose_learning\` with the same remote/path/manifests. Say in one line that
    you did. Do not propose one-off preferences or task-specific details.
@@ -293,7 +293,7 @@ organization, the project and the part of the code you are in (a repository or a
                     <h3>Optional: pin a repository to a project</h3>
                     <p>
                       OpenPurpose finds the project from the git remote. To override that, for
-                      example in a fork, add <code>.agentcontext.json</code> to the repository root.
+                      example in a fork, add <code>.openpurpose.json</code> to the repository root.
                       Each project page shows its own.
                     </p>
                     <pre><code>{{ agentContext }}</code></pre>

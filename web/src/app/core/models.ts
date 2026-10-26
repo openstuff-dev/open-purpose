@@ -365,7 +365,9 @@ export interface GroupRow extends GroupRef {
 }
 
 export interface SearchHit {
+  organization_id: string | null;
   organization_slug: string | null;
+  project_id: string | null;
   section_id: string;
   heading: string;
   snippet: string;

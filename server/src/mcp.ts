@@ -24,13 +24,14 @@ organizations' content is private unless your organization was given read access
 
 Workflow:
 1. Before starting a task in a repository, call get_context with the repo's git remote URL
-   (\`git remote get-url origin\`), plus the "project" value from .agentcontext.json if that file exists,
+   (\`git remote get-url origin\`), plus the "project" value from .openpurpose.json if that file exists
+   (an older .agentcontext.json means the same: rename it to .openpurpose.json),
    the path you are working in and the nearest manifest (package.json, *.csproj, ...). Always send the
    remote: parts of a project can be bound to one repository.
    Follow what it says. More specific rules override general ones. When a context is large, its most
    general sections are shortened to their first sentence; read those with read_section when they matter.
 2. If no project is found, ask the user which project the repo belongs to, then call register_repository
-   (or create_project), and write .agentcontext.json with {"project": "<slug>"} in the repo root.
+   (or create_project), and write .openpurpose.json with {"project": "<slug>"} in the repo root.
 3. When the user corrects you in a way that should also apply next time, call propose_learning with the
    same remote/path/manifests. A person reviews it before it becomes a rule. Keep it to one rule, stated
    positively, with the reason.
@@ -50,7 +51,7 @@ const manifestSchema = z.object({
 });
 
 const locate = {
-  project: z.string().optional().describe('Project slug, or "org/slug" for another organization, e.g. from .agentcontext.json. Takes precedence over remote_url.'),
+  project: z.string().optional().describe('Project slug, or "org/slug" for another organization, e.g. from .openpurpose.json. Takes precedence over remote_url.'),
   remote_url: z.string().optional().describe('Output of `git remote get-url origin`. Send it even with project: scopes can be bound to one repository.'),
   path: z.string().optional().describe('Repo-relative path of the file or folder you are working on'),
   stacks: z.array(z.string()).optional().describe('Stack tags you already know, e.g. ["angular"]. Usually leave empty and send manifests instead.'),
@@ -138,7 +139,7 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       via: r.via,
       remote_key: r.remote?.key ?? null,
       suggestions: r.suggestions.map((s) => ({ ref: `${s.organization_slug}/${s.slug}`, name: s.name, summary: s.summary })),
-      renamed: r.renamed && `"${r.renamed.asked}" is an old slug. Use "${r.renamed.current}" from now on, and update .agentcontext.json if it has the old one.`,
+      renamed: r.renamed && `"${r.renamed.asked}" is an old slug. Use "${r.renamed.current}" from now on, and update .openpurpose.json if it has the old one.`,
       next: r.project ? 'Call get_context.' : 'Ask the user which project this is, then call register_repository or create_project.',
     });
   }));
@@ -425,7 +426,7 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
     },
   }, (x) => run(async (db) => {
     const repo = await addRepository(db, a, x.project, x.remote_url);
-    return text(`Mapped ${repo.remote_key} to project "${x.project}". Also write .agentcontext.json with {"project": "${x.project}"} in the repo root.`);
+    return text(`Mapped ${repo.remote_key} to project "${x.project}". Also write .openpurpose.json with {"project": "${x.project}"} in the repo root.`);
   }));
 
   server.registerTool('create_project', {

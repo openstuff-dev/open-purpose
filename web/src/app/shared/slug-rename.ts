@@ -134,7 +134,7 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
                   @if (r.repositories) {
                     <li>
                       {{ plural(r.repositories, 'repository', 'repositories') }} may have
-                      <code>.agentcontext.json</code> naming <code>{{ r.from }}</code
+                      <code>.openpurpose.json</code> naming <code>{{ r.from }}</code
                       >. They keep working, and agents there are told to switch to
                       <code>{{ r.to }}</code
                       >.
@@ -230,9 +230,9 @@ export class SlugRenameField {
     const s = this.slug();
     switch (this.kind()) {
       case 'project':
-        return `People and agents use it in [[${this.prefix()}${s}]] links, in .agentcontext.json files in repositories, and to ask for this project.`;
+        return `People and agents use it in [[${this.prefix()}${s}]] links, in .openpurpose.json files in repositories, and to ask for this project.`;
       case 'organization':
-        return `It's the first part of links to this organization's projects, like [[${s}/project]], and of every .agentcontext.json that names one of them.`;
+        return `It's the first part of links to this organization's projects, like [[${s}/project]], and of every .openpurpose.json that names one of them.`;
       default:
         return `Agents use it to ask for this scope explicitly and to file learnings under it.`;
     }

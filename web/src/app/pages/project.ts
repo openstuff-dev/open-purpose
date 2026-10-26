@@ -11,7 +11,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import type { Graph, GraphNode, LinkRef, ProjectDetail } from '../core/models';
-import { Session } from '../core/session';
+import { Session, provideHere } from '../core/session';
 import { ContextSwitch } from '../core/switch';
 import { DocList } from '../shared/doc-list';
 import { Notices } from '../shared/notice';
@@ -316,7 +316,7 @@ const TABS: Tab[] = [
                 Optional. Put this file in the repository root to skip remote matching, for example
                 in forks or mirrors.
               </p>
-              <pre><code>// .agentcontext.json
+              <pre><code>// .openpurpose.json
 {{ agentContext() }}</code></pre>
             </details>
           }
@@ -461,6 +461,10 @@ export class ProjectPage {
 
   constructor() {
     effect(() => void this.load(this.id()));
+    provideHere(() => {
+      const p = this.project();
+      return p ? { project: { id: p.id, name: p.name }, organization: p.organization } : null;
+    });
   }
 
   async openOrg(id: string, ev: Event): Promise<void> {

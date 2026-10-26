@@ -12,7 +12,7 @@ import { OPEN_STATUSES } from './types.js';
 
 /**
  * Renaming the slug of an organization, project or scope. The slug is how people
- * and agents refer to it: [[links]], .agentcontext.json, get_context's scopes. A
+ * and agents refer to it: [[links]], .openpurpose.json, get_context's scopes. A
  * rename rewrites the links the renamer can edit, and keeps the old slug as an
  * alias so everything else keeps working.
  */

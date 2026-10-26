@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import type { Repository, ScopeDetail } from '../core/models';
-import { Session } from '../core/session';
+import { Session, provideHere } from '../core/session';
 import { DocList } from '../shared/doc-list';
 import { Notices } from '../shared/notice';
 import { Icon } from '../shared/icon';
@@ -162,6 +162,10 @@ export class ScopePage {
 
   constructor() {
     effect(() => void this.load(this.id()));
+    provideHere(() => {
+      const x = this.scope();
+      return x ? { project: x.project, organization: x.organization } : null;
+    });
   }
 
   reload(): void {

@@ -546,9 +546,15 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       return callReadTool(pool, req.access, VERSION, config.apiSpecs, body.name, body.args ?? {});
     });
     api.get('/search', async (req) => {
-      const q = req.query as { q?: string; project_id?: string; organization_id?: string };
-      if (!q.q) throw badRequest('q is required');
-      return content.searchSections(req.db, req.access, q.q, { projectId: qid(q.project_id), organizationId: qid(q.organization_id) });
+      const q = parse(z.object({
+        q: z.string().min(1, 'q is required'), project_id: z.string().optional(), organization_id: z.string().optional(),
+        near_project_id: z.string().optional(), near_organization_id: z.string().optional(),
+        within: z.enum(['project', 'organization']).optional(), limit: z.coerce.number().int().optional(),
+      }), req.query);
+      return content.searchSections(req.db, req.access, q.q, {
+        projectId: qid(q.project_id), organizationId: qid(q.organization_id),
+        nearProjectId: qid(q.near_project_id), nearOrganizationId: qid(q.near_organization_id), within: q.within, limit: q.limit,
+      });
     });
     api.get('/graph', async (req) => {
       const q = req.query as { focus?: string; depth?: string; missing?: string; archived?: string };
