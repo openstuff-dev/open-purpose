@@ -2,22 +2,24 @@ import { ChangeDetectionStrategy, Component, effect, inject, input, signal } fro
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Api } from '../core/api';
-import type { ScopeDetail } from '../core/models';
+import type { Repository, ScopeDetail } from '../core/models';
 import { Session } from '../core/session';
 import { DocList } from '../shared/doc-list';
 import { Notices } from '../shared/notice';
-import { splitList } from '../shared/scope-list';
+import { Icon } from '../shared/icon';
+import { RepoPicker } from '../shared/repo-picker';
+import { repoName, splitList } from '../shared/scope-list';
 import { SlugRenameField } from '../shared/slug-rename';
 
 @Component({
   selector: 'app-scope',
-  imports: [DocList, FormsModule, RouterLink, SlugRenameField],
+  imports: [DocList, FormsModule, RouterLink, SlugRenameField, Icon, RepoPicker],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (scope(); as s) {
       <header class="page-head">
         <nav class="crumbs" aria-label="Breadcrumb">
-          <a routerLink="/group">{{ session.group()?.name }}</a>
+          @if (session.groupShown()) { <a routerLink="/group">{{ session.group()?.name }}</a> }
           @if (s.organization; as o) { <a routerLink="/organization">{{ o.name }}</a> }
           @if (s.project; as p) { <a [routerLink]="['/projects', p.id]">{{ p.name }}</a> }
         </nav>
@@ -31,6 +33,9 @@ import { SlugRenameField } from '../shared/slug-rename';
           <form class="inline-form" (ngSubmit)="save()">
             <label class="grow">Name <input name="name" [(ngModel)]="draft.name" required></label>
             <label class="full">Description <input name="description" [(ngModel)]="draft.description"></label>
+            @if (s.project; as p) {
+              <app-repo-picker class="full" [projectId]="p.id" [(repositories)]="repos" [(selected)]="repositoryIds" />
+            }
             <label class="full">Paths <input name="globs" class="mono" [(ngModel)]="draft.globs" placeholder="frontend/**"></label>
             <label class="full">Stacks <input name="stacks" [(ngModel)]="draft.stacks" placeholder="angular"></label>
             <div class="form-actions full">
@@ -40,12 +45,16 @@ import { SlugRenameField } from '../shared/slug-rename';
           </form>
         } @else {
           <dl class="facts">
+            @if (s.project) {
+              <dt>Repositories</dt>
+              <dd>@for (r of boundRepos(s); track r.id) { <span class="chip repo" [title]="r.remote_key"><app-icon name="branch" [size]="11" />{{ repoName(r.remote_key) }}</span> } @empty { <span class="quiet">Any of {{ s.project.name }}'s repositories</span> }</dd>
+            }
             <dt>Paths</dt>
             <dd>@for (g of s.path_globs; track g) { <code class="chip path">{{ g }}</code> } @empty { <span class="quiet">Any path</span> }</dd>
             <dt>Stacks</dt>
             <dd>@for (t of s.stacks; track t) { <span class="chip stack">{{ t }}</span> } @empty { <span class="quiet">Any stack</span> }</dd>
           </dl>
-          <p class="quiet">Applies when an agent works on a file matching any path, or in code whose manifest has any of these stacks.</p>
+          <p class="quiet">{{ explain(s) }}</p>
           @if (s.can_edit) {
             <div class="form-actions">
               <button class="btn" type="button" (click)="startEdit()">Edit matching</button>
@@ -74,6 +83,21 @@ export class ScopePage {
   readonly scope = signal<ScopeDetail | null>(null);
   readonly editing = signal(false);
   draft = { name: '', description: '', globs: '', stacks: '' };
+  readonly repos = signal<Repository[]>([]);
+  readonly repositoryIds = signal<string[]>([]);
+  readonly repoName = repoName;
+
+  boundRepos(s: ScopeDetail): Repository[] {
+    return s.repositories.filter((r) => s.repository_ids.includes(r.id));
+  }
+
+  explain(s: ScopeDetail): string {
+    const bound = s.repository_ids.length > 0;
+    const narrowed = s.path_globs.length > 0 || s.stacks.length > 0;
+    if (bound && !narrowed) return 'Applies to everything an agent does in these repositories.';
+    if (bound) return 'Applies inside these repositories when an agent works on a file matching any path, or in code whose manifest has any of these stacks.';
+    return 'Applies when an agent works on a file matching any path, or in code whose manifest has any of these stacks.';
+  }
 
   constructor() {
     effect(() => void this.load(this.id()));
@@ -94,6 +118,8 @@ export class ScopePage {
   startEdit(): void {
     const s = this.scope()!;
     this.draft = { name: s.name, description: s.description, globs: s.path_globs.join(', '), stacks: s.stacks.join(', ') };
+    this.repos.set(s.repositories);
+    this.repositoryIds.set(s.repository_ids);
     this.editing.set(true);
   }
 
@@ -102,6 +128,7 @@ export class ScopePage {
       await this.api.updateScope(this.id(), {
         name: this.draft.name, description: this.draft.description,
         path_globs: splitList(this.draft.globs), stacks: splitList(this.draft.stacks),
+        ...(this.scope()!.project ? { repository_ids: this.repositoryIds() } : {}),
       });
       this.editing.set(false);
       this.notices.ok('Saved scope');

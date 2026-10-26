@@ -95,6 +95,38 @@ describe('matchScopes', () => {
     expect(mostSpecific([])).toBeNull();
   });
 
+  describe('bound to repositories', () => {
+    const web = { id: 'r-web', key: 'github.com/acme/portal-web' };
+    const api = { id: 'r-api', key: 'github.com/acme/portal-api' };
+    const bound = [
+      { id: '5', slug: 'angular-app', name: 'Angular app', project_id: 'p', path_globs: [], stacks: [], repository_ids: [web.id] },
+      { id: '6', slug: 'dotnet-api', name: '.NET API', project_id: 'p', path_globs: [], stacks: [], repository_ids: [api.id] },
+      { id: '7', slug: 'api-tests', name: 'API tests', project_id: 'p', path_globs: ['tests/**'], stacks: [], repository_ids: [api.id] },
+      ...scopes,
+    ];
+
+    it('covers the whole repository when it has no paths or stacks', () => {
+      const m = matchScopes(bound, { path: 'src/app/app.ts', repository: web });
+      expect(m.map((x) => x.scope.slug)).toEqual(['angular-app']);
+      expect(m[0].reason).toBe('repository "github.com/acme/portal-web"');
+    });
+
+    it('narrows to its paths inside the repository', () => {
+      expect(matchScopes(bound, { path: 'src/Program.cs', repository: api }).map((x) => x.scope.slug)).toEqual(['dotnet-api']);
+      expect(matchScopes(bound, { path: 'tests/OrderTests.cs', repository: api }).map((x) => x.scope.slug)).toEqual(['dotnet-api', 'api-tests']);
+      expect(matchScopes(bound, { path: 'tests/app.spec.ts', repository: web }).map((x) => x.scope.slug)).toEqual(['angular-app']);
+    });
+
+    it('never matches without a known repository, but folder scopes still do', () => {
+      expect(matchScopes(bound, { path: 'frontend/x.ts' }).map((x) => x.scope.slug)).toEqual(['frontend']);
+      expect(matchScopes(bound, { explicit: ['dotnet-api'] }).map((x) => x.scope.slug)).toEqual(['dotnet-api']);
+    });
+
+    it('beats unbound scopes for learnings', () => {
+      expect(mostSpecific(matchScopes(bound, { path: 'frontend/x.ts', repository: web }))?.slug).toBe('angular-app');
+    });
+  });
+
   it('normalises paths', () => {
     expect(normalizePath('.\\frontend\\src\\')).toBe('frontend/src');
     expect(normalizePath('/a/b')).toBe('a/b');

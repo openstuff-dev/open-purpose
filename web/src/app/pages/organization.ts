@@ -15,14 +15,14 @@ import { ScopeList } from '../shared/scope-list';
   template: `
     @if (session.org(); as org) {
       <header class="page-head">
-        <nav class="crumbs" aria-label="Breadcrumb"><a routerLink="/group">{{ session.group()?.name }}</a></nav>
+        @if (session.groupShown()) { <nav class="crumbs" aria-label="Breadcrumb"><a routerLink="/group">{{ session.group()?.name }}</a></nav> }
         <div class="title-row">
           <span class="badge" style="width:2.25rem;height:2.25rem;font-size:0.8rem" [style.background]="session.orgColor(org.id)">{{ initials(org.name) }}</span>
           <h1>{{ org.name }}</h1>
           @if (session.canAdmin(org.id)) { <a class="btn" routerLink="/settings/group"><app-icon name="settings" />Manage</a> }
           @if (session.canEdit(org.id)) { <a class="btn primary" routerLink="/projects"><app-icon name="plus" />New project</a> }
         </div>
-        <p class="lede">{{ org.summary || 'Rules here reach every agent in ' + org.name + ', after the group rules and before project rules.' }}</p>
+        <p class="lede">{{ org.summary || 'Rules here reach every agent in ' + org.name + (session.groupShown() ? ', after the group rules and' : ',') + ' before project rules.' }}</p>
       </header>
 
       @if (recent().length) {

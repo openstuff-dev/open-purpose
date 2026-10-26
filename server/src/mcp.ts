@@ -17,14 +17,16 @@ import { addComment, applySuggestion, getReview, renderReviewForAgent, revisePro
 import type { Level, Scope } from './service/types.js';
 
 export const SERVER_INSTRUCTIONS = `OpenPurpose holds shared context: purpose, business logic, glossary, engineering
-guidelines and learnings. It is layered: the group (e.g. a whole company), your organization within it,
-the project, and the part of the project you work in (e.g. only the Angular frontend). Your token belongs
-to one organization; other organizations' content is private unless your organization was given read access.
+guidelines and learnings. It is layered: your organization (and, in large companies, the group of
+organizations around it), the project, and the part of the project you work in: some of its
+repositories or folders (e.g. only the Angular frontend). Your token belongs to one organization; other
+organizations' content is private unless your organization was given read access.
 
 Workflow:
 1. Before starting a task in a repository, call get_context with the repo's git remote URL
-   (\`git remote get-url origin\`), or the "project" value from .agentcontext.json if that file exists,
-   plus the path you are working in and the nearest manifest (package.json, *.csproj, ...).
+   (\`git remote get-url origin\`), plus the "project" value from .agentcontext.json if that file exists,
+   the path you are working in and the nearest manifest (package.json, *.csproj, ...). Always send the
+   remote: parts of a project can be bound to one repository.
    Follow what it says. More specific rules override general ones.
 2. If no project is found, ask the user which project the repo belongs to, then call register_repository
    (or create_project), and write .agentcontext.json with {"project": "<slug>"} in the repo root.
@@ -48,7 +50,7 @@ const manifestSchema = z.object({
 
 const locate = {
   project: z.string().optional().describe('Project slug, or "org/slug" for another organization, e.g. from .agentcontext.json. Takes precedence over remote_url.'),
-  remote_url: z.string().optional().describe('Output of `git remote get-url origin`'),
+  remote_url: z.string().optional().describe('Output of `git remote get-url origin`. Send it even with project: scopes can be bound to one repository.'),
   path: z.string().optional().describe('Repo-relative path of the file or folder you are working on'),
   stacks: z.array(z.string()).optional().describe('Stack tags you already know, e.g. ["angular"]. Usually leave empty and send manifests instead.'),
   manifests: z.array(manifestSchema).optional().describe('The manifest nearest to the path (package.json, *.csproj, go.mod, ...). Used to detect stacks consistently.'),
@@ -165,15 +167,21 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
 
   server.registerTool('list_scopes', {
     title: 'List scopes',
-    description: 'List the scopes (parts of a project, or stacks across the organization or group) that guidelines and learnings can be filed under.',
+    description: 'List the scopes (parts of a project: some of its repositories and/or folders; or stacks across the organization or group) that guidelines and learnings can be filed under.',
     inputSchema: { project: z.string().optional().describe('Project slug. Omit for group and organization scopes only.') },
   }, ({ project }) => run(async (db) => {
     const p = project ? await getProject(db, a, project) : null;
     const orgId = p?.organization_id ?? a.orgId;
-    const at = async (org: string | null, proj: string | null) => (await db.query<Scope>(
-      `SELECT slug, name, path_globs, stacks, description FROM scopes
+    const at = async (org: string | null, proj: string | null) => (await db.query<Scope & { repositories: string[] }>(
+      `SELECT slug, name, path_globs, stacks, description,
+              ARRAY(SELECT r.remote_key FROM scope_repositories sr JOIN repositories r ON r.id = sr.repository_id
+                     WHERE sr.scope_id = scopes.id ORDER BY r.remote_key) AS repositories
+         FROM scopes
         WHERE organization_id IS NOT DISTINCT FROM $1 AND project_id IS NOT DISTINCT FROM $2 ORDER BY position, name`, [org, proj])).rows;
-    const fmt = (s: Scope) => ({ slug: s.slug, name: s.name, paths: s.path_globs, stacks: s.stacks, description: s.description });
+    const fmt = (s: Scope & { repositories: string[] }) => ({
+      slug: s.slug, name: s.name, ...(s.repositories.length ? { repositories: s.repositories } : {}),
+      paths: s.path_globs, stacks: s.stacks, description: s.description,
+    });
     return json({
       group: (await at(null, null)).map(fmt),
       organization: orgId ? (await at(orgId, null)).map(fmt) : [],

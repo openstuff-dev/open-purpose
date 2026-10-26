@@ -18,12 +18,12 @@ type Tab = 'account' | 'appearance' | 'connect' | 'test' | 'group' | 'people' | 
 const AGENTS_SNIPPET = `## OpenPurpose (shared rules and learnings)
 
 We keep our purpose, business logic, glossary, guidelines and learnings in
-OpenPurpose, available through the \`openpurpose\` MCP server. Rules come in layers: the
-group, our organization, the project and the part of the code you are in.
+OpenPurpose, available through the \`openpurpose\` MCP server. Rules come in layers: our
+organization, the project and the part of the code you are in (a repository or a folder).
 
 1. Before you start a task, call \`get_context\` with:
-   - \`project\` from \`.agentcontext.json\` if that file exists, otherwise
-     \`remote_url\` from \`git remote get-url origin\`
+   - \`remote_url\` from \`git remote get-url origin\`
+   - \`project\` from \`.agentcontext.json\` if that file exists
    - \`path\`: the file or folder you are about to work on
    - \`manifests\`: the nearest \`package.json\`, \`*.csproj\` or similar, with its content
    Follow what it returns. More specific rules override general ones.
@@ -56,7 +56,7 @@ group, our organization, the project and the part of the code you are in.
         <a routerLink="/settings/connect" routerLinkActive="active"><app-icon name="plug" />Connect an agent</a>
         <a routerLink="/settings/test" routerLinkActive="active"><app-icon name="eye" />Test a repository</a>
         @if (session.adminsAnything) {
-          <div class="nav-label">{{ session.group()?.name }}</div>
+          <div class="nav-label">{{ session.groupShown() ? session.group()?.name : session.org()?.name }}</div>
           <a routerLink="/settings/group" routerLinkActive="active"><app-icon name="building" />Organizations</a>
           <a routerLink="/settings/people" routerLinkActive="active"><app-icon name="users" />People and agents</a>
         }
@@ -181,7 +181,7 @@ group, our organization, the project and the part of the code you are in.
           }
 
           @case ('group') {
-            @if (session.canAdmin(null)) {
+            @if (session.canAdmin(null) && session.groupShown()) {
               <section>
                 <h2>Group</h2>
                 <div class="setting-card">
@@ -200,7 +200,9 @@ group, our organization, the project and the part of the code you are in.
               <div class="block-head">
                 <div>
                   <h2>Organizations</h2>
-                  <p class="quiet">Each keeps its own rules, projects and inbox, and is private to its members unless shared below.</p>
+                  <p class="quiet">{{ session.groupShown()
+                    ? 'Each keeps its own rules, projects and inbox, and is private to its members unless shared below.'
+                    : 'Most teams need just one. Add another for a separate company or division with its own rules, projects and people.' }}</p>
                 </div>
               </div>
               <div class="setting-card">
@@ -244,14 +246,18 @@ group, our organization, the project and the part of the code you are in.
                         <label class="grow">Name <input name="nname" [(ngModel)]="newOrg.name" required placeholder="Acme Payments"></label>
                         <label>Slug <input name="nslug" class="mono" [(ngModel)]="newOrg.slug" placeholder="payments"></label>
                         <label class="full">Summary <input name="nsum" [(ngModel)]="newOrg.summary"></label>
+                        @if (!session.groupShown()) {
+                          <label class="full">Name for both organizations together <input name="ngroup" [(ngModel)]="groupName" required placeholder="Acme Group"></label>
+                          <p class="quiet full">With a second organization, {{ session.org()?.name }} becomes one of several in a group. The group gets its own rules that reach every organization, and a page under this name.</p>
+                        }
                         <p class="quiet full">The slug is what people write in links to its projects, like <code>[[payments/payment-gateway]]</code>.</p>
                         <div class="form-actions full">
-                          <button class="btn primary" type="submit" [disabled]="!newOrg.name.trim()">Create organization</button>
+                          <button class="btn primary" type="submit" [disabled]="!newOrg.name.trim() || !groupName.trim()">Create organization</button>
                           <button class="btn" type="button" (click)="addingOrg.set(false)">Cancel</button>
                         </div>
                       </form>
                     } @else {
-                      <button class="btn" type="button" (click)="addingOrg.set(true)"><app-icon name="plus" />New organization</button>
+                      <button class="btn" type="button" (click)="addingOrg.set(true)"><app-icon name="plus" />{{ session.groupShown() ? 'New organization' : 'Add a second organization' }}</button>
                     }
                   </div>
                 }
@@ -447,7 +453,9 @@ export class SettingsPage {
   async createOrg(): Promise<void> {
     try {
       const body = { name: this.newOrg.name.trim(), slug: this.newOrg.slug.trim() || undefined, summary: this.newOrg.summary.trim() || undefined };
+      const naming = !this.session.groupShown() && this.groupName.trim() !== this.session.group()?.name;
       if (!await claimingOldSlug((take_alias) => this.api.createOrganization({ ...body, take_alias }))) return;
+      if (naming) await this.api.renameGroup(this.groupName.trim());
       this.newOrg = { name: '', slug: '', summary: '' };
       this.addingOrg.set(false);
       await this.reloadMe();

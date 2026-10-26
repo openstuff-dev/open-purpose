@@ -5,7 +5,7 @@ import type {
   ContextResult, Doc, DocDetail, DocKind, EditMode, EditResult, Graph, GroupRef, GroupRow, Level, LinkRef,
   LinkResolution, LinkTarget, Me, Member, Organization, Project, ProjectDetail, Proposal, ProposalStatus, Role,
   Scope, ScopeDetail, SearchHit, Section, SectionVersion, GraphNode, TokenRow, ProposalCounts, Review, ReviewThread,
-  ApiSpec, ApiSpecDetail, SlugKind, SlugRename,
+  ApiSpec, ApiSpecDetail, Repository, SlugKind, SlugRename,
 } from './models';
 
 const lv = (id: string | null | undefined) => id ?? 'group';
@@ -35,7 +35,7 @@ export class Api {
   revokeMyToken = (id: string) => this.send<void>('DELETE', `/me/tokens/${id}`);
   renameGroup = (name: string) => this.send('PUT', '/group', { name });
   groups = () => this.get<GroupRow[]>('/groups');
-  createGroup = (body: { name: string; organization_name: string; admin_name?: string }) =>
+  createGroup = (body: { name: string; organization_name?: string; admin_name?: string }) =>
     this.send<{ group: GroupRef; organization: Organization; token?: string }>('POST', '/groups', body);
 
   organizations = () => this.get<Organization[]>('/organizations');
@@ -53,7 +53,7 @@ export class Api {
   updateProject = (id: string, body: Partial<Pick<Project, 'name' | 'slug' | 'summary' | 'reviewed' | 'organization_id'>> & { archived?: boolean }) =>
     this.send<Project>('PATCH', `/projects/${id}`, body);
   deleteProject = (id: string) => this.send<void>('DELETE', `/projects/${id}`);
-  addRepository = (projectId: string, remote_url: string) => this.send('POST', `/projects/${projectId}/repositories`, { remote_url });
+  addRepository = (projectId: string, remote_url: string) => this.send<Repository>('POST', `/projects/${projectId}/repositories`, { remote_url });
   deleteRepository = (id: string) => this.send<void>('DELETE', `/repositories/${id}`);
 
   addApi = (projectId: string, body: { name?: string; url?: string; filename?: string; content?: string }) =>

@@ -26,7 +26,7 @@ const TABS: Tab[] = ['documents', 'scopes', 'apis', 'agents', 'connections', 're
     @if (project(); as p) {
       <header class="page-head project-head">
         <nav class="crumbs" aria-label="Breadcrumb">
-          <a routerLink="/group">{{ session.group()?.name }}</a>
+          @if (session.groupShown()) { <a routerLink="/group">{{ session.group()?.name }}</a> }
           <a routerLink="/organization" (click)="openOrg(p.organization.id, $event)">{{ p.organization.name }}</a>
           <a routerLink="/projects">Projects</a>
         </nav>
@@ -49,7 +49,9 @@ const TABS: Tab[] = ['documents', 'scopes', 'apis', 'agents', 'connections', 're
       </header>
 
       <ol class="layer-path" aria-label="Where this project's rules sit">
-        <li><a routerLink="/group"><span class="lp-kind">Group</span><span class="lp-name">{{ session.group()?.name }}</span></a></li>
+        @if (session.groupShown()) {
+          <li><a routerLink="/group"><span class="lp-kind">Group</span><span class="lp-name">{{ session.group()?.name }}</span></a></li>
+        }
         <li><a routerLink="/organization" (click)="openOrg(p.organization.id, $event)"><span class="lp-kind">Organization</span>
           <span class="lp-name"><i class="dot" [style.background]="session.orgColor(p.organization_id)"></i>{{ p.organization.name }}</span></a></li>
         <li class="current" aria-current="page"><a [routerLink]="[]" [queryParams]="{ tab: null }"><span class="lp-kind">Project</span><span class="lp-name">{{ p.name }}</span></a></li>
@@ -80,9 +82,9 @@ const TABS: Tab[] = ['documents', 'scopes', 'apis', 'agents', 'connections', 're
           @case ('scopes') {
             <div class="panel-head">
               <h2>Scopes</h2>
-              <p class="quiet">Parts of the project with their own rules, matched by folder or by stack. A rule in the Frontend scope never reaches backend code. Open a scope to see and edit its documents.</p>
+              <p class="quiet">Parts of the project with their own rules: one or more of its repositories, folders in them, or a stack. A rule in the Frontend scope never reaches backend code. Open a scope to see and edit its documents.</p>
             </div>
-            <app-scope-list [organizationId]="p.organization_id" [projectId]="p.id" [canEdit]="p.can_edit" emptyText="No scopes yet. Add one per part with its own conventions, such as Frontend (frontend/**) and API (src/Api/**)." />
+            <app-scope-list [organizationId]="p.organization_id" [projectId]="p.id" [canEdit]="p.can_edit" [repositories]="p.repositories" (repositoryAdded)="reload()" emptyText="No scopes yet. Add one per part with its own conventions, such as Frontend (the Angular repository, or frontend/** in a monorepo) and API (src/Api/**)." />
           }
           @case ('apis') {
             <div class="panel-head">

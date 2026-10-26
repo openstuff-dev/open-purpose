@@ -18,7 +18,7 @@ import { initials } from '../core/theme';
   template: `
     <section>
       <h2>All groups</h2>
-      <p class="quiet">Each group is walled off from the others in the database: its people, agents and rules never see another group's. Use one per company or client.</p>
+      <p class="quiet">Each group is walled off from the others in the database: its people, agents and rules never see another group's. Use one per company or client. A group starts as one organization; its admins can add more later.</p>
     </section>
 
     @if (created(); as c) {
@@ -50,12 +50,12 @@ import { initials } from '../core/theme';
     <section>
       <h3 class="list-label">New group</h3>
       <form class="inline-form panel" (ngSubmit)="create()">
-        <label class="grow">Group name <input name="name" [(ngModel)]="draft.name" required placeholder="Contoso Group"></label>
-        <label class="grow">First organization <input name="org" [(ngModel)]="draft.organization_name" required placeholder="Contoso Retail"></label>
+        <label class="grow">Company or client <input name="name" [(ngModel)]="draft.name" required placeholder="Contoso"></label>
+        <label class="grow">First organization <span class="quiet">(if not the same)</span> <input name="org" [(ngModel)]="draft.organization_name" [placeholder]="draft.name || 'Contoso Retail'"></label>
         <label class="full">First admin <span class="quiet">(leave empty to be the admin yourself)</span>
           <input name="admin" [(ngModel)]="draft.admin_name" placeholder="Name of the person who will run it"></label>
         <div class="form-actions full">
-          <button class="btn primary" type="submit" [disabled]="!draft.name.trim() || !draft.organization_name.trim()"><app-icon name="plus" />Create group</button>
+          <button class="btn primary" type="submit" [disabled]="!draft.name.trim()"><app-icon name="plus" />Create group</button>
         </div>
       </form>
     </section>
@@ -87,7 +87,7 @@ export class GroupsPage {
   async create(): Promise<void> {
     try {
       const r = await this.api.createGroup({
-        name: this.draft.name.trim(), organization_name: this.draft.organization_name.trim(),
+        name: this.draft.name.trim(), organization_name: this.draft.organization_name.trim() || undefined,
         admin_name: this.draft.admin_name.trim() || undefined,
       });
       this.created.set({ id: r.group.id, name: r.group.name, admin: this.draft.admin_name.trim(), token: r.token });

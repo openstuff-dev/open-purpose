@@ -97,7 +97,13 @@ describe('OpenPurpose with groups and organizations', () => {
     expect(me.data.group.can_admin).toBe(true);
     expect(me.data.organizations.map((x: any) => x.name)).toEqual(['Acme Logistics']);
     o.logistics = me.data.organizations[0].id;
-    expect((await api('GET', '/documents?organization_id=group')).data.map((d: any) => d.kind)).toEqual(['purpose', 'guidelines']);
+    // One organization: the group stays invisible and has no documents yet.
+    expect((await api('GET', '/documents?organization_id=group')).data).toEqual([]);
+    const { client, call } = await mcp(ADMIN);
+    const ctx = (await call('get_context', {})).text;
+    expect(ctx).not.toContain('- Group:');
+    expect(ctx).toContain('general rules come first (organization)');
+    await client.close();
     expect((await api(`GET`, `/documents?organization_id=${o.logistics}`)).data.map((d: any) => d.kind)).toEqual(['purpose', 'business_logic', 'guidelines']);
   });
 
@@ -105,6 +111,7 @@ describe('OpenPurpose with groups and organizations', () => {
     const pay = await api('POST', '/organizations', { name: 'Acme Payments', slug: 'payments' });
     expect(pay.status).toBe(201);
     o.payments = pay.data.id;
+    expect((await api('GET', '/documents?organization_id=group')).data.map((d: any) => d.kind)).toEqual(['purpose', 'guidelines']);
     await api('PATCH', `/organizations/${o.logistics}`, { slug: 'logistics' });
     const mk = async (body: object) => (await api('POST', '/members', body)).data.token as string;
     t.jonas = await mk({ name: 'Agent Jonas', kind: 'agent', organization_id: o.logistics });
@@ -196,6 +203,42 @@ describe('OpenPurpose with groups and organizations', () => {
     expect(fe.text).toContain('Every user action must be undoable');
     const be = await call('get_context', { remote_url: SSH_REMOTE, path: 'backend/x.cs' });
     expect(be.text).not.toContain('Every user action must be undoable');
+    await client.close();
+  });
+
+  it('binds scopes to repositories of a project', async () => {
+    const API_REMOTE = 'https://dev.azure.com/acme/Platform/_git/customer-portal-api';
+    const apiRepo = (await api('POST', `/projects/${projectId}/repositories`, { remote_url: API_REMOTE })).data;
+    const dotnetApi = await api('POST', '/scopes', { project_id: projectId, name: '.NET API', repository_ids: [apiRepo.id] });
+    expect(dotnetApi.status).toBe(201);
+    expect(dotnetApi.data.repository_ids).toEqual([apiRepo.id]);
+    const doc = await api('POST', '/documents', { scope_id: dotnetApi.data.id, kind: 'guidelines', title: 'API conventions' });
+    await api('POST', `/documents/${doc.data.id}/sections`, { heading: 'Use minimal APIs', body: 'No controllers.', mode: 'propose' });
+
+    expect((await api('POST', '/scopes', { project_id: projectId, name: 'Bad', repository_ids: ['00000000-0000-0000-0000-000000000000'] })).status).toBe(400);
+    expect((await api('POST', '/scopes', { organization_id: o.logistics, name: 'Org bad', repository_ids: [apiRepo.id] })).status).toBe(400);
+
+    const { client, call } = await mcp(t.jonas);
+    const inApi = await call('get_context', { remote_url: API_REMOTE, path: 'src/Program.cs' });
+    expect(inApi.text).toContain('Customer Portal › .NET API (repository "azure:acme/platform/customer-portal-api")');
+    expect(inApi.text).toContain('Use minimal APIs');
+    expect(inApi.text).not.toContain('Repository scopes left out');
+    // The whole repository is covered, and a learning made in it lands in the bound scope.
+    const learning = await call('propose_learning', {
+      heading: 'Return problem details', body: 'RFC 9457.', rationale: 'Corrected.', remote_url: API_REMOTE, path: 'src/Endpoints/Orders.cs',
+    });
+    expect(learning.text).toContain('Customer Portal › .NET API');
+
+    const inPortal = await call('get_context', { remote_url: SSH_REMOTE, path: 'src/Program.cs' });
+    expect(inPortal.text).not.toContain('Use minimal APIs');
+    const noRemote = await call('get_context', { project: 'logistics/customer-portal', path: 'src/Program.cs' });
+    expect(noRemote.text).toContain('Repository scopes left out: ".NET API"');
+    expect((await call('list_scopes', { project: 'logistics/customer-portal' })).text).toContain('azure:acme/platform/customer-portal-api');
+
+    const unbound = await api('PATCH', `/scopes/${dotnetApi.data.id}`, { repository_ids: [] });
+    expect(unbound.data.repository_ids).toEqual([]);
+    expect((await call('get_context', { remote_url: API_REMOTE, path: 'src/Program.cs' })).text).not.toContain('Use minimal APIs');
+    await api('DELETE', `/scopes/${dotnetApi.data.id}`);
     await client.close();
   });
 
@@ -675,7 +718,7 @@ describe('upgrade from v1', () => {
     expect(check.org).toEqual([{ name: 'Old Corp' }]);
     expect(check.project).toBe(true);
     expect(check.oldDoc).toBe(true);
-    expect(check.groupDocs).toBe(2);
+    expect(check.groupDocs).toBe(0);
     expect(check.roles).toEqual([
       { name: 'Admin', is_superadmin: true, role: 'admin', group_level: true },
       { name: 'Bot', is_superadmin: false, role: 'agent', group_level: false },

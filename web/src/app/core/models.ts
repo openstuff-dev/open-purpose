@@ -168,6 +168,8 @@ export interface ApiSpecDetail extends ApiSpec {
 export interface ScopeDetail extends Scope {
   documents: Doc[];
   project: Project | null;
+  /** The project's repositories, to pick from (empty for organization and group scopes). */
+  repositories: Repository[];
   organization: OrgRef | null;
   can_edit: boolean;
   aliases: SlugAlias[];

@@ -189,7 +189,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
     api.get('/groups', server, async (req) => admin.listGroups(pool, req.actor));
     api.post('/groups', server, async (req, reply) => {
       const body = parse(z.object({
-        name: z.string().min(1), slug: z.string().optional(), organization_name: z.string().min(1),
+        name: z.string().min(1), slug: z.string().optional(), organization_name: z.string().optional(),
         organization_slug: z.string().optional(), admin_name: z.string().optional(),
       }), req.body);
       return reply.status(201).send(await admin.createGroup(pool, req.actor, body));
@@ -337,7 +337,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
     const scopeBody = z.object({
       name: z.string().min(1), slug: z.string().optional(), description: z.string().optional(),
       path_globs: z.array(z.string()).optional(), stacks: z.array(z.string()).optional(), position: z.number().int().optional(),
-      take_alias: z.boolean().optional(),
+      repository_ids: z.array(z.string()).optional(), take_alias: z.boolean().optional(),
     });
     api.get('/scopes', async (req) => {
       const q = req.query as { organization_id?: string; project_id?: string };
@@ -352,9 +352,10 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       const scope = await content.getScope(req.db, a, (req.params as { id: string }).id);
       const documents = await content.listDocuments(req.db, a, { scope_id: scope.id });
       const project = scope.project_id ? await projects.getProject(req.db, a, scope.project_id) : null;
+      const repositories = project ? await projects.listRepositories(req.db, project.id) : [];
       const org = a.org(scope.organization_id);
       const aliases = await listAliases(req.db, 'scope', scope.id);
-      return { ...scope, documents, project, organization: org && { id: org.id, slug: org.slug, name: org.name }, can_edit: a.canEdit(scope.organization_id), aliases };
+      return { ...scope, documents, project, repositories, organization: org && { id: org.id, slug: org.slug, name: org.name }, can_edit: a.canEdit(scope.organization_id), aliases };
     });
     api.patch('/scopes/:id', async (req) => {
       const { slug, take_alias, ...body } = parse(scopeBody.partial(), req.body);

@@ -65,15 +65,33 @@ export interface ScopeInput {
   description?: string;
   path_globs?: string[];
   stacks?: string[];
+  /** Repositories of the scope's project it is bound to. */
+  repository_ids?: string[];
   position?: number;
   /** Take the slug even if it is another scope's old slug. */
   take_alias?: boolean;
 }
 
-const SCOPE_COLS = 'id, organization_id, project_id, slug, name, description, path_globs, stacks, position';
+const SCOPE_COLS = `id, organization_id, project_id, slug, name, description, path_globs, stacks, position,
+  ARRAY(SELECT sr.repository_id FROM scope_repositories sr WHERE sr.scope_id = scopes.id ORDER BY sr.created_at) AS repository_ids`;
 
 function cleanGlobs(globs: string[] | undefined): string[] {
   return [...new Set((globs ?? []).map(normalizePath).filter(Boolean))];
+}
+
+async function bindRepositories(c: Queryable, scope: Scope, ids: string[] | undefined): Promise<Scope> {
+  if (ids === undefined) return scope;
+  const unique = [...new Set(ids)];
+  if (unique.length && !scope.project_id) throw badRequest('Only project scopes can be bound to repositories');
+  if (unique.some((id) => !isUuid(id))) throw badRequest('repository_ids must be repository ids');
+  const { rows } = await c.query<{ id: string }>(
+    'SELECT id FROM repositories WHERE id = ANY($1::uuid[]) AND project_id = $2', [unique, scope.project_id]);
+  if (rows.length !== unique.length) throw badRequest("repository_ids must be repositories of the scope's project");
+  await c.query('DELETE FROM scope_repositories WHERE scope_id = $1 AND NOT (repository_id = ANY($2::uuid[]))', [scope.id, unique]);
+  for (const id of unique) {
+    await c.query('INSERT INTO scope_repositories (scope_id, repository_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [scope.id, id]);
+  }
+  return { ...scope, repository_ids: unique };
 }
 
 /** Scopes defined at exactly this level (group, organization or project). */
@@ -111,22 +129,24 @@ export async function createScope(
       [lv.organization_id, lv.project_id, slug, input.name.trim(), input.description ?? '',
         cleanGlobs(input.path_globs), normalizeTags(input.stacks ?? []), input.position ?? 0],
     );
-    return rows[0];
+    return bindRepositories(c, rows[0], input.repository_ids);
   }));
 }
 
 export async function updateScope(db: Db, a: Access, id: string, input: Partial<ScopeInput>): Promise<Scope> {
   const cur = await getScope(db, a, id);
   a.requireEdit(cur.organization_id);
-  const { rows } = await wrap(db.query<Scope>(
-    `UPDATE scopes SET slug = $2, name = $3, description = $4, path_globs = $5, stacks = $6,
-            position = $7, updated_at = now()
-      WHERE id = $1 RETURNING ${SCOPE_COLS}`,
-    [id, input.slug ?? cur.slug, input.name ?? cur.name, input.description ?? cur.description,
-      input.path_globs ? cleanGlobs(input.path_globs) : cur.path_globs,
-      input.stacks ? normalizeTags(input.stacks) : cur.stacks, input.position ?? cur.position],
-  ));
-  return rows[0];
+  return wrap(tx(db, async (c) => {
+    const { rows } = await c.query<Scope>(
+      `UPDATE scopes SET slug = $2, name = $3, description = $4, path_globs = $5, stacks = $6,
+              position = $7, updated_at = now()
+        WHERE id = $1 RETURNING ${SCOPE_COLS}`,
+      [id, input.slug ?? cur.slug, input.name ?? cur.name, input.description ?? cur.description,
+        input.path_globs ? cleanGlobs(input.path_globs) : cur.path_globs,
+        input.stacks ? normalizeTags(input.stacks) : cur.stacks, input.position ?? cur.position],
+    );
+    return bindRepositories(c, rows[0], input.repository_ids);
+  }));
 }
 
 export async function deleteScope(db: Db, a: Access, id: string): Promise<void> {

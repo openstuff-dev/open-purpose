@@ -68,7 +68,7 @@ import { Palette } from './shared/palette';
             <button type="button" class="ws-button" (click)="wsOpen.set(!wsOpen())" [attr.aria-expanded]="wsOpen()" aria-haspopup="menu">
               @if (session.org(); as org) {
                 <span class="badge" [style.background]="session.orgColor(org.id)">{{ initials(org.name) }}</span>
-                <span class="ws-text"><strong>{{ org.name }}</strong><small>{{ me.group.name }}</small></span>
+                <span class="ws-text"><strong>{{ org.name }}</strong>@if (session.groupShown()) { <small>{{ me.group.name }}</small> }</span>
               } @else {
                 <span class="badge group">{{ initials(me.group.name) }}</span>
                 <span class="ws-text"><strong>{{ me.group.name }}</strong><small>Choose an organization</small></span>
@@ -77,7 +77,7 @@ import { Palette } from './shared/palette';
             </button>
             @if (wsOpen()) {
               <div class="menu" role="menu">
-                @if (session.readableOrgs().length) {
+                @if (session.groupShown() && session.readableOrgs().length) {
                   <div class="menu-label">Organizations in {{ me.group.name }}</div>
                   @for (o of session.readableOrgs(); track o.id) {
                     <button type="button" class="menu-item" role="menuitemradio" [attr.aria-checked]="o.id === session.orgId()" (click)="pickOrg(o.id)">
@@ -100,7 +100,7 @@ import { Palette } from './shared/palette';
                 }
                 @if (session.canAdmin(null)) {
                   <div class="menu-sep"></div>
-                  <a class="menu-item" routerLink="/settings/group" (click)="wsOpen.set(false)"><app-icon name="settings" />Manage organizations</a>
+                  <a class="menu-item" routerLink="/settings/group" (click)="wsOpen.set(false)"><app-icon name="settings" />{{ session.groupShown() ? 'Manage organizations' : 'Add an organization' }}</a>
                 }
               </div>
             }
@@ -119,9 +119,11 @@ import { Palette } from './shared/palette';
               </a>
             </li>
           </ul>
-          <div class="nav-label">{{ me.group.name }}</div>
+          @if (session.groupShown()) { <div class="nav-label">{{ me.group.name }}</div> }
           <ul>
-            <li><a routerLink="/group" routerLinkActive="active"><app-icon name="building" />Group-wide rules</a></li>
+            @if (session.groupShown()) {
+              <li><a routerLink="/group" routerLinkActive="active"><app-icon name="building" />Group-wide rules</a></li>
+            }
             <li><a routerLink="/search" routerLinkActive="active"><app-icon name="search" />Search</a></li>
           </ul>
 
@@ -256,8 +258,8 @@ export class App {
     const me = this.session.me();
     if (!me) return '';
     if (me.actor.is_superadmin) return 'Server admin';
-    if (me.group.role) return `${ROLE_LABEL[me.group.role]}, ${me.group.name}`;
     const org = this.session.org();
+    if (me.group.role) return `${ROLE_LABEL[me.group.role]}, ${this.session.groupShown() ? me.group.name : org?.name ?? me.group.name}`;
     return org?.role ? `${ROLE_LABEL[org.role]}, ${org.name}` : '';
   }
 

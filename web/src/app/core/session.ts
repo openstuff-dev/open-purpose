@@ -43,6 +43,11 @@ export class Session {
   readonly group = computed(() => this.me()?.group ?? null);
   readonly orgs = computed(() => (this.me()?.organizations ?? []).filter((o) => !o.archived_at));
   readonly readableOrgs = computed(() => this.orgs().filter((o) => o.readable));
+  /**
+   * A group with one organization is just that organization: the group layer
+   * (its page, menu, breadcrumbs) only appears once there is a second one.
+   */
+  readonly groupShown = computed(() => (this.me()?.organizations.length ?? 0) > 1);
   readonly orgId = computed(() => this.me()?.current_organization_id ?? null);
   /** Agent mode: the UI shows exactly what an agent in the current organization reads. */
   readonly agentMode = signal(read(AGENT) === '1');

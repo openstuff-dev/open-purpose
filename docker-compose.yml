@@ -21,8 +21,8 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgres://openpurpose:${POSTGRES_PASSWORD:-openpurpose}@db:5432/openpurpose
-      OPENPURPOSE_GROUP_NAME: ${OPENPURPOSE_GROUP_NAME:-Our company}
-      OPENPURPOSE_ORG_NAME: ${OPENPURPOSE_ORG_NAME:-Engineering}
+      OPENPURPOSE_GROUP_NAME: ${OPENPURPOSE_GROUP_NAME:-}
+      OPENPURPOSE_ORG_NAME: ${OPENPURPOSE_ORG_NAME:-Our company}
       OPENPURPOSE_PUBLIC_URL: ${OPENPURPOSE_PUBLIC_URL:-http://localhost:8080}
       # Optional: fix the first admin's token instead of reading it from the log.
       OPENPURPOSE_BOOTSTRAP_TOKEN: ${OPENPURPOSE_BOOTSTRAP_TOKEN:-}

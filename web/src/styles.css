@@ -433,6 +433,13 @@ kbd {
 }
 .chip.path { font-family: var(--mono); font-weight: 400; background: var(--accent-soft); color: var(--accent-text); border-radius: 4px; }
 .chip.stack { background: transparent; box-shadow: inset 0 0 0 1px var(--line-strong); }
+.chip.repo { font-family: var(--mono); font-weight: 400; background: transparent; box-shadow: inset 0 0 0 1px var(--accent-soft); color: var(--accent-text); border-radius: 4px; }
+.repo-picker { flex: 1 1 100%; min-width: 0; border: 1px solid var(--line); border-radius: var(--r-md); padding: 0.6rem 0.9rem 0.5rem; margin: 0; display: flex; flex-direction: column; gap: 0.45rem; }
+.repo-picker legend { font-size: var(--fs-sm); font-weight: 600; padding: 0 0.35rem; color: var(--ink-2); }
+.repo-picker label.check code { overflow-wrap: anywhere; }
+.repo-picker p { margin: 0; font-size: var(--fs-sm); }
+.repo-add { display: flex; gap: 0.5rem; align-items: center; }
+.repo-add input { flex: 1; min-width: 0; margin: 0; }
 .chip .dot { width: 6px; height: 6px; }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.55rem 1.5rem; margin: 0.5rem 0 1rem; }
 .facts dt { color: var(--muted); font-size: var(--fs-sm); }

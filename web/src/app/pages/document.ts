@@ -21,7 +21,7 @@ interface Draft { heading: string; body: string; note: string }
     @if (doc(); as d) {
       <header class="page-head doc-head">
         <nav class="crumbs" aria-label="Breadcrumb">
-          <a routerLink="/group">{{ session.group()?.name }}</a>
+          @if (session.groupShown() || !d.organization) { <a routerLink="/group">{{ session.group()?.name }}</a> }
           @if (d.organization; as o) { <a routerLink="/organization">{{ o.name }}</a> }
           @if (d.project; as p) { <a [routerLink]="['/projects', p.id]">{{ p.name }}</a> }
           @if (d.scope; as s) { <a [routerLink]="['/scopes', s.id]">{{ s.name }}</a> }

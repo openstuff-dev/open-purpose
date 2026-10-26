@@ -8,10 +8,10 @@ specific ones last:
 
 | Level | Applies to | Example |
 |---|---|---|
-| Group | every organization in a company group | "Never log personal data" |
+| Group | every organization in a company group (only once there are several) | "Never log personal data" |
 | Organization | every project in one company or division | "Amounts are integer øre, never floats" |
 | Project | every repo and folder of one product | "The portal owns no business data" |
-| Scope | one part of a project, or one kind of code across an organization or the group | "Every user action in the frontend must be undoable" (only `frontend/**`) |
+| Scope | one part of a project: some of its repositories, some folders, or both; or one kind of code across an organization or the group | "Every user action in the frontend must be undoable" (only the Angular repo, or only `frontend/**`) |
 
 Agents read it over **MCP**; people curate it in an **Angular web UI**. When a
 developer corrects an agent, the agent proposes a learning. It is filed under the
@@ -45,7 +45,9 @@ private to their members by default:
   group-wide term.
 - **Server admins** create groups, and can switch between them.
 
-A small company simply has one group with one organization.
+A small company simply has one organization. Its group stays out of sight (no
+group page, menu or layer in the agent's context) until a group admin adds a
+second organization under Settings › Organizations.
 
 ## What else is in it
 
@@ -54,8 +56,10 @@ A small company simply has one group with one organization.
   A `.agentcontext.json` with `{"project": "org/slug"}` overrides it. Unknown
   repos make the agent ask the user and register the repo. One project can span
   many repos, and the same repo can belong to projects in different groups.
-- **Scopes** match by path glob (`frontend/**`) or by stack tag (`angular`,
-  `dotnet`). Tags are detected server-side from the manifest the agent sends
+- **Scopes** match by repository, by path glob (`frontend/**`) or by stack tag
+  (`angular`, `dotnet`). A project scope bound to repositories (say "Angular" for
+  the web repo and ".NET" for the API repo) only applies inside them; its paths and
+  stacks, if any, narrow it further. Unbound scopes work across a monorepo's folders. Tags are detected server-side from the manifest the agent sends
   (`package.json`, `*.csproj`, ...), so every agent tags code the same way.
 - **Per-section edit modes.** Each section is **locked** (agents read only),
   **propose** (agent edits become proposals) or **open** (agents edit directly).
@@ -108,7 +112,7 @@ A small company simply has one group with one organization.
 ## Run it
 
 ```bash
-cp .env.example .env        # set POSTGRES_PASSWORD, OPENPURPOSE_GROUP_NAME and OPENPURPOSE_ORG_NAME
+cp .env.example .env        # set POSTGRES_PASSWORD and OPENPURPOSE_ORG_NAME
 docker compose up -d --build
 docker compose logs openpurpose | grep "Admin token"
 ```
@@ -154,8 +158,8 @@ forced on the owner instead. Either way works without configuration.
 |---|---|---|
 | `DATABASE_URL` | `postgres://openpurpose:openpurpose@localhost:5432/openpurpose` | |
 | `PORT` | `8080` | |
-| `OPENPURPOSE_GROUP_NAME` | `Our company` | first group, created on first boot only |
-| `OPENPURPOSE_ORG_NAME` | `Engineering` | first organization in that group, first boot only |
+| `OPENPURPOSE_ORG_NAME` | `Our company` | first organization, created on first boot only |
+| `OPENPURPOSE_GROUP_NAME` | the organization's name | the group around it; only shown once it has a second organization |
 | `OPENPURPOSE_PUBLIC_URL` | `http://localhost:PORT` | shown in MCP setup snippets |
 | `OPENPURPOSE_BOOTSTRAP_TOKEN` | random | first admin's token; otherwise printed once in the log |
 | `OPENPURPOSE_API_FETCH` | `on` | `off` stops the server from fetching API spec URLs (uploads still work) |

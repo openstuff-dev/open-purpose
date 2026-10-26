@@ -1,12 +1,12 @@
 ## OpenPurpose (shared rules and learnings)
 
 We keep our purpose, business logic, glossary, guidelines and learnings in
-OpenPurpose, available through the `openpurpose` MCP server. Rules come in layers: the
-group, our organization, the project and the part of the code you are in.
+OpenPurpose, available through the `openpurpose` MCP server. Rules come in layers: our
+organization, the project and the part of the code you are in (a repository or a folder).
 
 1. Before you start a task, call `get_context` with:
-   - `project` from `.agentcontext.json` if that file exists, otherwise
-     `remote_url` from `git remote get-url origin`
+   - `remote_url` from `git remote get-url origin`
+   - `project` from `.agentcontext.json` if that file exists
    - `path`: the file or folder you are about to work on
    - `manifests`: the nearest `package.json`, `*.csproj` or similar, with its content
    Follow what it returns. More specific rules override general ones.

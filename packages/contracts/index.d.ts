@@ -51,6 +51,8 @@ export interface Scope {
   description: string;
   path_globs: string[];
   stacks: string[];
+  /** Project scopes only: the repositories it is bound to. Empty = any repository of the project. */
+  repository_ids: string[];
   position: number;
 }
 

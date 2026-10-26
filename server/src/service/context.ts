@@ -2,6 +2,7 @@ import type { Access } from '../auth.js';
 import type { Queryable } from '../db.js';
 import { matchScopes, mostSpecific, normalizePath, type ScopeMatch } from '../domain/scopes.js';
 import { detectStacks, normalizeTags, type Manifest } from '../domain/stacks.js';
+import { tryParseRemote } from '../domain/remote.js';
 import { documentsAt, listSections } from './content.js';
 import { resolveProject, type Resolution } from './projects.js';
 import { relatedTo, type Related } from './graph.js';
@@ -31,12 +32,15 @@ export interface ContextBlock {
 }
 
 export interface ContextResult {
-  group: { name: string };
+  /** shown: false while the group has a single organization, so it is just that organization. */
+  group: { name: string; shown: boolean };
   organization: { id: string; slug: string; name: string } | null;
   project: Project | null;
   resolution: Pick<Resolution, 'via' | 'remote' | 'renamed' | 'suggestions'>;
   path: string;
   stacks: string[];
+  /** Names of repository-bound scopes skipped because remote_url was missing or not one of the project's repositories. */
+  missed_repository_scopes: string[];
   blocks: ContextBlock[];
   /** Where propose_learning will file a learning for this same request by default. */
   learning_target: Level & { label: string };
@@ -59,6 +63,7 @@ function byKind(a: Document, b: Document): number {
 }
 
 const SCOPE_COLS = `id, organization_id, project_id, slug, name, description, path_globs, stacks, position,
+  ARRAY(SELECT sr.repository_id FROM scope_repositories sr WHERE sr.scope_id = scopes.id) AS repository_ids,
   ARRAY(SELECT x.old_slug FROM slug_aliases x WHERE x.scope_id = scopes.id) AS aliases`;
 
 async function scopesAt(db: Queryable, organizationId: string | null, projectId: string | null): Promise<Scope[]> {
@@ -70,11 +75,22 @@ async function scopesAt(db: Queryable, organizationId: string | null, projectId:
   return rows;
 }
 
+/** The project's repository the agent is working in, when its remote is one of them. */
+async function repositoryOf(db: Queryable, projectId: string, remoteUrl: string | null | undefined): Promise<{ id: string; key: string } | null> {
+  const remote = tryParseRemote(remoteUrl);
+  if (!remote) return null;
+  const { rows } = await db.query<{ id: string; key: string }>(
+    'SELECT id, remote_key AS key FROM repositories WHERE project_id = $1 AND remote_key = $2', [projectId, remote.key]);
+  return rows[0] ?? null;
+}
+
 export interface Matches {
   stacks: string[];
   groupMatches: ScopeMatch<Scope>[];
   orgMatches: ScopeMatch<Scope>[];
   projectMatches: ScopeMatch<Scope>[];
+  /** Scopes bound to repositories that could not apply because the agent's repository is unknown. */
+  missedRepoScopes: string[];
   target: Level & { label: string };
 }
 
@@ -86,13 +102,16 @@ export interface Matches {
  */
 export async function resolveTarget(
   db: Queryable, a: Access, orgId: string | null, project: Project | null,
-  req: Pick<ContextRequest, 'path' | 'stacks' | 'manifests' | 'scopes'>,
+  req: Pick<ContextRequest, 'remote_url' | 'path' | 'stacks' | 'manifests' | 'scopes'>,
 ): Promise<Matches> {
   const stacks = normalizeTags([...(req.stacks ?? []), ...detectStacks(req.manifests ?? [])]);
   const input = { path: req.path, stacks, explicit: req.scopes };
   const groupMatches = matchScopes(await scopesAt(db, null, null), input);
   const orgMatches = orgId ? matchScopes(await scopesAt(db, orgId, null), input) : [];
-  const projectMatches = project ? matchScopes(await scopesAt(db, project.organization_id, project.id), input) : [];
+  const repository = project ? await repositoryOf(db, project.id, req.remote_url) : null;
+  const projectScopes = project ? await scopesAt(db, project.organization_id, project.id) : [];
+  const projectMatches = matchScopes(projectScopes, { ...input, repository });
+  const missedRepoScopes = repository ? [] : projectScopes.filter((s) => s.repository_ids?.length).map((s) => s.name);
   const org = a.org(orgId);
   const prefix = org ? `${org.name} › ` : '';
   let target: Level & { label: string };
@@ -112,7 +131,7 @@ export async function resolveTarget(
   } else {
     target = { organization_id: null, project_id: null, scope_id: null, label: a.group.name };
   }
-  return { stacks, groupMatches, orgMatches, projectMatches, target };
+  return { stacks, groupMatches, orgMatches, projectMatches, missedRepoScopes, target };
 }
 
 export async function buildContext(db: Queryable, a: Access, req: ContextRequest): Promise<ContextResult> {
@@ -121,7 +140,7 @@ export async function buildContext(db: Queryable, a: Access, req: ContextRequest
   const orgId = project?.organization_id ?? a.orgId;
   if (orgId) a.requireRead(orgId);
   const org = a.org(orgId);
-  const { stacks, groupMatches, orgMatches, projectMatches, target } = await resolveTarget(db, a, orgId, project, req);
+  const { stacks, groupMatches, orgMatches, projectMatches, missedRepoScopes, target } = await resolveTarget(db, a, orgId, project, req);
 
   type L = { level: Level; kind: LevelKind; label: string; match: ScopeMatch<Scope> | null };
   const g = a.group.name;
@@ -162,12 +181,13 @@ export async function buildContext(db: Queryable, a: Access, req: ContextRequest
   }));
 
   const result: Omit<ContextResult, 'markdown'> = {
-    group: { name: g },
+    group: { name: g, shown: a.orgs.length > 1 },
     organization: org ? { id: org.id, slug: org.slug, name: org.name } : null,
     project,
     resolution: { via: resolution.via, remote: resolution.remote, renamed: resolution.renamed, suggestions: resolution.suggestions },
     path: normalizePath(req.path),
     stacks,
+    missed_repository_scopes: missedRepoScopes,
     blocks,
     learning_target: target,
     related: [],
@@ -201,7 +221,9 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
   const projectLine = ctx.project
     ? `**${ctx.project.name}** (\`${ctx.organization ? ctx.organization.slug + '/' : ''}${ctx.project.slug}\`, found via ${ctx.resolution.via === 'project' ? 'project name' : 'git remote'})`
     : '_none resolved_';
-  out.push('', `- Group: **${ctx.group.name}**`, `- Organization: ${ctx.organization ? `**${ctx.organization.name}**` : '_none_'}`, `- Project: ${projectLine}`);
+  out.push('');
+  if (ctx.group.shown) out.push(`- Group: **${ctx.group.name}**`);
+  out.push(`- Organization: ${ctx.organization ? `**${ctx.organization.name}**` : '_none_'}`, `- Project: ${projectLine}`);
   if (ctx.path || ctx.stacks.length) {
     out.push(`- Path: ${ctx.path ? '`' + ctx.path + '`' : '_repo root_'}`, `- Stacks: ${ctx.stacks.length ? ctx.stacks.join(', ') : '_none given_'}`);
   }
@@ -215,8 +237,17 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
     out.push('');
   }
 
+  if (ctx.project && ctx.missed_repository_scopes.length) {
+    const names = ctx.missed_repository_scopes.map((n) => `"${n}"`).join(', ');
+    out.push(ctx.resolution.remote
+      ? `> **This repository (\`${ctx.resolution.remote.key}\`) is not one of ${ctx.project.name}'s repositories**, so its repository scopes (${names}) were left out. If it belongs to the project, ask the user and call \`register_repository\`.`
+      : `> **Repository scopes left out: ${names}.** They only apply inside specific repositories. Call \`get_context\` again with \`remote_url\` (\`git remote get-url origin\`).`);
+    out.push('');
+  }
+
   if (!ctx.project) {
-    out.push(`> **No project found for this repository.** Only ${ctx.organization ? 'group and organization' : 'group'}-wide context is included below.`);
+    const wide = ctx.organization ? (ctx.group.shown ? 'group and organization' : 'organization') : 'group';
+    out.push(`> **No project found for this repository.** Only ${wide}-wide context is included below.`);
     if (ctx.resolution.suggestions.length) {
       out.push(`> Possible matches: ${ctx.resolution.suggestions.map((s) => `\`${s.organization_slug}/${s.slug}\` (${s.name})`).join(', ')}.`);
     }
@@ -224,7 +255,7 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
     out.push('');
   }
 
-  out.push('How to read this: general rules come first (group, then organization), specific ones last (project, then the part of the code you are in). When two rules conflict, the more specific one wins.');
+  out.push(`How to read this: general rules come first (${ctx.group.shown ? 'group, then organization' : 'organization'}), specific ones last (project, then the part of the code you are in). When two rules conflict, the more specific one wins.`);
   out.push('');
   out.push('Each section has a marker `[s:<id> · <mode>]`. **locked**: read-only for you. **propose**: your edits become proposals a person approves. **open**: you may edit directly.');
 

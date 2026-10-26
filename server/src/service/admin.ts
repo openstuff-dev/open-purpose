@@ -38,7 +38,12 @@ async function otherGroups(pool: Pool, actorId: string, groupId: string): Promis
 
 // ───────────────────────────── default content ─────────────────────────────
 
+/** Group documents only exist once a group has a second organization; until then the group is invisible. */
 async function seedGroupDocs(c: Queryable, actorId: string | null): Promise<void> {
+  const { rows } = await c.query<{ orgs: number; docs: number }>(
+    `SELECT (SELECT count(*)::int FROM organizations) AS orgs,
+            (SELECT count(*)::int FROM documents WHERE organization_id IS NULL AND scope_id IS NULL) AS docs`);
+  if (rows[0].orgs < 2 || rows[0].docs > 0) return;
   const level = { organization_id: null, project_id: null, scope_id: null };
   const purpose = await insertDocument(c, level, { kind: 'purpose', title: 'Group purpose', slug: 'purpose', mode: 'locked', position: 0 });
   await insertSection(c, purpose.id, {
@@ -81,16 +86,15 @@ export async function listGroups(pool: Pool, actor: Actor): Promise<Array<Group 
 }
 
 /**
- * Create a group with its first organization. The first admin is either the
+ * Create a group with its first organization, named like the group unless given. The first admin is either the
  * calling server admin, or a new person whose token is returned once.
  */
 export async function createGroup(
   pool: Pool, actor: Actor,
-  input: { name: string; slug?: string; organization_name: string; organization_slug?: string; admin_name?: string },
+  input: { name: string; slug?: string; organization_name?: string; organization_slug?: string; admin_name?: string },
 ): Promise<{ group: Group; organization: Organization; token?: string }> {
   requireSuperadmin(actor);
   if (!input.name?.trim()) throw badRequest('name is required');
-  if (!input.organization_name?.trim()) throw badRequest('organization_name is required');
   try {
     const { rows } = await pool.query<Group>(
       'INSERT INTO groups (slug, name) VALUES ($1, $2) RETURNING id, slug, name, created_at',
@@ -98,8 +102,7 @@ export async function createGroup(
     const group = rows[0];
     try {
       return await withScope(pool, { groupId: group.id }, async (c) => {
-        const org = await insertOrganization(c, { name: input.organization_name, slug: input.organization_slug }, actor.id);
-        await seedGroupDocs(c, actor.id);
+        const org = await insertOrganization(c, { name: input.organization_name?.trim() || input.name, slug: input.organization_slug }, actor.id);
         let token: string | undefined;
         let adminId = actor.id;
         if (input.admin_name?.trim()) {
@@ -179,7 +182,9 @@ export async function createOrganization(
   try {
     return await tx(db, async (c) => {
       await claimSlug(c, 'organization', {}, slug, null, input.take_alias);
-      return insertOrganization(c, { ...input, slug }, a.actor.id);
+      const org = await insertOrganization(c, { ...input, slug }, a.actor.id);
+      await seedGroupDocs(c, a.actor.id);
+      return org;
     });
   } catch (err) {
     throw mapPgError(err);
@@ -419,7 +424,6 @@ export async function bootstrap(
     if (!rows[0]) return { createdAdmin: false }; // another replica won the race
     return withScope(pool, { groupId: rows[0].id }, async (c) => {
       await insertOrganization(c, { name: opts.orgName }, null);
-      await seedGroupDocs(c, null);
       const { rows: admin } = await c.query<{ id: string }>(
         `INSERT INTO actors (name, kind, is_superadmin) VALUES ('Admin', 'human', true) RETURNING id`);
       await c.query(`INSERT INTO memberships (actor_id, organization_id, role) VALUES ($1, NULL, 'admin')`, [admin[0].id]);
@@ -430,10 +434,7 @@ export async function bootstrap(
 
   // Groups upgraded from v1 have organization documents but no group-level ones yet.
   for (const g of groups) {
-    await withScope(pool, { groupId: g.id }, async (c) => {
-      const { rowCount } = await c.query('SELECT 1 FROM documents WHERE organization_id IS NULL LIMIT 1');
-      if (!rowCount) await seedGroupDocs(c, null);
-    });
+    await withScope(pool, { groupId: g.id }, (c) => seedGroupDocs(c, null));
   }
   return { createdAdmin: false };
 }
