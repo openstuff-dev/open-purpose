@@ -8,7 +8,10 @@ import { Notices } from '../shared/notice';
 import { Session } from '../core/session';
 
 function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }
 
 @Component({
@@ -20,14 +23,25 @@ function escapeHtml(s: string): string {
       <h1>Search</h1>
     </header>
     <form class="toolbar" (ngSubmit)="run()" role="search">
-      <input type="search" class="search" name="q" [(ngModel)]="q" placeholder="Search rules, terms and learnings" aria-label="Search">
+      <input
+        type="search"
+        class="search"
+        name="q"
+        [(ngModel)]="q"
+        placeholder="Search rules, terms and learnings"
+        aria-label="Search"
+      />
       <button class="btn primary" type="submit" [disabled]="!q.trim()">Search</button>
     </form>
     @if (hits().length) {
       <ul class="hits">
         @for (h of hits(); track h.section_id) {
           <li>
-            <a [routerLink]="['/documents', h.document_id]" [fragment]="'s-' + h.section_id.slice(0, 8)">{{ h.heading }}</a>
+            <a
+              [routerLink]="['/documents', h.document_id]"
+              [fragment]="'s-' + h.section_id.slice(0, 8)"
+              >{{ h.heading }}</a
+            >
             <app-mode-badge [mode]="h.mode" />
             <p class="quiet">{{ where(h) }}, in {{ h.document_title }}</p>
             <p class="snippet" [innerHTML]="snippet(h.snippet)"></p>
@@ -58,7 +72,10 @@ export class SearchPage {
   private session = inject(Session);
 
   where(h: SearchHit): string {
-    const org = h.organization_slug ? this.session.orgs().find((o) => o.slug === h.organization_slug)?.name ?? h.organization_slug : this.session.group()?.name ?? 'Group';
+    const org = h.organization_slug
+      ? (this.session.orgs().find((o) => o.slug === h.organization_slug)?.name ??
+        h.organization_slug)
+      : (this.session.group()?.name ?? 'Group');
     return [org, h.project_slug, h.scope_slug].filter(Boolean).join(' › ');
   }
 

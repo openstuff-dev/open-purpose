@@ -20,6 +20,8 @@ export interface Config {
   publicUrl: string;
   /** Fetching API specs (OpenAPI/Swagger) from URLs. */
   apiSpecs: ApiSpecConfig;
+  /** Largest export file accepted by an import. */
+  importMaxBytes: number;
 }
 
 export interface ApiSpecConfig {
@@ -50,5 +52,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       maxBytes: Number(env.OPENPURPOSE_API_MAX_MB ?? 20) * 1024 * 1024,
       timeoutMs: 15_000,
     },
+    importMaxBytes: Number(env.OPENPURPOSE_IMPORT_MAX_MB ?? 100) * 1024 * 1024,
   };
 }

@@ -39,7 +39,7 @@ async function otherGroups(pool: Pool, actorId: string, groupId: string): Promis
 // ───────────────────────────── default content ─────────────────────────────
 
 /** Group documents only exist once a group has a second organization; until then the group is invisible. */
-async function seedGroupDocs(c: Queryable, actorId: string | null): Promise<void> {
+export async function seedGroupDocs(c: Queryable, actorId: string | null): Promise<void> {
   const { rows } = await c.query<{ orgs: number; docs: number }>(
     `SELECT (SELECT count(*)::int FROM organizations) AS orgs,
             (SELECT count(*)::int FROM documents WHERE organization_id IS NULL AND scope_id IS NULL) AS docs`);

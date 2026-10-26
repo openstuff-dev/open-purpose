@@ -1,14 +1,56 @@
 /** Shapes identical on server and web live in @openpurpose/contracts; the rest are API response shapes. */
-import type { Actor, DocKind, EditMode, GraphNode, GroupRef, ProposalKind, ProposalStatus, Repository, Role, Scope, SlugAlias } from '@openpurpose/contracts';
+import type {
+  Actor,
+  DocKind,
+  EditMode,
+  GraphNode,
+  GroupRef,
+  ProposalKind,
+  ProposalStatus,
+  Repository,
+  Role,
+  Scope,
+  SlugAlias,
+} from '@openpurpose/contracts';
 
 export type {
-  Actor, ActorKind, DocKind, EditMode, Graph, GraphEdge, GraphNode, GroupRef, LinkRef, LinkResolution, NodeType,
-  ProposalCounts, ProposalKind, ProposalStatus, Repository, Review, ReviewComment, ReviewEvent, ReviewRevision,
-  ReviewThread, Role, Scope, SlugAlias, SlugKind, SlugRename, SlugRenameRef,
+  Actor,
+  ActorKind,
+  DocKind,
+  EditMode,
+  Graph,
+  GraphEdge,
+  GraphNode,
+  GroupRef,
+  LinkRef,
+  LinkResolution,
+  NodeType,
+  ProposalCounts,
+  ProposalKind,
+  ProposalStatus,
+  Repository,
+  Review,
+  ReviewComment,
+  ReviewEvent,
+  ReviewRevision,
+  ReviewThread,
+  Role,
+  Scope,
+  SlugAlias,
+  SlugKind,
+  SlugRename,
+  SlugRenameRef,
 } from '@openpurpose/contracts';
 
 export const EDIT_MODES: EditMode[] = ['locked', 'propose', 'open'];
-export const DOC_KINDS: DocKind[] = ['purpose', 'business_logic', 'glossary', 'guidelines', 'reference', 'learnings'];
+export const DOC_KINDS: DocKind[] = [
+  'purpose',
+  'business_logic',
+  'glossary',
+  'guidelines',
+  'reference',
+  'learnings',
+];
 
 export const KIND_LABEL: Record<DocKind, string> = {
   purpose: 'Purpose',
@@ -31,7 +73,12 @@ export const MODE_HELP: Record<EditMode, string> = {
   open: 'Agents can change this directly. Every change is kept in history.',
 };
 
-export const ROLE_LABEL: Record<Role, string> = { admin: 'Admin', editor: 'Editor', viewer: 'Viewer', agent: 'Agent' };
+export const ROLE_LABEL: Record<Role, string> = {
+  admin: 'Admin',
+  editor: 'Editor',
+  viewer: 'Viewer',
+  agent: 'Agent',
+};
 
 export interface Organization {
   id: string;
@@ -56,7 +103,11 @@ export interface Me {
   organizations: Organization[];
   current_organization_id: string | null;
   /** Set while agent mode is on. */
-  agent_view: { organization_id: string; readable_organization_ids: string[]; switchable_organization_ids: string[] } | null;
+  agent_view: {
+    organization_id: string;
+    readable_organization_ids: string[];
+    switchable_organization_ids: string[];
+  } | null;
   pending_proposals: number;
   public_url: string;
   version: string;
@@ -202,7 +253,12 @@ export interface Proposal {
   heading: string;
   body: string;
   rationale: string;
-  context: { remote?: string | null; path?: string | null; stacks?: string[]; manifests?: string[] };
+  context: {
+    remote?: string | null;
+    path?: string | null;
+    stacks?: string[];
+    manifests?: string[];
+  };
   created_by: string | null;
   created_by_name: string | null;
   created_at: string;
@@ -229,13 +285,18 @@ export interface Proposal {
   awaiting: 'review' | 'author' | null;
 }
 
-export type EditResult = { status: 'applied'; section: Section } | { status: 'proposed'; proposal: Proposal };
+export type EditResult =
+  { status: 'applied'; section: Section } | { status: 'proposed'; proposal: Proposal };
 
 export interface ContextResult {
   group: { name: string };
   organization: OrgRef | null;
   project: Project | null;
-  resolution: { via: string | null; remote: { key: string } | null; suggestions: Array<{ slug: string; name: string; organization_slug: string }> };
+  resolution: {
+    via: string | null;
+    remote: { key: string } | null;
+    suggestions: Array<{ slug: string; name: string; organization_slug: string }>;
+  };
   path: string;
   stacks: string[];
   blocks: Array<{
@@ -246,7 +307,9 @@ export interface ContextResult {
   }>;
   learning_target: { label: string };
   related: Array<{ direction: 'uses' | 'used_by'; node: GraphNode }>;
-  apis: Array<ApiSpec & { project_ref: string; project_name: string; relation: 'this' | 'uses' | 'used_by' }>;
+  apis: Array<
+    ApiSpec & { project_ref: string; project_name: string; relation: 'this' | 'uses' | 'used_by' }
+  >;
   markdown: string;
 }
 
@@ -263,7 +326,14 @@ export interface Member extends Actor {
   created_at: string;
   disabled_at: string | null;
   memberships: Array<{ id: string; organization_id: string | null; role: Role }>;
-  tokens: Array<{ id: string; prefix: string; label: string; created_at: string; last_used_at: string | null; revoked_at: string | null }>;
+  tokens: Array<{
+    id: string;
+    prefix: string;
+    label: string;
+    created_at: string;
+    last_used_at: string | null;
+    revoked_at: string | null;
+  }>;
   manageable: boolean;
 }
 

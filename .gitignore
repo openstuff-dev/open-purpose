@@ -5,3 +5,5 @@ dist/
 .idea
 AGENTS.md
 CLAUDE.md
+# Generated files, rebuilt by scripts (e.g. web/scripts/agent-mode-css.mjs)
+*.generated.*

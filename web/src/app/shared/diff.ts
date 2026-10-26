@@ -43,8 +43,12 @@ export function diffLines(before: string, after: string): DiffLine[] {
     <div class="diff" role="table" aria-label="Changes">
       @for (l of lines(); track $index) {
         <div class="diff-line" [attr.data-type]="l.type" role="row">
-          <span class="diff-sign" aria-hidden="true">{{ l.type === 'add' ? '+' : l.type === 'del' ? '−' : '' }}</span>
-          <span class="sr-only">{{ l.type === 'add' ? 'Added:' : l.type === 'del' ? 'Removed:' : '' }}</span>
+          <span class="diff-sign" aria-hidden="true">{{
+            l.type === 'add' ? '+' : l.type === 'del' ? '−' : ''
+          }}</span>
+          <span class="sr-only">{{
+            l.type === 'add' ? 'Added:' : l.type === 'del' ? 'Removed:' : ''
+          }}</span>
           <span class="diff-text" role="cell">{{ l.text || ' ' }}</span>
         </div>
       }

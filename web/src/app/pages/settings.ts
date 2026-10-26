@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
@@ -41,7 +49,17 @@ organization, the project and the part of the code you are in (a repository or a
 
 @Component({
   selector: 'app-settings',
-  imports: [FormsModule, DatePipe, RouterLink, RouterLinkActive, Icon, PeoplePage, GroupsPage, PreviewPage, SlugRenameField],
+  imports: [
+    FormsModule,
+    DatePipe,
+    RouterLink,
+    RouterLinkActive,
+    Icon,
+    PeoplePage,
+    GroupsPage,
+    PreviewPage,
+    SlugRenameField,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="page-head">
@@ -51,18 +69,34 @@ organization, the project and the part of the code you are in (a repository or a
     <div class="settings">
       <nav class="settings-nav" aria-label="Settings">
         <div class="nav-label">You</div>
-        <a routerLink="/settings/account" routerLinkActive="active"><app-icon name="user" />Account and tokens</a>
-        <a routerLink="/settings/appearance" routerLinkActive="active"><app-icon name="palette" />Appearance</a>
-        <a routerLink="/settings/connect" routerLinkActive="active"><app-icon name="plug" />Connect an agent</a>
-        <a routerLink="/settings/test" routerLinkActive="active"><app-icon name="eye" />Test a repository</a>
+        <a routerLink="/settings/account" routerLinkActive="active"
+          ><app-icon name="user" />Account and tokens</a
+        >
+        <a routerLink="/settings/appearance" routerLinkActive="active"
+          ><app-icon name="palette" />Appearance</a
+        >
+        <a routerLink="/settings/connect" routerLinkActive="active"
+          ><app-icon name="plug" />Connect an agent</a
+        >
+        <a routerLink="/settings/test" routerLinkActive="active"
+          ><app-icon name="eye" />Test a repository</a
+        >
         @if (session.adminsAnything) {
-          <div class="nav-label">{{ session.groupShown() ? session.group()?.name : session.org()?.name }}</div>
-          <a routerLink="/settings/group" routerLinkActive="active"><app-icon name="building" />Organizations</a>
-          <a routerLink="/settings/people" routerLinkActive="active"><app-icon name="users" />People and agents</a>
+          <div class="nav-label">
+            {{ session.groupShown() ? session.group()?.name : session.org()?.name }}
+          </div>
+          <a routerLink="/settings/group" routerLinkActive="active"
+            ><app-icon name="building" />Organizations</a
+          >
+          <a routerLink="/settings/people" routerLinkActive="active"
+            ><app-icon name="users" />People and agents</a
+          >
         }
         @if (session.isSuperadmin) {
           <div class="nav-label">Server</div>
-          <a routerLink="/settings/server" routerLinkActive="active"><app-icon name="server" />All groups</a>
+          <a routerLink="/settings/server" routerLinkActive="active"
+            ><app-icon name="server" />All groups</a
+          >
         }
       </nav>
 
@@ -73,48 +107,87 @@ organization, the project and the part of the code you are in (a repository or a
               <h2>Account</h2>
               <div class="setting-card">
                 <div class="setting-row">
-                  <div><h3>Name</h3><p>Shown in history, the inbox and on proposals your agents make.</p></div>
+                  <div>
+                    <h3>Name</h3>
+                    <p>Shown in history, the inbox and on proposals your agents make.</p>
+                  </div>
                   <form (ngSubmit)="saveName()">
-                    <input name="name" [(ngModel)]="name" aria-label="Your name" required>
-                    <button class="btn" type="submit" [disabled]="!name.trim() || name.trim() === session.me()?.actor?.name">Save</button>
+                    <input name="name" [(ngModel)]="name" aria-label="Your name" required />
+                    <button
+                      class="btn"
+                      type="submit"
+                      [disabled]="!name.trim() || name.trim() === session.me()?.actor?.name"
+                    >
+                      Save
+                    </button>
                   </form>
                 </div>
                 <div class="setting-row">
-                  <div><h3>Your access</h3><p>{{ accessLine() }}</p></div>
+                  <div>
+                    <h3>Your access</h3>
+                    <p>{{ accessLine() }}</p>
+                  </div>
                 </div>
               </div>
             </section>
 
             <section>
               <h2>Personal tokens</h2>
-              <p class="quiet">Use one per device. A personal token also works over MCP, for scripts or an agent that acts as you.</p>
+              <p class="quiet">
+                Use one per device. A personal token also works over MCP, for scripts or an agent
+                that acts as you.
+              </p>
               @if (freshToken(); as t) {
                 <div class="callout token-callout" role="alert">
                   <strong>Copy your new token now. It is not shown again.</strong>
-                  <div class="copy-block" style="width:100%"><pre><code>{{ t }}</code></pre>
-                    <button class="btn sm" type="button" (click)="copy(t)"><app-icon name="copy" [size]="13" />Copy</button></div>
-                  <button class="link-btn" type="button" (click)="freshToken.set(null)">Done</button>
+                  <div class="copy-block" style="width:100%">
+                    <pre><code>{{ t }}</code></pre>
+                    <button class="btn sm" type="button" (click)="copy(t)">
+                      <app-icon name="copy" [size]="13" />Copy
+                    </button>
+                  </div>
+                  <button class="link-btn" type="button" (click)="freshToken.set(null)">
+                    Done
+                  </button>
                 </div>
               }
               <div class="setting-card">
                 @for (t of tokens(); track t.id) {
                   <div class="setting-row" [style.opacity]="t.revoked_at ? 0.55 : 1">
                     <div>
-                      <h3><app-icon name="key" [size]="14" /> {{ t.label }} <code class="quiet">{{ t.prefix }}…</code></h3>
+                      <h3>
+                        <app-icon name="key" [size]="14" /> {{ t.label }}
+                        <code class="quiet">{{ t.prefix }}…</code>
+                      </h3>
                       <p>
                         Created {{ t.created_at | date: 'd MMM y' }} ·
-                        @if (t.revoked_at) { revoked {{ t.revoked_at | date: 'd MMM y' }} }
-                        @else if (t.last_used_at) { last used {{ t.last_used_at | date: 'd MMM y, HH:mm' }} }
-                        @else { never used }
-                        @if (isCurrent(t)) { · <strong>this browser</strong> }
+                        @if (t.revoked_at) {
+                          revoked {{ t.revoked_at | date: 'd MMM y' }}
+                        } @else if (t.last_used_at) {
+                          last used {{ t.last_used_at | date: 'd MMM y, HH:mm' }}
+                        } @else {
+                          never used
+                        }
+                        @if (isCurrent(t)) {
+                          · <strong>this browser</strong>
+                        }
                       </p>
                     </div>
-                    @if (!t.revoked_at) { <button class="btn danger sm" type="button" (click)="revoke(t)">Revoke</button> }
+                    @if (!t.revoked_at) {
+                      <button class="btn danger sm" type="button" (click)="revoke(t)">
+                        Revoke
+                      </button>
+                    }
                   </div>
                 }
                 <div class="setting-row">
                   <form (ngSubmit)="newToken()">
-                    <input name="label" [(ngModel)]="tokenLabel" placeholder="Label, e.g. work laptop" aria-label="Token label">
+                    <input
+                      name="label"
+                      [(ngModel)]="tokenLabel"
+                      placeholder="Label, e.g. work laptop"
+                      aria-label="Token label"
+                    />
                     <button class="btn" type="submit"><app-icon name="plus" />Create token</button>
                   </form>
                 </div>
@@ -131,8 +204,16 @@ organization, the project and the part of the code you are in (a repository or a
                   <div><h3>Theme</h3></div>
                   <div class="theme-options" role="radiogroup" aria-label="Theme">
                     @for (o of themes; track o.value) {
-                      <button type="button" class="theme-option" role="radio" [attr.aria-checked]="theme.choice() === o.value" (click)="theme.set(o.value)">
-                        <div class="theme-swatch" [class]="'theme-swatch ' + o.value"><i></i><i></i></div>
+                      <button
+                        type="button"
+                        class="theme-option"
+                        role="radio"
+                        [attr.aria-checked]="theme.choice() === o.value"
+                        (click)="theme.set(o.value)"
+                      >
+                        <div class="theme-swatch" [class]="'theme-swatch ' + o.value">
+                          <i></i><i></i>
+                        </div>
                         <span><app-icon [name]="o.icon" [size]="14" />{{ o.label }}</span>
                       </button>
                     }
@@ -145,37 +226,77 @@ organization, the project and the part of the code you are in (a repository or a
           @case ('connect') {
             <section>
               <h2>Connect an agent</h2>
-              <p class="quiet">Any MCP client that supports streamable HTTP works: Claude Code, Cursor, VS Code, Codex and others.</p>
+              <p class="quiet">
+                Any MCP client that supports streamable HTTP works: Claude Code, Cursor, VS Code,
+                Codex and others.
+              </p>
               <ol class="steps">
-                <li><div>
-                  <h3>Get an agent token</h3>
-                  @if (session.adminsAnything) {
-                    <p>Create one agent per developer and tool under <a routerLink="/settings/people">People and agents</a>. The token decides which organization the agent works in.</p>
-                  } @else {
-                    <p>Ask an admin of {{ session.org()?.name ?? 'your organization' }} for an agent token. One per developer and tool keeps history readable.</p>
-                  }
-                </div></li>
-                <li><div>
-                  <h3>Add the server to your client</h3>
-                  <p>Claude Code:</p>
-                  <div class="copy-block"><pre><code>{{ claudeCommand }}</code></pre>
-                    <button class="btn sm" type="button" (click)="copy(claudeCommand)"><app-icon name="copy" [size]="13" />Copy</button></div>
-                  <p>Other clients (mcp.json):</p>
-                  <div class="copy-block"><pre><code>{{ mcpJson }}</code></pre>
-                    <button class="btn sm" type="button" (click)="copy(mcpJson)"><app-icon name="copy" [size]="13" />Copy</button></div>
-                </div></li>
-                <li><div>
-                  <h3>Tell agents to use it</h3>
-                  <p>Agents follow the server's instructions more reliably when the repository says so too. Add this to <code>AGENTS.md</code> or <code>CLAUDE.md</code>.</p>
-                  <div class="copy-block"><pre><code>{{ agentsSnippet }}</code></pre>
-                    <button class="btn sm" type="button" (click)="copy(agentsSnippet)"><app-icon name="copy" [size]="13" />Copy</button></div>
-                </div></li>
-                <li><div>
-                  <h3>Optional: pin a repository to a project</h3>
-                  <p>OpenPurpose finds the project from the git remote. To override that, for example in a fork, add <code>.agentcontext.json</code> to the repository root. Each project page shows its own.</p>
-                  <pre><code>{{ agentContext }}</code></pre>
-                  <p><a routerLink="/settings/test">Test a repository</a> to check what an agent there will get.</p>
-                </div></li>
+                <li>
+                  <div>
+                    <h3>Get an agent token</h3>
+                    @if (session.adminsAnything) {
+                      <p>
+                        Create one agent per developer and tool under
+                        <a routerLink="/settings/people">People and agents</a>. The token decides
+                        which organization the agent works in.
+                      </p>
+                    } @else {
+                      <p>
+                        Ask an admin of {{ session.org()?.name ?? 'your organization' }} for an
+                        agent token. One per developer and tool keeps history readable.
+                      </p>
+                    }
+                  </div>
+                </li>
+                <li>
+                  <div>
+                    <h3>Add the server to your client</h3>
+                    <p>Claude Code:</p>
+                    <div class="copy-block">
+                      <pre><code>{{ claudeCommand }}</code></pre>
+                      <button class="btn sm" type="button" (click)="copy(claudeCommand)">
+                        <app-icon name="copy" [size]="13" />Copy
+                      </button>
+                    </div>
+                    <p>Other clients (mcp.json):</p>
+                    <div class="copy-block">
+                      <pre><code>{{ mcpJson }}</code></pre>
+                      <button class="btn sm" type="button" (click)="copy(mcpJson)">
+                        <app-icon name="copy" [size]="13" />Copy
+                      </button>
+                    </div>
+                  </div>
+                </li>
+                <li>
+                  <div>
+                    <h3>Tell agents to use it</h3>
+                    <p>
+                      Agents follow the server's instructions more reliably when the repository says
+                      so too. Add this to <code>AGENTS.md</code> or <code>CLAUDE.md</code>.
+                    </p>
+                    <div class="copy-block">
+                      <pre><code>{{ agentsSnippet }}</code></pre>
+                      <button class="btn sm" type="button" (click)="copy(agentsSnippet)">
+                        <app-icon name="copy" [size]="13" />Copy
+                      </button>
+                    </div>
+                  </div>
+                </li>
+                <li>
+                  <div>
+                    <h3>Optional: pin a repository to a project</h3>
+                    <p>
+                      OpenPurpose finds the project from the git remote. To override that, for
+                      example in a fork, add <code>.agentcontext.json</code> to the repository root.
+                      Each project page shows its own.
+                    </p>
+                    <pre><code>{{ agentContext }}</code></pre>
+                    <p>
+                      <a routerLink="/settings/test">Test a repository</a> to check what an agent
+                      there will get.
+                    </p>
+                  </div>
+                </li>
               </ol>
             </section>
           }
@@ -186,10 +307,27 @@ organization, the project and the part of the code you are in (a repository or a
                 <h2>Group</h2>
                 <div class="setting-card">
                   <div class="setting-row">
-                    <div><h3>Group name</h3><p>Shown to everyone in {{ session.group()?.name }}, and to agents as the top layer of their context.</p></div>
+                    <div>
+                      <h3>Group name</h3>
+                      <p>
+                        Shown to everyone in {{ session.group()?.name }}, and to agents as the top
+                        layer of their context.
+                      </p>
+                    </div>
                     <form (ngSubmit)="renameGroup()">
-                      <input name="gname" [(ngModel)]="groupName" aria-label="Group name" required>
-                      <button class="btn" type="submit" [disabled]="!groupName.trim() || groupName.trim() === session.group()?.name">Save</button>
+                      <input
+                        name="gname"
+                        [(ngModel)]="groupName"
+                        aria-label="Group name"
+                        required
+                      />
+                      <button
+                        class="btn"
+                        type="submit"
+                        [disabled]="!groupName.trim() || groupName.trim() === session.group()?.name"
+                      >
+                        Save
+                      </button>
                     </form>
                   </div>
                 </div>
@@ -200,40 +338,72 @@ organization, the project and the part of the code you are in (a repository or a
               <div class="block-head">
                 <div>
                   <h2>Organizations</h2>
-                  <p class="quiet">{{ session.groupShown()
-                    ? 'Each keeps its own rules, projects and inbox, and is private to its members unless shared below.'
-                    : 'Most teams need just one. Add another for a separate company or division with its own rules, projects and people.' }}</p>
+                  <p class="quiet">
+                    {{
+                      session.groupShown()
+                        ? 'Each keeps its own rules, projects and inbox, and is private to its members unless shared below.'
+                        : 'Most teams need just one. Add another for a separate company or division with its own rules, projects and people.'
+                    }}
+                  </p>
                 </div>
               </div>
               <div class="setting-card">
                 @for (o of manageableOrgs(); track o.id) {
                   <div class="setting-row" [style.opacity]="o.archived_at ? 0.6 : 1">
                     @if (editingOrg() === o.id) {
-                      <form class="inline-form" style="margin:0;grid-column:1/-1" (ngSubmit)="saveOrg(o)">
-                        <label class="grow">Name <input name="oname" [(ngModel)]="orgDraft.name" required></label>
-                        <label class="full">Summary <input name="osum" [(ngModel)]="orgDraft.summary"></label>
+                      <form
+                        class="inline-form"
+                        style="margin:0;grid-column:1/-1"
+                        (ngSubmit)="saveOrg(o)"
+                      >
+                        <label class="grow"
+                          >Name <input name="oname" [(ngModel)]="orgDraft.name" required
+                        /></label>
+                        <label class="full"
+                          >Summary
+                          <textarea name="osum" rows="3" [(ngModel)]="orgDraft.summary"></textarea>
+                        </label>
                         <div class="form-actions full">
                           <button class="btn primary" type="submit">Save</button>
-                          <button class="btn" type="button" (click)="editingOrg.set(null)">Cancel</button>
+                          <button class="btn" type="button" (click)="editingOrg.set(null)">
+                            Cancel
+                          </button>
                         </div>
                       </form>
                       <div style="grid-column:1/-1">
-                        <app-slug-rename kind="organization" [id]="o.id" [slug]="o.slug" [name]="o.name" [aliases]="o.aliases"
-                          [canEdit]="session.canAdmin(null)" (changed)="reloadMe()" />
+                        <app-slug-rename
+                          kind="organization"
+                          [id]="o.id"
+                          [slug]="o.slug"
+                          [name]="o.name"
+                          [aliases]="o.aliases"
+                          [canEdit]="session.canAdmin(null)"
+                          (changed)="reloadMe()"
+                        />
                       </div>
                     } @else {
                       <div style="display:flex;gap:0.75rem;align-items:center;min-width:0">
-                        <span class="badge" [style.background]="session.orgColor(o.id)">{{ initials(o.name) }}</span>
+                        <span class="badge" [style.background]="session.orgColor(o.id)">{{
+                          initials(o.name)
+                        }}</span>
                         <div style="min-width:0">
-                          <h3>{{ o.name }} <code class="quiet">{{ o.slug }}</code>
-                            @if (o.archived_at) { <span class="flag muted">Archived</span> }</h3>
-                          <p>{{ o.summary || 'No summary' }}</p>
+                          <h3>
+                            {{ o.name }} <code class="quiet">{{ o.slug }}</code>
+                            @if (o.archived_at) {
+                              <span class="flag muted">Archived</span>
+                            }
+                          </h3>
+                          <p class="multiline">{{ o.summary || 'No summary' }}</p>
                         </div>
                       </div>
                       <div class="form-actions">
-                        <button class="btn sm" type="button" (click)="editOrg(o)"><app-icon name="pencil" [size]="13" />Edit</button>
+                        <button class="btn sm" type="button" (click)="editOrg(o)">
+                          <app-icon name="pencil" [size]="13" />Edit
+                        </button>
                         @if (session.canAdmin(null)) {
-                          <button class="btn sm ghost" type="button" (click)="toggleArchive(o)">{{ o.archived_at ? 'Restore' : 'Archive' }}</button>
+                          <button class="btn sm ghost" type="button" (click)="toggleArchive(o)">
+                            {{ o.archived_at ? 'Restore' : 'Archive' }}
+                          </button>
                         }
                       </div>
                     }
@@ -242,22 +412,69 @@ organization, the project and the part of the code you are in (a repository or a
                 @if (session.canAdmin(null)) {
                   <div class="setting-row">
                     @if (addingOrg()) {
-                      <form class="inline-form" style="margin:0;grid-column:1/-1" (ngSubmit)="createOrg()">
-                        <label class="grow">Name <input name="nname" [(ngModel)]="newOrg.name" required placeholder="Acme Payments"></label>
-                        <label>Slug <input name="nslug" class="mono" [(ngModel)]="newOrg.slug" placeholder="payments"></label>
-                        <label class="full">Summary <input name="nsum" [(ngModel)]="newOrg.summary"></label>
+                      <form
+                        class="inline-form"
+                        style="margin:0;grid-column:1/-1"
+                        (ngSubmit)="createOrg()"
+                      >
+                        <label class="grow"
+                          >Name
+                          <input
+                            name="nname"
+                            [(ngModel)]="newOrg.name"
+                            required
+                            placeholder="Acme Payments"
+                        /></label>
+                        <label
+                          >Slug
+                          <input
+                            name="nslug"
+                            class="mono"
+                            [(ngModel)]="newOrg.slug"
+                            placeholder="payments"
+                        /></label>
+                        <label class="full"
+                          >Summary
+                          <textarea name="nsum" rows="3" [(ngModel)]="newOrg.summary"></textarea>
+                        </label>
                         @if (!session.groupShown()) {
-                          <label class="full">Name for both organizations together <input name="ngroup" [(ngModel)]="groupName" required placeholder="Acme Group"></label>
-                          <p class="quiet full">With a second organization, {{ session.org()?.name }} becomes one of several in a group. The group gets its own rules that reach every organization, and a page under this name.</p>
+                          <label class="full"
+                            >Name for both organizations together
+                            <input
+                              name="ngroup"
+                              [(ngModel)]="groupName"
+                              required
+                              placeholder="Acme Group"
+                          /></label>
+                          <p class="quiet full">
+                            With a second organization, {{ session.org()?.name }} becomes one of
+                            several in a group. The group gets its own rules that reach every
+                            organization, and a page under this name.
+                          </p>
                         }
-                        <p class="quiet full">The slug is what people write in links to its projects, like <code>[[payments/payment-gateway]]</code>.</p>
+                        <p class="quiet full">
+                          The slug is what people write in links to its projects, like
+                          <code>[[payments/payment-gateway]]</code>.
+                        </p>
                         <div class="form-actions full">
-                          <button class="btn primary" type="submit" [disabled]="!newOrg.name.trim() || !groupName.trim()">Create organization</button>
-                          <button class="btn" type="button" (click)="addingOrg.set(false)">Cancel</button>
+                          <button
+                            class="btn primary"
+                            type="submit"
+                            [disabled]="!newOrg.name.trim() || !groupName.trim()"
+                          >
+                            Create organization
+                          </button>
+                          <button class="btn" type="button" (click)="addingOrg.set(false)">
+                            Cancel
+                          </button>
                         </div>
                       </form>
                     } @else {
-                      <button class="btn" type="button" (click)="addingOrg.set(true)"><app-icon name="plus" />{{ session.groupShown() ? 'New organization' : 'Add a second organization' }}</button>
+                      <button class="btn" type="button" (click)="addingOrg.set(true)">
+                        <app-icon name="plus" />{{
+                          session.groupShown() ? 'New organization' : 'Add a second organization'
+                        }}
+                      </button>
                     }
                   </div>
                 }
@@ -267,18 +484,44 @@ organization, the project and the part of the code you are in (a repository or a
             @if (session.canAdmin(null) && activeOrgs().length > 1) {
               <section>
                 <h2>Who can read what</h2>
-                <p class="quiet">Tick a box to let members and agents of the organization on the left read the one at the top. Reading only: agents never write outside their own organization. People with a role in the group read everything.</p>
+                <p class="quiet">
+                  Tick a box to let members and agents of the organization on the left read the one
+                  at the top. Reading only: agents never write outside their own organization.
+                  People with a role in the group read everything.
+                </p>
                 <div class="setting-card" style="overflow-x:auto">
                   <table class="matrix">
-                    <thead><tr><th scope="col">Members of…</th>@for (t of activeOrgs(); track t.id) { <th scope="col">may read {{ t.name }}</th> }</tr></thead>
+                    <thead>
+                      <tr>
+                        <th scope="col">Members of…</th>
+                        @for (t of activeOrgs(); track t.id) {
+                          <th scope="col">may read {{ t.name }}</th>
+                        }
+                      </tr>
+                    </thead>
                     <tbody>
                       @for (r of activeOrgs(); track r.id) {
                         <tr>
-                          <th scope="row"><span class="badge sm" [style.background]="session.orgColor(r.id)" style="margin-right:0.5rem">{{ initials(r.name) }}</span>{{ r.name }}</th>
+                          <th scope="row">
+                            <span
+                              class="badge sm"
+                              [style.background]="session.orgColor(r.id)"
+                              style="margin-right:0.5rem"
+                              >{{ initials(r.name) }}</span
+                            >{{ r.name }}
+                          </th>
                           @for (t of activeOrgs(); track t.id) {
                             <td>
-                              @if (r.id === t.id) { <span class="self" title="Always">—</span> }
-                              @else { <input type="checkbox" [checked]="t.readers.includes(r.id)" (change)="share(t, r, $any($event.target).checked)" [attr.aria-label]="r.name + ' may read ' + t.name"> }
+                              @if (r.id === t.id) {
+                                <span class="self" title="Always">—</span>
+                              } @else {
+                                <input
+                                  type="checkbox"
+                                  [checked]="t.readers.includes(r.id)"
+                                  (change)="share(t, r, $any($event.target).checked)"
+                                  [attr.aria-label]="r.name + ' may read ' + t.name"
+                                />
+                              }
                             </td>
                           }
                         </tr>
@@ -290,9 +533,15 @@ organization, the project and the part of the code you are in (a repository or a
             }
           }
 
-          @case ('test') { <app-preview /> }
-          @case ('people') { <app-people /> }
-          @case ('server') { <app-groups /> }
+          @case ('test') {
+            <app-preview />
+          }
+          @case ('people') {
+            <app-people />
+          }
+          @case ('server') {
+            <app-groups />
+          }
         }
       </div>
     </div>
@@ -326,7 +575,8 @@ export class SettingsPage {
   readonly editingOrg = signal<string | null>(null);
   readonly addingOrg = signal(false);
   readonly manageableOrgs = computed(() =>
-    (this.session.me()?.organizations ?? []).filter((o) => this.session.canAdmin(o.id)));
+    (this.session.me()?.organizations ?? []).filter((o) => this.session.canAdmin(o.id)),
+  );
   readonly activeOrgs = computed(() => this.session.orgs());
   name = '';
   tokenLabel = '';
@@ -336,9 +586,25 @@ export class SettingsPage {
 
   private readonly base = this.session.me()?.public_url ?? location.origin;
   readonly claudeCommand = `claude mcp add --transport http openpurpose ${this.base}/mcp \\\n  --header "Authorization: Bearer <agent token>"`;
-  readonly mcpJson = JSON.stringify({ mcpServers: { openpurpose: { type: 'http', url: `${this.base}/mcp`, headers: { Authorization: 'Bearer <agent token>' } } } }, null, 2);
+  readonly mcpJson = JSON.stringify(
+    {
+      mcpServers: {
+        openpurpose: {
+          type: 'http',
+          url: `${this.base}/mcp`,
+          headers: { Authorization: 'Bearer <agent token>' },
+        },
+      },
+    },
+    null,
+    2,
+  );
   readonly agentsSnippet = AGENTS_SNIPPET;
-  readonly agentContext = JSON.stringify({ project: `${this.session.org()?.slug ?? 'org'}/project-slug` }, null, 2);
+  readonly agentContext = JSON.stringify(
+    { project: `${this.session.org()?.slug ?? 'org'}/project-slug` },
+    null,
+    2,
+  );
 
   constructor() {
     effect(() => {
@@ -352,7 +618,8 @@ export class SettingsPage {
       if (this.current() === 'account') void this.loadTokens();
     });
     effect(() => {
-      if (this.tab() && this.tab() !== this.current()) void this.router.navigate(['/settings', this.current()], { replaceUrl: true });
+      if (this.tab() && this.tab() !== this.current())
+        void this.router.navigate(['/settings', this.current()], { replaceUrl: true });
     });
   }
 
@@ -407,7 +674,14 @@ export class SettingsPage {
 
   async revoke(t: TokenRow): Promise<void> {
     const current = this.isCurrent(t);
-    if (!confirm(current ? 'This is the token you are signed in with. Revoke it and sign out?' : `Revoke "${t.label}"? Anything using it stops working immediately.`)) return;
+    if (
+      !confirm(
+        current
+          ? 'This is the token you are signed in with. Revoke it and sign out?'
+          : `Revoke "${t.label}"? Anything using it stops working immediately.`,
+      )
+    )
+      return;
     try {
       await this.api.revokeMyToken(t.id);
       if (current) {
@@ -435,7 +709,10 @@ export class SettingsPage {
 
   async saveOrg(o: Organization): Promise<void> {
     await this.run(async () => {
-      await this.api.updateOrganization(o.id, { name: this.orgDraft.name.trim(), summary: this.orgDraft.summary });
+      await this.api.updateOrganization(o.id, {
+        name: this.orgDraft.name.trim(),
+        summary: this.orgDraft.summary,
+      });
       this.editingOrg.set(null);
       await this.reloadMe();
     }, `Saved ${this.orgDraft.name.trim()}`);
@@ -443,18 +720,37 @@ export class SettingsPage {
 
   async toggleArchive(o: Organization): Promise<void> {
     const archive = !o.archived_at;
-    if (archive && !confirm(`Archive ${o.name}? It disappears from menus, lists and the map; its content stays and can be restored.`)) return;
-    await this.run(async () => {
-      await this.api.updateOrganization(o.id, { archived: archive });
-      await this.reloadMe();
-    }, archive ? `Archived ${o.name}` : `Restored ${o.name}`);
+    if (
+      archive &&
+      !confirm(
+        `Archive ${o.name}? It disappears from menus, lists and the map; its content stays and can be restored.`,
+      )
+    )
+      return;
+    await this.run(
+      async () => {
+        await this.api.updateOrganization(o.id, { archived: archive });
+        await this.reloadMe();
+      },
+      archive ? `Archived ${o.name}` : `Restored ${o.name}`,
+    );
   }
 
   async createOrg(): Promise<void> {
     try {
-      const body = { name: this.newOrg.name.trim(), slug: this.newOrg.slug.trim() || undefined, summary: this.newOrg.summary.trim() || undefined };
-      const naming = !this.session.groupShown() && this.groupName.trim() !== this.session.group()?.name;
-      if (!await claimingOldSlug((take_alias) => this.api.createOrganization({ ...body, take_alias }))) return;
+      const body = {
+        name: this.newOrg.name.trim(),
+        slug: this.newOrg.slug.trim() || undefined,
+        summary: this.newOrg.summary.trim() || undefined,
+      };
+      const naming =
+        !this.session.groupShown() && this.groupName.trim() !== this.session.group()?.name;
+      if (
+        !(await claimingOldSlug((take_alias) =>
+          this.api.createOrganization({ ...body, take_alias }),
+        ))
+      )
+        return;
       if (naming) await this.api.renameGroup(this.groupName.trim());
       this.newOrg = { name: '', slug: '', summary: '' };
       this.addingOrg.set(false);
@@ -466,10 +762,15 @@ export class SettingsPage {
   }
 
   async share(target: Organization, reader: Organization, allowed: boolean): Promise<void> {
-    await this.run(async () => {
-      await this.api.setReader(target.id, reader.id, allowed);
-      await this.reloadMe();
-    }, allowed ? `${reader.name} can now read ${target.name}` : `${reader.name} can no longer read ${target.name}`);
+    await this.run(
+      async () => {
+        await this.api.setReader(target.id, reader.id, allowed);
+        await this.reloadMe();
+      },
+      allowed
+        ? `${reader.name} can now read ${target.name}`
+        : `${reader.name} can no longer read ${target.name}`,
+    );
   }
 
   async copy(text: string): Promise<void> {

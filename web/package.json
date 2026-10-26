@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "start": "node scripts/agent-mode-css.mjs && ng serve",
     "build": "node scripts/agent-mode-css.mjs && ng build",
     "css:agent": "node scripts/agent-mode-css.mjs",
     "watch": "ng build --watch --configuration development",

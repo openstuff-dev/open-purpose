@@ -675,7 +675,105 @@ definitions:`);
     expect((await api('DELETE', `/tokens/${jonas.tokens[0].id}`)).status).toBe(204);
     expect((await api('GET', '/me', undefined, { token: t.jonas })).status).toBe(401);
   });
+
+  it('exports an organization and imports it again as a new one', async () => {
+    // Only admins of the organization or the group may export it.
+    expect((await api('GET', `/export?organization_id=${o.logistics}`, undefined, { token: t.ida })).status).toBe(403);
+    expect((await api('GET', '/export', undefined, { token: t.ida })).status).toBe(403);
+    expect((await api('GET', `/export?organization_id=${o.logistics}`, undefined, { token: t.anders })).status).toBe(403);
+    expect((await api('GET', `/export?organization_id=${o.payments}`, undefined, { token: t.ida })).status).toBe(200);
+
+    const exported = await api('GET', `/export?organization_id=${o.logistics}&people=1`);
+    expect(exported.status).toBe(200);
+    const file = exported.data;
+    expect(JSON.stringify(file)).not.toMatch(/chr_|token_hash/);
+    expect(file.organizations.map((x: any) => x.slug)).toEqual(['logistics']);
+    expect(file.documents.every((d: any) => d.organization === o.logistics)).toBe(true);
+    expect(file.proposals.length).toBeGreaterThan(0);
+    expect(file.api_specs.length).toBeGreaterThan(0);
+    expect(file.people.map((p: any) => p.name)).toContain('Anders H.');
+    const sections = file.documents.flatMap((d: any) => d.sections).length;
+
+    const orgCount = async () => (await api('GET', '/organizations')).data.length;
+    const before = await orgCount();
+    // The slug is taken here: the preview says so, suggests another and changes nothing.
+    const preview = await api('POST', '/import/preview', { file });
+    expect(preview.status).toBe(200);
+    expect(preview.data).toMatchObject({ ok: false, applied: false });
+    expect(preview.data.organizations[0]).toMatchObject({ slug: 'logistics', suggested_slug: 'logistics-2', id: null });
+    expect(preview.data.counts.sections).toBe(sections);
+    expect(preview.data.warnings.join('\n')).toContain('already registered in this group');
+    expect(await orgCount()).toBe(before);
+    expect((await api('POST', '/import', { file })).status).toBe(409);
+    expect((await api('POST', '/import', { file: { ...file, version: 2 } })).status).toBe(400);
+    const broken = { ...file, projects: [{ ...file.projects[0], organization: 'nope' }, ...file.projects.slice(1)] };
+    expect((await api('POST', '/import', { file: broken })).status).toBe(400);
+    expect((await api('POST', '/import', { file, renames: { [file.organizations[0].key]: 'copy' } }, { token: t.ida })).status).toBe(403);
+    expect(await orgCount()).toBe(before);
+
+    const imported = await api('POST', '/import', { file, renames: { [file.organizations[0].key]: 'logistics-copy' } });
+    expect(imported.status).toBe(201);
+    expect(imported.data).toMatchObject({ ok: true, applied: true });
+    const copy = imported.data.organizations[0].id;
+    expect(await orgCount()).toBe(before + 1);
+    // People come in disabled, without tokens.
+    const members = (await api('GET', '/members')).data.filter((m: any) => m.memberships.some((x: any) => x.organization_id === copy));
+    expect(members.length).toBeGreaterThan(0);
+    expect(members.every((m: any) => m.disabled_at && m.tokens.length === 0)).toBe(true);
+
+    // Exported again, the copy holds the same content. Repositories stay with the original (one per group).
+    const again = (await api('GET', `/export?organization_id=${copy}&people=1`)).data;
+    expect(again.organizations[0].slug).toBe('logistics-copy');
+    expect(comparable(again)).toEqual(comparable(file));
+    const links = (orgId: string) => withScope(pool, { groupId: null, bypass: true }, async (c) =>
+      (await c.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM section_links l JOIN sections s ON s.id = l.section_id
+           JOIN documents d ON d.id = s.document_id WHERE d.organization_id = $1`, [orgId])).rows[0].n);
+    expect(await links(copy)).toBeGreaterThan(0);
+    expect(await links(copy)).toBe(await links(o.logistics));
+  });
+
+  it('imports into another group without touching this one', async () => {
+    const file = (await api('GET', `/export?organization_id=${o.logistics}`)).data;
+    const acme = (await api('GET', '/organizations')).data.length;
+    const other: Who = { token: ADMIN, group: 'other-corp' };
+    const res = await api('POST', '/import', { file }, other);
+    expect(res.status).toBe(201);
+    expect(res.data.organizations[0].slug).toBe('logistics');
+    // Other Corp has its own copy of the portal's repository already.
+    expect(res.data.warnings.join('\n')).toContain('already registered in this group');
+    expect((await api('GET', '/organizations')).data.length).toBe(acme);
+    expect((await api('GET', '/organizations', undefined, other)).data.map((x: any) => x.slug).sort()).toEqual(['logistics', 'other']);
+  });
+
+  it('exports from the command line', async () => {
+    const { execFileSync } = await import('node:child_process');
+    const out = execFileSync('npx', ['tsx', 'src/export-cli.ts', '--group', 'acme-group', '--organization', 'payments', '--no-history'], {
+      env: { ...process.env, DATABASE_URL }, encoding: 'utf8',
+    });
+    const file = JSON.parse(out);
+    expect(file.source).toMatchObject({ kind: 'organization', group: { slug: 'acme-group' } });
+    expect(file.organizations.map((x: any) => x.slug)).toEqual(['payments']);
+    expect(file.people).toEqual([]);
+    expect(file.documents.flatMap((d: any) => d.sections).every((s: any) => s.versions.length === 0)).toBe(true);
+  });
 });
+
+/** An export without what differs between copies: ids, slugs and repositories (a remote belongs to one project per group). */
+function comparable(file: any): unknown {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  const walk = (v: any): any => {
+    if (Array.isArray(v)) return v.map(walk).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    if (v && typeof v === 'object') {
+      return Object.fromEntries(Object.entries(v)
+        .filter(([k]) => k !== 'repositories')
+        .map(([k, x]) => [k, walk(x)]));
+    }
+    return typeof v === 'string' && uuid.test(v) ? '<id>' : v;
+  };
+  const { exported_at: _, source: __, organizations, ...rest } = file;
+  return walk({ ...rest, organizations: organizations.map(({ slug: ___, aliases: ____, ...o }: any) => o) });
+}
 
 describe('upgrade from v1', () => {
   it('moves a v1 database into one group and organization', async () => {

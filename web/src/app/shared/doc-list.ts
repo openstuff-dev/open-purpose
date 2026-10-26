@@ -9,7 +9,12 @@ import { Icon } from './icon';
 import { DatePipe } from '@angular/common';
 
 const GLYPH: Record<DocKind, string> = {
-  purpose: 'book', business_logic: 'layers', glossary: 'link', guidelines: 'file', reference: 'grid', learnings: 'bot',
+  purpose: 'book',
+  business_logic: 'layers',
+  glossary: 'link',
+  guidelines: 'file',
+  reference: 'grid',
+  learnings: 'bot',
 };
 import { Notices } from './notice';
 
@@ -33,7 +38,9 @@ const KIND_HINT: Record<DocKind, string> = {
         @for (d of docs(); track d.id) {
           <li>
             <a [routerLink]="['/documents', d.id]">
-              <span class="doc-glyph" [attr.data-kind]="d.kind"><app-icon [name]="glyph[d.kind]" /></span>
+              <span class="doc-glyph" [attr.data-kind]="d.kind"
+                ><app-icon [name]="glyph[d.kind]"
+              /></span>
               <span class="doc-name">
                 <span class="doc-title">{{ d.title }}</span>
                 <span class="doc-kind">{{ kindLabel[d.kind] }}</span>
@@ -50,20 +57,27 @@ const KIND_HINT: Record<DocKind, string> = {
     @if (canEdit()) {
       @if (adding()) {
         <form class="inline-form" (ngSubmit)="create()">
-          <label>Type
+          <label
+            >Type
             <select name="kind" [(ngModel)]="kind" (ngModelChange)="suggestTitle()">
-              @for (k of kinds; track k) { <option [value]="k">{{ kindLabel[k] }}</option> }
+              @for (k of kinds; track k) {
+                <option [value]="k">{{ kindLabel[k] }}</option>
+              }
             </select>
           </label>
-          <label class="grow">Title <input name="title" [(ngModel)]="title" required></label>
+          <label class="grow">Title <input name="title" [(ngModel)]="title" required /></label>
           <p class="quiet full">{{ hint[kind] }}</p>
           <div class="form-actions full">
-            <button class="btn primary" type="submit" [disabled]="!title.trim()">Create document</button>
+            <button class="btn primary" type="submit" [disabled]="!title.trim()">
+              Create document
+            </button>
             <button class="btn" type="button" (click)="adding.set(false)">Cancel</button>
           </div>
         </form>
       } @else {
-        <button class="btn" type="button" (click)="adding.set(true); suggestTitle()"><app-icon name="plus" />New document</button>
+        <button class="btn" type="button" (click)="adding.set(true); suggestTitle()">
+          <app-icon name="plus" />New document
+        </button>
       }
     }
   `,
@@ -91,11 +105,19 @@ export class DocList {
 
   constructor() {
     effect(() => {
-      void this.load({ organization_id: this.organizationId(), project_id: this.projectId(), scope_id: this.scopeId() });
+      void this.load({
+        organization_id: this.organizationId(),
+        project_id: this.projectId(),
+        scope_id: this.scopeId(),
+      });
     });
   }
 
-  private async load(level: { organization_id: string | null; project_id: string | null; scope_id: string | null }): Promise<void> {
+  private async load(level: {
+    organization_id: string | null;
+    project_id: string | null;
+    scope_id: string | null;
+  }): Promise<void> {
     try {
       this.docs.set(await this.api.documents(level));
     } catch (e) {
@@ -105,15 +127,20 @@ export class DocList {
   }
 
   suggestTitle(): void {
-    if (!this.title.trim() || Object.values(KIND_LABEL).includes(this.title)) this.title = KIND_LABEL[this.kind];
+    if (!this.title.trim() || Object.values(KIND_LABEL).includes(this.title))
+      this.title = KIND_LABEL[this.kind];
   }
 
   async create(): Promise<void> {
     const mode: EditMode = this.kind === 'purpose' ? 'locked' : 'propose';
     try {
       const doc = await this.api.createDocument({
-        organization_id: this.organizationId(), project_id: this.projectId(), scope_id: this.scopeId(),
-        kind: this.kind, title: this.title.trim(), mode,
+        organization_id: this.organizationId(),
+        project_id: this.projectId(),
+        scope_id: this.scopeId(),
+        kind: this.kind,
+        title: this.title.trim(),
+        mode,
       });
       this.notices.ok(`Created ${doc.title}`);
       await this.router.navigate(['/documents', doc.id]);

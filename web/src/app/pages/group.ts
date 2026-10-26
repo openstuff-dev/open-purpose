@@ -16,52 +16,101 @@ import { ScopeList } from '../shared/scope-list';
     @if (session.group(); as g) {
       <header class="page-head">
         <div class="title-row">
-          <span class="badge group" style="width:2.25rem;height:2.25rem;font-size:0.8rem">{{ initials(g.name) }}</span>
+          <span class="badge group" style="width:2.25rem;height:2.25rem;font-size:0.8rem">{{
+            initials(g.name)
+          }}</span>
           <h1>{{ g.name }}</h1>
-          @if (g.can_admin) { <a class="btn" routerLink="/settings/group"><app-icon name="settings" />Manage</a> }
+          @if (g.can_admin) {
+            <a class="btn" routerLink="/settings/group"><app-icon name="settings" />Manage</a>
+          }
         </div>
-        <p class="lede">Rules here reach every agent in every organization, before any organization or project rules.</p>
+        <p class="lede">
+          Rules here reach every agent in every organization, before any organization or project
+          rules.
+        </p>
       </header>
 
       <section class="block">
-        <div class="block-head"><div>
-          <h2>Organizations</h2>
-          <p class="quiet">Each keeps its own rules, projects and inbox, and is private to its members unless shared.</p>
-        </div></div>
+        <div class="block-head">
+          <div>
+            <h2>Organizations</h2>
+            <p class="quiet">
+              Each keeps its own rules, projects and inbox, and is private to its members unless
+              shared.
+            </p>
+          </div>
+        </div>
         <ul class="org-list">
           @for (o of orgs(); track o.id) {
             <li>
               <div class="org-main">
-                <span class="badge" [style.background]="o.readable ? session.orgColor(o.id) : 'var(--faint)'">{{ initials(o.name) }}</span>
+                <span
+                  class="badge"
+                  [style.background]="o.readable ? session.orgColor(o.id) : 'var(--faint)'"
+                  >{{ initials(o.name) }}</span
+                >
                 @if (o.readable) {
-                  <button type="button" class="org-name link-btn" (click)="open(o)">{{ o.name }}</button>
+                  <button type="button" class="org-name link-btn" (click)="open(o)">
+                    {{ o.name }}
+                  </button>
                 } @else {
-                  <span class="org-name">{{ o.name }}</span><span class="flag muted"><app-icon name="lock" [size]="11" />No access</span>
+                  <span class="org-name">{{ o.name }}</span
+                  ><span class="flag muted"><app-icon name="lock" [size]="11" />No access</span>
                 }
-                @if (o.role) { <span class="chip">{{ roleLabel[o.role] }}</span> }
-                <span class="quiet org-count">@if (o.projects !== null) { {{ o.projects }} {{ o.projects === 1 ? 'project' : 'projects' }} }</span>
+                @if (o.role) {
+                  <span class="chip">{{ roleLabel[o.role] }}</span>
+                }
+                <span class="quiet org-count">
+                  @if (o.projects !== null) {
+                    {{ o.projects }} {{ o.projects === 1 ? 'project' : 'projects' }}
+                  }
+                </span>
               </div>
-              @if (o.summary) { <p class="quiet">{{ o.summary }}</p> }
-              @if (readersOf(o).length) { <p class="org-readers"><app-icon name="share" [size]="12" />Shared with {{ readersOf(o).join(', ') }}</p> }
+              @if (o.summary) {
+                <p class="quiet multiline">{{ o.summary }}</p>
+              }
+              @if (readersOf(o).length) {
+                <p class="org-readers">
+                  <app-icon name="share" [size]="12" />Shared with {{ readersOf(o).join(', ') }}
+                </p>
+              }
             </li>
           }
         </ul>
       </section>
 
       <section class="block">
-        <div class="block-head"><div>
-          <h2>Group documents</h2>
-          <p class="quiet">Purpose, rules and glossary that hold in every organization: security, privacy, legal, shared terms.</p>
-        </div></div>
-        <app-doc-list [organizationId]="null" [canEdit]="g.can_edit" emptyText="No group documents yet." />
+        <div class="block-head">
+          <div>
+            <h2>Group documents</h2>
+            <p class="quiet">
+              Purpose, rules and glossary that hold in every organization: security, privacy, legal,
+              shared terms.
+            </p>
+          </div>
+        </div>
+        <app-doc-list
+          [organizationId]="null"
+          [canEdit]="g.can_edit"
+          emptyText="No group documents yet."
+        />
       </section>
 
       <section class="block">
-        <div class="block-head"><div>
-          <h2>Group-wide scopes</h2>
-          <p class="quiet">Rules for a kind of code in every organization, such as all .NET services. Matched by stack tags or paths.</p>
-        </div></div>
-        <app-scope-list [organizationId]="null" [canEdit]="g.can_edit" emptyText="No group-wide scopes yet. A typical first one is “.NET services” with the stack tag dotnet." />
+        <div class="block-head">
+          <div>
+            <h2>Group-wide scopes</h2>
+            <p class="quiet">
+              Rules for a kind of code in every organization, such as all .NET services. Matched by
+              stack tags or paths.
+            </p>
+          </div>
+        </div>
+        <app-scope-list
+          [organizationId]="null"
+          [canEdit]="g.can_edit"
+          emptyText="No group-wide scopes yet. A typical first one is “.NET services” with the stack tag dotnet."
+        />
       </section>
     }
   `,

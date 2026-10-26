@@ -14,16 +14,32 @@ import { Icon } from './icon';
     <fieldset class="repo-picker">
       <legend>Repositories</legend>
       @for (r of repositories(); track r.id) {
-        <label class="check"><input type="checkbox" [checked]="selected().includes(r.id)" (change)="toggle(r.id)"><code>{{ r.remote_key }}</code></label>
+        <label class="check"
+          ><input
+            type="checkbox"
+            [checked]="selected().includes(r.id)"
+            (change)="toggle(r.id)"
+          /><code>{{ r.remote_key }}</code></label
+        >
       } @empty {
         <p class="quiet">The project has no repositories yet.</p>
       }
       <div class="repo-add">
-        <input class="mono" name="repo-picker-remote" [(ngModel)]="remote" aria-label="Git remote URL of another repository"
-          placeholder="Add a git remote URL" (keydown.enter)="$event.preventDefault(); add()">
-        <button class="btn sm" type="button" [disabled]="!remote.trim()" (click)="add()"><app-icon name="plus" />Add</button>
+        <input
+          class="mono"
+          name="repo-picker-remote"
+          [(ngModel)]="remote"
+          aria-label="Git remote URL of another repository"
+          placeholder="Add a git remote URL"
+          (keydown.enter)="$event.preventDefault(); add()"
+        />
+        <button class="btn sm" type="button" [disabled]="!remote.trim()" (click)="add()">
+          <app-icon name="plus" />Add
+        </button>
       </div>
-      <p class="quiet">Tick none to use paths and stacks in any of the project's repositories, as in a monorepo.</p>
+      <p class="quiet">
+        Tick none to use paths and stacks in any of the project's repositories, as in a monorepo.
+      </p>
     </fieldset>
   `,
 })

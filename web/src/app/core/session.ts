@@ -57,7 +57,9 @@ export class Session {
     const ids = this.agentView()?.switchable_organization_ids ?? [];
     return this.orgs().filter((o) => ids.includes(o.id));
   });
-  readonly org = computed<Organization | null>(() => this.orgs().find((o) => o.id === this.orgId()) ?? null);
+  readonly org = computed<Organization | null>(
+    () => this.orgs().find((o) => o.id === this.orgId()) ?? null,
+  );
 
   setToken(token: string | null): void {
     write(TOKEN, token);
@@ -117,7 +119,11 @@ export class Session {
   /** Admin of the group or of any organization in it. */
   get adminsAnything(): boolean {
     const me = this.me();
-    return !!me && !me.agent_view && (me.group.can_admin || me.organizations.some((o) => o.role === 'admin'));
+    return (
+      !!me &&
+      !me.agent_view &&
+      (me.group.can_admin || me.organizations.some((o) => o.role === 'admin'))
+    );
   }
 
   get isSuperadmin(): boolean {
@@ -148,7 +154,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
 /** Set when a create or rename failed because the slug is still another one's old slug. */
 export function aliasConflict(err: unknown): { id: string; name: string; slug: string } | null {
-  const body = (err as HttpErrorResponse)?.error as { error?: string; alias_of?: { id: string; name: string; slug: string } } | undefined;
+  const body = (err as HttpErrorResponse)?.error as
+    { error?: string; alias_of?: { id: string; name: string; slug: string } } | undefined;
   return body?.error === 'conflict' && body.alias_of ? body.alias_of : null;
 }
 
@@ -157,7 +164,9 @@ export function aliasConflict(err: unknown): { id: string; name: string; slug: s
  * taking the slug over, since repositories and links using it would follow.
  * Resolves to undefined when the person says no.
  */
-export async function claimingOldSlug<T>(run: (take_alias?: boolean) => Promise<T>): Promise<T | undefined> {
+export async function claimingOldSlug<T>(
+  run: (take_alias?: boolean) => Promise<T>,
+): Promise<T | undefined> {
   try {
     return await run();
   } catch (e) {

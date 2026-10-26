@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  untracked,
+} from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../core/api';
@@ -31,20 +41,40 @@ function ago(iso: string | null): string {
       <ul class="api-list">
         @for (s of specs(); track s.id) {
           <li class="api-card" [class.open]="openId() === s.id">
-            <button type="button" class="api-card-main" (click)="toggle(s.id)" [attr.aria-expanded]="openId() === s.id">
+            <button
+              type="button"
+              class="api-card-main"
+              (click)="toggle(s.id)"
+              [attr.aria-expanded]="openId() === s.id"
+            >
               <span class="api-icon"><app-icon name="plug" [size]="16" /></span>
               <span class="api-text">
-                <span class="api-name">{{ s.name }} @if (s.version) { <span class="quiet">{{ s.version }}</span> }</span>
+                <span class="api-name"
+                  >{{ s.name }}
+                  @if (s.version) {
+                    <span class="quiet">{{ s.version }}</span>
+                  }
+                </span>
                 <span class="api-sub">
                   <span class="chip">{{ s.spec_version }}</span>
                   {{ s.endpoint_count }} endpoints · {{ s.schema_count }} schemas ·
                   @if (s.source_url) {
                     <span [title]="s.source_url">from link, fetched {{ ago(s.fetched_at) }}</span>
                   } @else {
-                    <span>file {{ s.filename }}, updated {{ s.updated_at | date: 'd MMM' }}@if (s.updated_by_name) { by {{ s.updated_by_name }} }</span>
+                    <span
+                      >file {{ s.filename }}, updated {{ s.updated_at | date: 'd MMM' }}
+                      @if (s.updated_by_name) {
+                        by {{ s.updated_by_name }}
+                      }
+                    </span>
                   }
                 </span>
-                @if (s.fetch_error) { <span class="api-error"><app-icon name="x" [size]="12" />Last fetch failed: {{ s.fetch_error }}. Agents get the last version that worked.</span> }
+                @if (s.fetch_error) {
+                  <span class="api-error"
+                    ><app-icon name="x" [size]="12" />Last fetch failed: {{ s.fetch_error }}. Agents
+                    get the last version that worked.</span
+                  >
+                }
               </span>
               <app-icon name="chevron-down" [size]="16" class="api-chevron" />
             </button>
@@ -52,46 +82,107 @@ function ago(iso: string | null): string {
             @if (openId() === s.id) {
               <div class="api-body">
                 <div class="api-actions">
-                  @if (s.source_url) { <code class="api-url" [title]="s.source_url">{{ s.source_url }}</code> }
+                  @if (s.source_url) {
+                    <code class="api-url" [title]="s.source_url">{{ s.source_url }}</code>
+                  }
                   <span class="api-actions-btns">
-                    @if (canEdit() && s.source_url) { <button class="btn sm" type="button" (click)="refresh(s)" [disabled]="busy()">Fetch now</button> }
-                    @if (canEdit()) {
-                      <label class="btn sm file-btn">Replace with file<input type="file" accept=".json,.yaml,.yml,application/json,application/yaml" (change)="replace(s, $event)"></label>
+                    @if (canEdit() && s.source_url) {
+                      <button class="btn sm" type="button" (click)="refresh(s)" [disabled]="busy()">
+                        Fetch now
+                      </button>
                     }
-                    <button class="btn sm" type="button" (click)="download(s)"><app-icon name="copy" [size]="13" />Download</button>
-                    @if (canEdit()) { <button class="btn sm danger" type="button" (click)="remove(s)">Remove</button> }
+                    @if (canEdit()) {
+                      <label class="btn sm file-btn"
+                        >Replace with file<input
+                          type="file"
+                          accept=".json,.yaml,.yml,application/json,application/yaml"
+                          (change)="replace(s, $event)"
+                      /></label>
+                    }
+                    <button class="btn sm" type="button" (click)="download(s)">
+                      <app-icon name="copy" [size]="13" />Download
+                    </button>
+                    @if (canEdit()) {
+                      <button class="btn sm danger" type="button" (click)="remove(s)">
+                        Remove
+                      </button>
+                    }
                   </span>
                 </div>
 
                 @if (detail(); as d) {
                   <div class="api-browser">
                     <nav class="api-nav" aria-label="Endpoints and schemas">
-                      <label class="search-field"><app-icon name="search" />
-                        <input type="search" placeholder="Filter endpoints and schemas" aria-label="Filter" [ngModel]="filter()" (ngModelChange)="filter.set($event)">
+                      <label class="search-field"
+                        ><app-icon name="search" />
+                        <input
+                          type="search"
+                          placeholder="Filter endpoints and schemas"
+                          aria-label="Filter"
+                          [ngModel]="filter()"
+                          (ngModelChange)="filter.set($event)"
+                        />
                       </label>
-                      <button type="button" class="api-nav-item overview" [class.active]="!view()" (click)="show(null)">Overview <span class="quiet">all endpoints</span></button>
+                      <button
+                        type="button"
+                        class="api-nav-item overview"
+                        [class.active]="!view()"
+                        (click)="show(null)"
+                      >
+                        Overview <span class="quiet">all endpoints</span>
+                      </button>
                       @for (g of groups(); track g.tag) {
                         <div class="api-nav-tag">{{ g.tag }}</div>
                         @for (op of g.ops; track op.key) {
-                          <button type="button" class="api-nav-item" [class.active]="view()?.endpoint === op.key" (click)="show({ endpoint: op.key })" [title]="op.summary">
-                            <span class="method" [attr.data-method]="op.method">{{ op.method }}</span>
-                            <span class="api-path" [class.deprecated]="op.deprecated">{{ op.path }}</span>
+                          <button
+                            type="button"
+                            class="api-nav-item"
+                            [class.active]="view()?.endpoint === op.key"
+                            (click)="show({ endpoint: op.key })"
+                            [title]="op.summary"
+                          >
+                            <span class="method" [attr.data-method]="op.method">{{
+                              op.method
+                            }}</span>
+                            <span class="api-path" [class.deprecated]="op.deprecated">{{
+                              op.path
+                            }}</span>
                           </button>
                         }
                       }
                       @if (schemas().length) {
                         <div class="api-nav-tag">Schemas</div>
                         @for (n of schemas(); track n) {
-                          <button type="button" class="api-nav-item" [class.active]="view()?.schema === n" (click)="show({ schema: n })">
-                            <span class="method schema">DTO</span><span class="api-path">{{ n }}</span>
+                          <button
+                            type="button"
+                            class="api-nav-item"
+                            [class.active]="view()?.schema === n"
+                            (click)="show({ schema: n })"
+                          >
+                            <span class="method schema">DTO</span
+                            ><span class="api-path">{{ n }}</span>
                           </button>
                         }
                       }
-                      @if (!groups().length && !schemas().length) { <p class="quiet">Nothing matches.</p> }
+                      @if (!groups().length && !schemas().length) {
+                        <p class="quiet">Nothing matches.</p>
+                      }
                     </nav>
                     <div class="api-view">
-                      <p class="api-view-note"><app-icon name="bot" [size]="13" />What an agent gets from <code>get_api</code>@if (view()?.endpoint) { <code>endpoint: "{{ view()!.endpoint }}"</code> } @else if (view()?.schema) { <code>schema: "{{ view()!.schema }}"</code> }</p>
-                      @if (text(); as t) { <app-md class="api-md" [text]="t" /> } @else { <p class="quiet">Loading…</p> }
+                      <p class="api-view-note">
+                        <app-icon name="bot" [size]="13" />What an agent gets from
+                        <code>get_api</code>
+                        @if (view()?.endpoint) {
+                          <code>endpoint: "{{ view()!.endpoint }}"</code>
+                        } @else if (view()?.schema) {
+                          <code>schema: "{{ view()!.schema }}"</code>
+                        }
+                      </p>
+                      @if (text(); as t) {
+                        <app-md class="api-md" [text]="t" />
+                      } @else {
+                        <p class="quiet">Loading…</p>
+                      }
                     </div>
                   </div>
                 } @else {
@@ -103,7 +194,11 @@ function ago(iso: string | null): string {
         }
       </ul>
     } @else {
-      <p class="empty">No API spec yet. Add the project's <code>swagger.json</code> or <code>openapi.yaml</code> and agents get its endpoints and DTOs, here and in every project that uses this one.</p>
+      <p class="empty">
+        No API spec yet. Add the project's <code>swagger.json</code> or
+        <code>openapi.yaml</code> and agents get its endpoints and DTOs, here and in every project
+        that uses this one.
+      </p>
     }
 
     @if (canEdit()) {
@@ -111,24 +206,66 @@ function ago(iso: string | null): string {
         <div class="api-add-head">
           <h3>Add an API spec</h3>
           <div class="segmented sm" role="tablist" aria-label="Source">
-            <button type="button" role="tab" [attr.aria-selected]="mode() === 'url'" (click)="mode.set('url')">From a link</button>
-            <button type="button" role="tab" [attr.aria-selected]="mode() === 'file'" (click)="mode.set('file')">Upload a file</button>
+            <button
+              type="button"
+              role="tab"
+              [attr.aria-selected]="mode() === 'url'"
+              (click)="mode.set('url')"
+            >
+              From a link
+            </button>
+            <button
+              type="button"
+              role="tab"
+              [attr.aria-selected]="mode() === 'file'"
+              (click)="mode.set('file')"
+            >
+              Upload a file
+            </button>
           </div>
         </div>
         <div class="inline-form">
           @if (mode() === 'url') {
-            <label class="grow">URL of swagger.json or openapi.yaml
-              <input name="url" class="mono" type="url" [(ngModel)]="url" placeholder="https://orders.acme.internal/swagger/v1/swagger.json"></label>
+            <label class="grow"
+              >URL of swagger.json or openapi.yaml
+              <input
+                name="url"
+                class="mono"
+                type="url"
+                [(ngModel)]="url"
+                placeholder="https://orders.acme.internal/swagger/v1/swagger.json"
+            /></label>
           } @else {
-            <label class="grow">File (JSON or YAML)
-              <input name="file" type="file" accept=".json,.yaml,.yml,application/json,application/yaml" (change)="pickFile($event)"></label>
+            <label class="grow"
+              >File (JSON or YAML)
+              <input
+                name="file"
+                type="file"
+                accept=".json,.yaml,.yml,application/json,application/yaml"
+                (change)="pickFile($event)"
+            /></label>
           }
-          <label>Name <span class="quiet">(optional)</span><input name="name" [(ngModel)]="name" placeholder="Defaults to the spec's title"></label>
-          <div class="form-actions"><button class="btn primary" type="submit" [disabled]="busy() || (mode() === 'url' ? !url.trim() : !file())"><app-icon name="plus" />Add API</button></div>
+          <label
+            >Name <span class="quiet">(optional)</span
+            ><input name="name" [(ngModel)]="name" placeholder="Defaults to the spec's title"
+          /></label>
+          <div class="form-actions">
+            <button
+              class="btn primary"
+              type="submit"
+              [disabled]="busy() || (mode() === 'url' ? !url.trim() : !file())"
+            >
+              <app-icon name="plus" />Add API
+            </button>
+          </div>
         </div>
         <p class="quiet api-add-hint">
-          @if (mode() === 'url') { OpenPurpose fetches the link now, and again in the background when agents read it and it's over an hour old. The server must be able to reach it. }
-          @else { OpenAPI 3 or Swagger 2, up to 20 MB. Upload a new version whenever the API changes. }
+          @if (mode() === 'url') {
+            OpenPurpose fetches the link now, and again in the background when agents read it and
+            it's over an hour old. The server must be able to reach it.
+          } @else {
+            OpenAPI 3 or Swagger 2, up to 20 MB. Upload a new version whenever the API changes.
+          }
         </p>
       </form>
     }
@@ -160,7 +297,11 @@ export class ApiSpecs {
     const q = this.filter().trim().toLowerCase();
     const m = new Map<string, ApiSpecDetail['operations']>();
     for (const op of d.operations) {
-      if (q && !`${op.key} ${op.summary} ${op.operation_id} ${op.tags.join(' ')}`.toLowerCase().includes(q)) continue;
+      if (
+        q &&
+        !`${op.key} ${op.summary} ${op.operation_id} ${op.tags.join(' ')}`.toLowerCase().includes(q)
+      )
+        continue;
       const tag = op.tags[0] ?? 'Other';
       m.set(tag, [...(m.get(tag) ?? []), op]);
     }
@@ -223,9 +364,14 @@ export class ApiSpecs {
   async add(): Promise<void> {
     this.busy.set(true);
     try {
-      const body = this.mode() === 'url'
-        ? { url: this.url.trim(), name: this.name.trim() || undefined }
-        : { content: await this.readFile(this.file()!), filename: this.file()!.name, name: this.name.trim() || undefined };
+      const body =
+        this.mode() === 'url'
+          ? { url: this.url.trim(), name: this.name.trim() || undefined }
+          : {
+              content: await this.readFile(this.file()!),
+              filename: this.file()!.name,
+              name: this.name.trim() || undefined,
+            };
       const s = await this.api.addApi(this.projectId(), body);
       this.notices.ok(`Added ${s.name}: ${s.endpoint_count} endpoints, ${s.schema_count} schemas`);
       this.url = '';
@@ -260,8 +406,13 @@ export class ApiSpecs {
     input.value = '';
     if (!f) return;
     try {
-      const r = await this.api.updateApi(s.id, { content: await this.readFile(f), filename: f.name });
-      this.notices.ok(`Replaced ${r.name}: ${r.endpoint_count} endpoints, ${r.schema_count} schemas`);
+      const r = await this.api.updateApi(s.id, {
+        content: await this.readFile(f),
+        filename: f.name,
+      });
+      this.notices.ok(
+        `Replaced ${r.name}: ${r.endpoint_count} endpoints, ${r.schema_count} schemas`,
+      );
       this.changed.emit();
       void this.open(s.id);
     } catch (e) {

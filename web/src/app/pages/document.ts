@@ -1,9 +1,27 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Api } from '../core/api';
-import { KIND_LABEL, MODE_HELP, MODE_LABEL, type DocDetail, type EditMode, type GraphNode, type LinkRef, type Section, type SectionVersion } from '../core/models';
+import {
+  KIND_LABEL,
+  MODE_HELP,
+  MODE_LABEL,
+  type DocDetail,
+  type EditMode,
+  type GraphNode,
+  type LinkRef,
+  type Section,
+  type SectionVersion,
+} from '../core/models';
 import { Session } from '../core/session';
 import { MarkdownView } from '../shared/markdown';
 import { MarkdownEditor } from '../shared/md-editor';
@@ -11,24 +29,45 @@ import { ModeBadge, ModePicker } from '../shared/mode';
 import { Notices } from '../shared/notice';
 import { Icon } from '../shared/icon';
 
-interface Draft { heading: string; body: string; note: string }
+interface Draft {
+  heading: string;
+  body: string;
+  note: string;
+}
 
 @Component({
   selector: 'app-document',
-  imports: [FormsModule, RouterLink, DatePipe, MarkdownView, MarkdownEditor, ModeBadge, ModePicker, Icon],
+  imports: [
+    FormsModule,
+    RouterLink,
+    DatePipe,
+    MarkdownView,
+    MarkdownEditor,
+    ModeBadge,
+    ModePicker,
+    Icon,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (doc(); as d) {
       <header class="page-head doc-head">
         <nav class="crumbs" aria-label="Breadcrumb">
-          @if (session.groupShown() || !d.organization) { <a routerLink="/group">{{ session.group()?.name }}</a> }
-          @if (d.organization; as o) { <a routerLink="/organization">{{ o.name }}</a> }
-          @if (d.project; as p) { <a [routerLink]="['/projects', p.id]">{{ p.name }}</a> }
-          @if (d.scope; as s) { <a [routerLink]="['/scopes', s.id]">{{ s.name }}</a> }
+          @if (session.groupShown() || !d.organization) {
+            <a routerLink="/group">{{ session.group()?.name }}</a>
+          }
+          @if (d.organization; as o) {
+            <a routerLink="/organization">{{ o.name }}</a>
+          }
+          @if (d.project; as p) {
+            <a [routerLink]="['/projects', p.id]">{{ p.name }}</a>
+          }
+          @if (d.scope; as s) {
+            <a [routerLink]="['/scopes', s.id]">{{ s.name }}</a>
+          }
         </nav>
         @if (editingTitle()) {
           <form class="title-form" (ngSubmit)="saveTitle()">
-            <input name="title" [(ngModel)]="titleDraft" aria-label="Document title" required>
+            <input name="title" [(ngModel)]="titleDraft" aria-label="Document title" required />
             <button class="btn primary" type="submit">Save</button>
             <button class="btn" type="button" (click)="editingTitle.set(false)">Cancel</button>
           </form>
@@ -36,23 +75,45 @@ interface Draft { heading: string; body: string; note: string }
           <div class="title-row">
             <h1>{{ d.title }}</h1>
             @if (d.can_edit) {
-              <button class="btn" type="button" (click)="titleDraft = d.title; editingTitle.set(true)"><app-icon name="pencil" />Rename</button>
-              <button class="btn danger" type="button" (click)="removeDoc()" aria-label="Delete document"><app-icon name="trash" /></button>
+              <button
+                class="btn"
+                type="button"
+                (click)="titleDraft = d.title; editingTitle.set(true)"
+              >
+                <app-icon name="pencil" />Rename
+              </button>
+              <button
+                class="btn danger"
+                type="button"
+                (click)="removeDoc()"
+                aria-label="Delete document"
+              >
+                <app-icon name="trash" />
+              </button>
             }
           </div>
         }
         <p class="meta">
           <span class="chip">{{ kindLabel[d.kind] }}</span>
           <span>{{ where() }}</span>
-          <span>{{ d.sections.length }} {{ d.sections.length === 1 ? 'section' : 'sections' }}</span>
+          <span
+            >{{ d.sections.length }} {{ d.sections.length === 1 ? 'section' : 'sections' }}</span
+          >
         </p>
         @if (d.kind === 'glossary') {
-          <p class="quiet">Each section is one term. Anyone can link to it with <code>[[Term name]]</code>, and it shows up on the map.</p>
+          <p class="quiet">
+            Each section is one term. Anyone can link to it with <code>[[Term name]]</code>, and it
+            shows up on the map.
+          </p>
         }
         <div class="doc-mode">
           <span>New sections from agents</span>
           @if (d.can_edit) {
-            <app-mode-picker [mode]="d.mode" (changed)="setDocMode($event)" label="What agents may do when adding sections" />
+            <app-mode-picker
+              [mode]="d.mode"
+              (changed)="setDocMode($event)"
+              label="What agents may do when adding sections"
+            />
           } @else {
             <app-mode-badge [mode]="d.mode" />
           }
@@ -65,11 +126,22 @@ interface Draft { heading: string; body: string; note: string }
           <article class="section" [attr.data-mode]="s.mode" [id]="'s-' + s.id.slice(0, 8)">
             @if (editing() === s.id) {
               <form class="section-edit" (ngSubmit)="saveSection(s)">
-                <label>Heading <input name="heading" [(ngModel)]="draft.heading" required></label>
-                <app-md-editor [(value)]="draft.body" [rows]="10" label="Section text" [fromProject]="d.project_id" [fromOrganization]="d.organization_id" />
-                <label>Note for history <span class="quiet">(optional)</span><input name="note" [(ngModel)]="draft.note" placeholder="What changed and why"></label>
+                <label>Heading <input name="heading" [(ngModel)]="draft.heading" required /></label>
+                <app-md-editor
+                  [(value)]="draft.body"
+                  [rows]="10"
+                  label="Section text"
+                  [fromProject]="d.project_id"
+                  [fromOrganization]="d.organization_id"
+                />
+                <label
+                  >Note for history <span class="quiet">(optional)</span
+                  ><input name="note" [(ngModel)]="draft.note" placeholder="What changed and why"
+                /></label>
                 <div class="form-actions">
-                  <button class="btn primary" type="submit" [disabled]="!draft.heading.trim()">Save section</button>
+                  <button class="btn primary" type="submit" [disabled]="!draft.heading.trim()">
+                    Save section
+                  </button>
                   <button class="btn" type="button" (click)="editing.set(null)">Cancel</button>
                 </div>
               </form>
@@ -77,27 +149,73 @@ interface Draft { heading: string; body: string; note: string }
               <header class="section-head">
                 <h2>{{ s.heading }}</h2>
                 @if (d.can_edit) {
-                  <app-mode-picker [mode]="s.mode" (changed)="setSectionMode(s, $event)" [label]="'What agents may do with ' + s.heading" />
+                  <app-mode-picker
+                    [mode]="s.mode"
+                    (changed)="setSectionMode(s, $event)"
+                    [label]="'What agents may do with ' + s.heading"
+                  />
                 } @else {
                   <app-mode-badge [mode]="s.mode" />
                 }
               </header>
-              <app-md [text]="s.body" [fromProject]="d.project_id" [fromOrganization]="d.organization_id" />
+              <app-md
+                [text]="s.body"
+                [fromProject]="d.project_id"
+                [fromOrganization]="d.organization_id"
+              />
               <footer class="section-foot">
-                <span>Version {{ s.version }}@if (s.updated_by_name) {, by {{ s.updated_by_name }}}, {{ s.updated_at | date: 'd MMM y, HH:mm' }}</span>
+                <span
+                  >Version {{ s.version }}
+                  @if (s.updated_by_name) {
+                    , by {{ s.updated_by_name }}
+                  }
+                  , {{ s.updated_at | date: 'd MMM y, HH:mm' }}</span
+                >
                 <code class="sid" title="Section id agents use">s:{{ s.id.slice(0, 8) }}</code>
                 <span class="section-actions">
                   @if (d.can_edit) {
                     <button class="link-btn" type="button" (click)="startEdit(s)">Edit</button>
                   }
-                  <button class="link-btn" type="button" (click)="toggleHistory(s)" [attr.aria-expanded]="historyFor() === s.id">History</button>
+                  <button
+                    class="link-btn"
+                    type="button"
+                    (click)="toggleHistory(s)"
+                    [attr.aria-expanded]="historyFor() === s.id"
+                  >
+                    History
+                  </button>
                   @if (d.kind === 'glossary') {
-                    <button class="link-btn" type="button" (click)="toggleRefs(s)" [attr.aria-expanded]="refsFor() === s.id">References</button>
+                    <button
+                      class="link-btn"
+                      type="button"
+                      (click)="toggleRefs(s)"
+                      [attr.aria-expanded]="refsFor() === s.id"
+                    >
+                      References
+                    </button>
                   }
                   @if (d.can_edit) {
-                    <button class="link-btn" type="button" [disabled]="first" (click)="move(s, -1)" aria-label="Move up">Up</button>
-                    <button class="link-btn" type="button" [disabled]="last" (click)="move(s, 1)" aria-label="Move down">Down</button>
-                    <button class="link-btn danger" type="button" (click)="removeSection(s)">Delete</button>
+                    <button
+                      class="link-btn"
+                      type="button"
+                      [disabled]="first"
+                      (click)="move(s, -1)"
+                      aria-label="Move up"
+                    >
+                      Up
+                    </button>
+                    <button
+                      class="link-btn"
+                      type="button"
+                      [disabled]="last"
+                      (click)="move(s, 1)"
+                      aria-label="Move down"
+                    >
+                      Down
+                    </button>
+                    <button class="link-btn danger" type="button" (click)="removeSection(s)">
+                      Delete
+                    </button>
                   }
                 </span>
               </footer>
@@ -107,13 +225,18 @@ interface Draft { heading: string; body: string; note: string }
                     <li>
                       <details>
                         <summary>
-                          Version {{ v.version }}, {{ v.actor_name ?? 'system' }}, {{ v.created_at | date: 'd MMM y, HH:mm' }}
-                          @if (v.note) { <span class="quiet">: {{ v.note }}</span> }
+                          Version {{ v.version }}, {{ v.actor_name ?? 'system' }},
+                          {{ v.created_at | date: 'd MMM y, HH:mm' }}
+                          @if (v.note) {
+                            <span class="quiet">: {{ v.note }}</span>
+                          }
                         </summary>
                         <p class="quiet">{{ v.heading }}, {{ modeNames[v.mode] }}</p>
                         <app-md [text]="v.body" />
                         @if (d.can_edit && v.version !== s.version) {
-                          <button class="btn" type="button" (click)="revert(s, v.version)">Restore version {{ v.version }}</button>
+                          <button class="btn" type="button" (click)="revert(s, v.version)">
+                            Restore version {{ v.version }}
+                          </button>
                         }
                       </details>
                     </li>
@@ -123,9 +246,22 @@ interface Draft { heading: string; body: string; note: string }
               @if (refsFor() === s.id) {
                 <div class="refs">
                   @for (r of refs(); track r.source.id) {
-                    <p><a [routerLink]="r.source.type === 'project' ? ['/projects', r.source.project_id] : r.source.type === 'group' ? ['/group'] : ['/organization']">{{ r.source.label }}</a>
-                      <span class="quiet">in {{ refText(r.refs) }}</span></p>
-                  } @empty { <p class="empty">Nothing links to this term yet.</p> }
+                    <p>
+                      <a
+                        [routerLink]="
+                          r.source.type === 'project'
+                            ? ['/projects', r.source.project_id]
+                            : r.source.type === 'group'
+                              ? ['/group']
+                              : ['/organization']
+                        "
+                        >{{ r.source.label }}</a
+                      >
+                      <span class="quiet">in {{ refText(r.refs) }}</span>
+                    </p>
+                  } @empty {
+                    <p class="empty">Nothing links to this term yet.</p>
+                  }
                 </div>
               }
             }
@@ -138,19 +274,42 @@ interface Draft { heading: string; body: string; note: string }
       @if (d.can_edit) {
         @if (adding()) {
           <form class="section-edit add" (ngSubmit)="addSection()">
-            <label>Heading <input name="heading" [(ngModel)]="newDraft.heading" required [placeholder]="d.kind === 'glossary' ? 'Term, e.g. Order' : 'One rule or topic per section'"></label>
-            <app-md-editor [(value)]="newDraft.body" [rows]="8" label="Section text" [fromProject]="d.project_id" [fromOrganization]="d.organization_id" />
+            <label
+              >Heading
+              <input
+                name="heading"
+                [(ngModel)]="newDraft.heading"
+                required
+                [placeholder]="
+                  d.kind === 'glossary' ? 'Term, e.g. Order' : 'One rule or topic per section'
+                "
+            /></label>
+            <app-md-editor
+              [(value)]="newDraft.body"
+              [rows]="8"
+              label="Section text"
+              [fromProject]="d.project_id"
+              [fromOrganization]="d.organization_id"
+            />
             <div class="doc-mode">
               <span>Agents may</span>
-              <app-mode-picker [mode]="newMode()" (changed)="newMode.set($event)" label="What agents may do with the new section" />
+              <app-mode-picker
+                [mode]="newMode()"
+                (changed)="newMode.set($event)"
+                label="What agents may do with the new section"
+              />
             </div>
             <div class="form-actions">
-              <button class="btn primary" type="submit" [disabled]="!newDraft.heading.trim()">Add section</button>
+              <button class="btn primary" type="submit" [disabled]="!newDraft.heading.trim()">
+                Add section
+              </button>
               <button class="btn" type="button" (click)="adding.set(false)">Cancel</button>
             </div>
           </form>
         } @else {
-          <button class="btn" type="button" (click)="startAdd()"><app-icon name="plus" />Add section</button>
+          <button class="btn" type="button" (click)="startAdd()">
+            <app-icon name="plus" />Add section
+          </button>
         }
       }
     }
@@ -182,9 +341,16 @@ export class DocumentPage {
     const d = this.doc();
     if (!d) return '';
     const org = d.organization?.name;
-    if (d.scope) return d.project ? `Only in ${d.project.name} › ${d.scope.name}` : org ? `${d.scope.name}, across ${org}` : `${d.scope.name}, in every organization`;
+    if (d.scope)
+      return d.project
+        ? `Only in ${d.project.name} › ${d.scope.name}`
+        : org
+          ? `${d.scope.name}, across ${org}`
+          : `${d.scope.name}, in every organization`;
     if (d.project) return `All of ${d.project.name}`;
-    return org ? `Every project in ${org}` : `Every organization in ${this.session.group()?.name ?? 'the group'}`;
+    return org
+      ? `Every project in ${org}`
+      : `Every organization in ${this.session.group()?.name ?? 'the group'}`;
   });
 
   constructor() {
@@ -218,7 +384,10 @@ export class DocumentPage {
   async saveSection(s: Section): Promise<void> {
     try {
       await this.api.updateSection(s.id, {
-        heading: this.draft.heading, body: this.draft.body, note: this.draft.note || undefined, expected_version: s.version,
+        heading: this.draft.heading,
+        body: this.draft.body,
+        note: this.draft.note || undefined,
+        expected_version: s.version,
       });
       this.editing.set(null);
       this.notices.ok('Saved section');
@@ -230,7 +399,11 @@ export class DocumentPage {
 
   async setSectionMode(s: Section, mode: EditMode): Promise<void> {
     try {
-      await this.api.updateSection(s.id, { mode, expected_version: s.version, note: `Mode set to ${mode}` });
+      await this.api.updateSection(s.id, {
+        mode,
+        expected_version: s.version,
+        note: `Mode set to ${mode}`,
+      });
       this.notices.ok(`${s.heading}: ${MODE_HELP[mode]}`);
       await this.reload();
     } catch (e) {
@@ -259,7 +432,11 @@ export class DocumentPage {
 
   async addSection(): Promise<void> {
     try {
-      await this.api.addSection(this.id(), { heading: this.newDraft.heading.trim(), body: this.newDraft.body, mode: this.newMode() });
+      await this.api.addSection(this.id(), {
+        heading: this.newDraft.heading.trim(),
+        body: this.newDraft.body,
+        mode: this.newMode(),
+      });
       this.adding.set(false);
       this.notices.ok('Added section');
       await this.reload();
@@ -340,7 +517,15 @@ export class DocumentPage {
     try {
       await this.api.deleteDocument(d.id);
       this.notices.ok(`Deleted ${d.title}`);
-      await this.router.navigate(d.scope ? ['/scopes', d.scope.id] : d.project ? ['/projects', d.project.id] : d.organization ? ['/organization'] : ['/group']);
+      await this.router.navigate(
+        d.scope
+          ? ['/scopes', d.scope.id]
+          : d.project
+            ? ['/projects', d.project.id]
+            : d.organization
+              ? ['/organization']
+              : ['/group'],
+      );
     } catch (e) {
       this.notices.error(e);
     }

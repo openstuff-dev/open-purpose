@@ -1,11 +1,21 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  computed,
+  inject,
+  input,
+} from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import DOMPurify from 'dompurify';
 import { Marked, type TokenizerAndRendererExtension } from 'marked';
 
 function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+  return s.replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+  );
 }
 
 /** [[target]], [[target|label]], [[project:x]], [[term:x]] → links handled by the /go route. */
@@ -21,7 +31,11 @@ const wikilink: TokenizerAndRendererExtension = {
   renderer(token) {
     const target = String(token['target']);
     const shown = String(token['label'] || target.replace(/^(project|term)\s*:\s*/i, ''));
-    const kind = /^term\s*:/i.test(target) ? 'term' : /^project\s*:/i.test(target) ? 'project' : 'any';
+    const kind = /^term\s*:/i.test(target)
+      ? 'term'
+      : /^project\s*:/i.test(target)
+        ? 'project'
+        : 'any';
     return `<a class="wikilink wikilink-${kind}" href="/go/${encodeURIComponent(target)}" data-wikilink="${escapeHtml(target)}">${escapeHtml(shown)}</a>`;
   },
 };
@@ -51,16 +65,24 @@ export class MarkdownView {
   readonly fromProject = input<string | null>(null);
   /** Organization the text belongs to (null = group-wide), for resolving bare [[links]]. */
   readonly fromOrganization = input<string | null>(null);
+  /** Off in agent mode, where the pages [[links]] point to aren't reachable. */
+  readonly followLinks = input(true);
   private sanitizer = inject(DomSanitizer);
   private router = inject(Router);
   private el = inject(ElementRef<HTMLElement>);
 
-  readonly html = computed(() => this.sanitizer.bypassSecurityTrustHtml(renderMarkdown(this.text())));
+  readonly html = computed(() =>
+    this.sanitizer.bypassSecurityTrustHtml(renderMarkdown(this.text())),
+  );
 
   onClick(ev: MouseEvent): void {
     const a = (ev.target as HTMLElement).closest('a');
     if (!a || !this.el.nativeElement.contains(a)) return;
     const target = a.getAttribute('data-wikilink');
+    if (target && !this.followLinks()) {
+      ev.preventDefault();
+      return;
+    }
     if (target && !ev.metaKey && !ev.ctrlKey) {
       ev.preventDefault();
       const queryParams: Record<string, string> = {};

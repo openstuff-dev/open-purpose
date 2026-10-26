@@ -44,7 +44,16 @@ export class Theme {
  * position in the group, so it is the same on every page and on the map.
  */
 /** Defaults; the values live in styles.css as --org-0 … --org-7. */
-export const ORG_COLORS = ['#2d5bff', '#a03fb5', '#0f8a6a', '#c26a12', '#d23f57', '#1d8fb3', '#6a55e0', '#5f7a14'];
+export const ORG_COLORS = [
+  '#2d5bff',
+  '#a03fb5',
+  '#0f8a6a',
+  '#c26a12',
+  '#d23f57',
+  '#1d8fb3',
+  '#6a55e0',
+  '#5f7a14',
+];
 
 /** An organization's colour as a CSS variable (--org-0 … --org-7), so agent mode can re-tint it. */
 export function orgColor(index: number): string {
@@ -53,5 +62,7 @@ export function orgColor(index: number): string {
 
 export function initials(name: string): string {
   const words = name.split(/\s+/).filter(Boolean);
-  return (words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? '?').slice(0, 2)).toUpperCase();
+  return (
+    words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? '?').slice(0, 2)
+  ).toUpperCase();
 }

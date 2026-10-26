@@ -207,3 +207,231 @@ export interface SlugRename {
   /** Open proposals that mention the old slug. They are not rewritten. */
   open_proposals: number;
 }
+
+// ───────────────────────────── export and import ─────────────────────────────
+
+/**
+ * A group or organization written to one JSON file, to back it up or move it to
+ * another OpenPurpose server. Every row has a `key` (its id on the server it came
+ * from) that other rows refer to; an import gives every row a new id.
+ * Tokens are never exported.
+ */
+export interface ExportFile {
+  format: 'openpurpose-export';
+  version: 1;
+  exported_at: string;
+  server_version: string;
+  source: {
+    kind: 'group' | 'organization';
+    group: { slug: string; name: string };
+    /** Key of the exported organization. */
+    organization: string | null;
+  };
+  includes: ExportIncludes;
+  /** Empty unless `includes.people`. Without people, every actor reference is null. */
+  people: ExportPerson[];
+  organizations: ExportOrganization[];
+  read_grants: Array<{ reader: string; target: string }>;
+  projects: ExportProject[];
+  api_specs: ExportApiSpec[];
+  scopes: ExportScope[];
+  documents: ExportDocument[];
+  proposals: ExportProposal[];
+}
+
+export interface ExportIncludes {
+  /** Earlier versions of every section. */
+  history: boolean;
+  /** Proposals with their revisions, review threads and comments. */
+  proposals: boolean;
+  /** Names and memberships of people and agents (never tokens). */
+  people: boolean;
+  api_specs: boolean;
+}
+
+export interface ExportPerson {
+  key: string;
+  name: string;
+  kind: ActorKind;
+  /** organization null = a role in the group itself. */
+  memberships: Array<{ organization: string | null; role: Role }>;
+}
+
+export interface ExportOrganization {
+  key: string;
+  slug: string;
+  name: string;
+  summary: string;
+  created_at: string;
+  archived_at: string | null;
+  aliases: string[];
+}
+
+export interface ExportProject {
+  key: string;
+  organization: string;
+  slug: string;
+  name: string;
+  summary: string;
+  reviewed: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+  aliases: string[];
+  repositories: Array<{ key: string; remote_key: string; remote_url: string; created_by: string | null; created_at: string }>;
+}
+
+export interface ExportApiSpec {
+  key: string;
+  project: string;
+  name: string;
+  source_url: string | null;
+  filename: string | null;
+  spec: unknown;
+  source_format: 'json' | 'yaml';
+  spec_version: string;
+  title: string;
+  version: string;
+  endpoint_count: number;
+  schema_count: number;
+  content_hash: string;
+  fetched_at: string | null;
+  fetch_error: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExportScope {
+  key: string;
+  /** null for group-wide scopes. */
+  organization: string | null;
+  project: string | null;
+  slug: string;
+  name: string;
+  description: string;
+  path_globs: string[];
+  stacks: string[];
+  position: number;
+  created_at: string;
+  updated_at: string;
+  aliases: string[];
+  /** Keys of the project's repositories the scope is bound to. */
+  repositories: string[];
+}
+
+export interface ExportDocument {
+  key: string;
+  /** All null for group-wide documents. */
+  organization: string | null;
+  project: string | null;
+  scope: string | null;
+  kind: DocKind;
+  slug: string;
+  title: string;
+  mode: EditMode;
+  position: number;
+  created_at: string;
+  updated_at: string;
+  sections: ExportSection[];
+}
+
+export interface ExportSection {
+  key: string;
+  heading: string;
+  /** Markdown. */
+  body: string;
+  mode: EditMode;
+  position: number;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+  /** Every version, oldest first. Empty unless `includes.history`. */
+  versions: Array<{
+    version: number;
+    heading: string;
+    body: string;
+    mode: EditMode;
+    actor: string | null;
+    note: string;
+    created_at: string;
+  }>;
+}
+
+export interface ExportProposal {
+  key: string;
+  kind: ProposalKind;
+  status: ProposalStatus;
+  organization: string | null;
+  project: string | null;
+  scope: string | null;
+  document: string | null;
+  section: string | null;
+  result_section: string | null;
+  base_version: number | null;
+  heading: string;
+  body: string;
+  rationale: string;
+  context: Record<string, unknown>;
+  revision: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string;
+  revisions: Array<{ revision: number; heading: string; body: string; note: string; actor: string | null; created_at: string }>;
+  events: Array<{ kind: ReviewEvent['kind']; revision: number; note: string; actor: string | null; created_at: string }>;
+  threads: Array<{
+    revision: number;
+    line_start: number | null;
+    line_end: number | null;
+    anchor: string;
+    resolved_at: string | null;
+    resolved_by: string | null;
+    created_by: string | null;
+    created_at: string;
+    comments: Array<{
+      actor: string | null;
+      body: string;
+      suggestion: string | null;
+      applied_at: string | null;
+      applied_by: string | null;
+      created_at: string;
+    }>;
+  }>;
+}
+
+/** What an import does (or, as a preview, would do). */
+export interface ImportReport {
+  /** false when a conflict blocks the import; `organizations` says which slug to change. */
+  ok: boolean;
+  applied: boolean;
+  source: ExportFile['source'] & { exported_at: string };
+  organizations: Array<{
+    key: string;
+    name: string;
+    slug: string;
+    /** Why `slug` can't be used here, with `suggested_slug` as a free one. */
+    conflict: string | null;
+    suggested_slug: string | null;
+    /** Set once applied. */
+    id: string | null;
+  }>;
+  counts: {
+    people: number;
+    projects: number;
+    repositories: number;
+    api_specs: number;
+    scopes: number;
+    documents: number;
+    sections: number;
+    section_versions: number;
+    proposals: number;
+  };
+  /** Things left out, and why. */
+  warnings: string[];
+}

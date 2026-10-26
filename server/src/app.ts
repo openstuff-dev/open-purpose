@@ -19,7 +19,9 @@ import * as proposals from './service/proposals.js';
 import * as review from './service/review.js';
 import { deleteAlias, listAliases } from './service/aliases.js';
 import { renameSlug } from './service/slugs.js';
+import * as transfer from './service/transfer.js';
 import { DOC_KINDS, EDIT_MODES } from './service/types.js';
+import type { ExportIncludes } from '@openpurpose/contracts';
 
 export const VERSION = '0.2.0';
 
@@ -597,6 +599,34 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
     api.delete('/tokens/:id', async (req, reply) => {
       await admin.revokeToken(req.db, pool, req.access, (req.params as { id: string }).id);
       return reply.status(204).send();
+    });
+
+    // export and import (also the backup)
+    api.get('/export', async (req, reply) => {
+      const q = req.query as Partial<Record<'organization_id' | keyof ExportIncludes, string>>;
+      const flag = (v: string | undefined, fallback: boolean) => (v === undefined ? fallback : v === '1' || v === 'true');
+      const d = transfer.DEFAULT_INCLUDES;
+      const file = await transfer.exportContent(req.db, req.access, qid(q.organization_id), {
+        history: flag(q.history, d.history), proposals: flag(q.proposals, d.proposals),
+        people: flag(q.people, d.people), api_specs: flag(q.api_specs, d.api_specs),
+      }, VERSION);
+      const name = file.source.organization
+        ? file.organizations.find((o) => o.key === file.source.organization)!.slug
+        : file.source.group.slug;
+      return reply
+        .header('content-disposition', `attachment; filename="${name}-${file.exported_at.slice(0, 10)}.openpurpose.json"`)
+        .type('application/json')
+        .send(JSON.stringify(file, null, 2));
+    });
+    const importBody = z.object({ file: z.unknown(), renames: z.record(z.string(), z.string()).optional() });
+    const importLimit = { bodyLimit: config.importMaxBytes };
+    api.post('/import/preview', importLimit, async (req) => {
+      const body = parse(importBody, req.body);
+      return transfer.importContent(req.db, req.access, body.file, { renames: body.renames, dryRun: true });
+    });
+    api.post('/import', importLimit, async (req, reply) => {
+      const body = parse(importBody, req.body);
+      return reply.status(201).send(await transfer.importContent(req.db, req.access, body.file, { renames: body.renames, dryRun: false }));
     });
   }, { prefix: '/api' });
 

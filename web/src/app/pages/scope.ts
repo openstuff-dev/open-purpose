@@ -19,25 +19,53 @@ import { SlugRenameField } from '../shared/slug-rename';
     @if (scope(); as s) {
       <header class="page-head">
         <nav class="crumbs" aria-label="Breadcrumb">
-          @if (session.groupShown()) { <a routerLink="/group">{{ session.group()?.name }}</a> }
-          @if (s.organization; as o) { <a routerLink="/organization">{{ o.name }}</a> }
-          @if (s.project; as p) { <a [routerLink]="['/projects', p.id]">{{ p.name }}</a> }
+          @if (session.groupShown()) {
+            <a routerLink="/group">{{ session.group()?.name }}</a>
+          }
+          @if (s.organization; as o) {
+            <a routerLink="/organization">{{ o.name }}</a>
+          }
+          @if (s.project; as p) {
+            <a [routerLink]="['/projects', p.id]">{{ p.name }}</a>
+          }
         </nav>
         <h1>{{ s.name }}</h1>
-        <p class="lede">{{ s.description || (s.project ? 'Rules for one part of ' + s.project.name + '.' : s.organization ? 'Rules for a kind of code across ' + s.organization.name + '.' : 'Rules for a kind of code in every organization.') }}</p>
+        <p class="lede">
+          {{
+            s.description ||
+              (s.project
+                ? 'Rules for one part of ' + s.project.name + '.'
+                : s.organization
+                  ? 'Rules for a kind of code across ' + s.organization.name + '.'
+                  : 'Rules for a kind of code in every organization.')
+          }}
+        </p>
       </header>
 
       <section class="block">
         <h2>When this applies</h2>
         @if (editing()) {
           <form class="inline-form" (ngSubmit)="save()">
-            <label class="grow">Name <input name="name" [(ngModel)]="draft.name" required></label>
-            <label class="full">Description <input name="description" [(ngModel)]="draft.description"></label>
+            <label class="grow">Name <input name="name" [(ngModel)]="draft.name" required /></label>
+            <label class="full"
+              >Description
+              <textarea name="description" rows="3" [(ngModel)]="draft.description"></textarea>
+            </label>
             @if (s.project; as p) {
-              <app-repo-picker class="full" [projectId]="p.id" [(repositories)]="repos" [(selected)]="repositoryIds" />
+              <app-repo-picker
+                class="full"
+                [projectId]="p.id"
+                [(repositories)]="repos"
+                [(selected)]="repositoryIds"
+              />
             }
-            <label class="full">Paths <input name="globs" class="mono" [(ngModel)]="draft.globs" placeholder="frontend/**"></label>
-            <label class="full">Stacks <input name="stacks" [(ngModel)]="draft.stacks" placeholder="angular"></label>
+            <label class="full"
+              >Paths
+              <input name="globs" class="mono" [(ngModel)]="draft.globs" placeholder="frontend/**"
+            /></label>
+            <label class="full"
+              >Stacks <input name="stacks" [(ngModel)]="draft.stacks" placeholder="angular"
+            /></label>
             <div class="form-actions full">
               <button class="btn primary" type="submit">Save</button>
               <button class="btn" type="button" (click)="editing.set(false)">Cancel</button>
@@ -47,12 +75,32 @@ import { SlugRenameField } from '../shared/slug-rename';
           <dl class="facts">
             @if (s.project) {
               <dt>Repositories</dt>
-              <dd>@for (r of boundRepos(s); track r.id) { <span class="chip repo" [title]="r.remote_key"><app-icon name="branch" [size]="11" />{{ repoName(r.remote_key) }}</span> } @empty { <span class="quiet">Any of {{ s.project.name }}'s repositories</span> }</dd>
+              <dd>
+                @for (r of boundRepos(s); track r.id) {
+                  <span class="chip repo" [title]="r.remote_key"
+                    ><app-icon name="branch" [size]="11" />{{ repoName(r.remote_key) }}</span
+                  >
+                } @empty {
+                  <span class="quiet">Any of {{ s.project.name }}'s repositories</span>
+                }
+              </dd>
             }
             <dt>Paths</dt>
-            <dd>@for (g of s.path_globs; track g) { <code class="chip path">{{ g }}</code> } @empty { <span class="quiet">Any path</span> }</dd>
+            <dd>
+              @for (g of s.path_globs; track g) {
+                <code class="chip path">{{ g }}</code>
+              } @empty {
+                <span class="quiet">Any path</span>
+              }
+            </dd>
             <dt>Stacks</dt>
-            <dd>@for (t of s.stacks; track t) { <span class="chip stack">{{ t }}</span> } @empty { <span class="quiet">Any stack</span> }</dd>
+            <dd>
+              @for (t of s.stacks; track t) {
+                <span class="chip stack">{{ t }}</span>
+              } @empty {
+                <span class="quiet">Any stack</span>
+              }
+            </dd>
           </dl>
           <p class="quiet">{{ explain(s) }}</p>
           @if (s.can_edit) {
@@ -62,14 +110,26 @@ import { SlugRenameField } from '../shared/slug-rename';
             </div>
           }
         }
-        <app-slug-rename kind="scope" [id]="s.id" [slug]="s.slug" [name]="s.name" [aliases]="s.aliases"
-          [canEdit]="s.can_edit" (changed)="reload()" />
+        <app-slug-rename
+          kind="scope"
+          [id]="s.id"
+          [slug]="s.slug"
+          [name]="s.name"
+          [aliases]="s.aliases"
+          [canEdit]="s.can_edit"
+          (changed)="reload()"
+        />
       </section>
 
       <section class="block">
         <h2>Documents</h2>
-        <app-doc-list [organizationId]="s.organization_id" [projectId]="s.project_id" [scopeId]="s.id" [canEdit]="s.can_edit"
-          emptyText="No documents yet. Approved learnings for this scope will appear in a Learnings document here." />
+        <app-doc-list
+          [organizationId]="s.organization_id"
+          [projectId]="s.project_id"
+          [scopeId]="s.id"
+          [canEdit]="s.can_edit"
+          emptyText="No documents yet. Approved learnings for this scope will appear in a Learnings document here."
+        />
       </section>
     }
   `,
@@ -95,7 +155,8 @@ export class ScopePage {
     const bound = s.repository_ids.length > 0;
     const narrowed = s.path_globs.length > 0 || s.stacks.length > 0;
     if (bound && !narrowed) return 'Applies to everything an agent does in these repositories.';
-    if (bound) return 'Applies inside these repositories when an agent works on a file matching any path, or in code whose manifest has any of these stacks.';
+    if (bound)
+      return 'Applies inside these repositories when an agent works on a file matching any path, or in code whose manifest has any of these stacks.';
     return 'Applies when an agent works on a file matching any path, or in code whose manifest has any of these stacks.';
   }
 
@@ -117,7 +178,12 @@ export class ScopePage {
 
   startEdit(): void {
     const s = this.scope()!;
-    this.draft = { name: s.name, description: s.description, globs: s.path_globs.join(', '), stacks: s.stacks.join(', ') };
+    this.draft = {
+      name: s.name,
+      description: s.description,
+      globs: s.path_globs.join(', '),
+      stacks: s.stacks.join(', '),
+    };
     this.repos.set(s.repositories);
     this.repositoryIds.set(s.repository_ids);
     this.editing.set(true);
@@ -126,8 +192,10 @@ export class ScopePage {
   async save(): Promise<void> {
     try {
       await this.api.updateScope(this.id(), {
-        name: this.draft.name, description: this.draft.description,
-        path_globs: splitList(this.draft.globs), stacks: splitList(this.draft.stacks),
+        name: this.draft.name,
+        description: this.draft.description,
+        path_globs: splitList(this.draft.globs),
+        stacks: splitList(this.draft.stacks),
         ...(this.scope()!.project ? { repository_ids: this.repositoryIds() } : {}),
       });
       this.editing.set(false);
@@ -144,7 +212,9 @@ export class ScopePage {
     try {
       await this.api.deleteScope(s.id);
       this.notices.ok(`Deleted ${s.name}`);
-      await this.router.navigate(s.project ? ['/projects', s.project.id] : s.organization ? ['/organization'] : ['/group']);
+      await this.router.navigate(
+        s.project ? ['/projects', s.project.id] : s.organization ? ['/organization'] : ['/group'],
+      );
     } catch (e) {
       this.notices.error(e);
     }

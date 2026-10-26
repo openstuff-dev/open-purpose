@@ -34,15 +34,21 @@ export class ModeBadge {
   selector: 'app-mode-picker',
   imports: [ModeIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <div class="mode-picker" role="radiogroup" [attr.aria-label]="label()">
-      @for (m of modes; track m) {
-        <button type="button" role="radio" [attr.data-mode]="m" [attr.aria-checked]="m === mode()"
-                [disabled]="disabled()" [attr.title]="help[m]" (click)="m !== mode() && changed.emit(m)">
-          <app-mode-icon [mode]="m" /><span>{{ names[m] }}</span>
-        </button>
-      }
-    </div>`,
+  template: ` <div class="mode-picker" role="radiogroup" [attr.aria-label]="label()">
+    @for (m of modes; track m) {
+      <button
+        type="button"
+        role="radio"
+        [attr.data-mode]="m"
+        [attr.aria-checked]="m === mode()"
+        [disabled]="disabled()"
+        [attr.title]="help[m]"
+        (click)="m !== mode() && changed.emit(m)"
+      >
+        <app-mode-icon [mode]="m" /><span>{{ names[m] }}</span>
+      </button>
+    }
+  </div>`,
 })
 export class ModePicker {
   readonly mode = input.required<EditMode>();

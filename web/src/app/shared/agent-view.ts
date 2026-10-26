@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  untracked,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../core/api';
 import type { ContextResult, Scope } from '../core/models';
@@ -10,13 +19,20 @@ import { Notices } from './notice';
 import { splitList } from './scope-list';
 
 const LAYER: Record<string, string> = {
-  group: 'Group', 'group-scope': 'Group scope', organization: 'Organization',
-  'organization-scope': 'Organization scope', project: 'Project', 'project-scope': 'Project scope',
+  group: 'Group',
+  'group-scope': 'Group scope',
+  organization: 'Organization',
+  'organization-scope': 'Organization scope',
+  project: 'Project',
+  'project-scope': 'Project scope',
 };
 
 /** A path an agent working in this scope would send: "frontend/**" → "frontend/app". */
 function samplePath(glob: string): string {
-  const clean = glob.replace(/\/\*\*.*$/, '').replace(/\*.*$/, '').replace(/\/$/, '');
+  const clean = glob
+    .replace(/\/\*\*.*$/, '')
+    .replace(/\*.*$/, '')
+    .replace(/\/$/, '');
   return clean || '';
 }
 
@@ -32,16 +48,48 @@ function samplePath(glob: string): string {
     <div class="agent-view">
       <div class="av-pick">
         <div class="segmented" role="tablist" aria-label="Part of the code">
-          <button type="button" role="tab" [attr.aria-selected]="choice() === 'root'" (click)="pick('root')">Whole project</button>
+          <button
+            type="button"
+            role="tab"
+            [attr.aria-selected]="choice() === 'root'"
+            (click)="pick('root')"
+          >
+            Whole project
+          </button>
           @for (s of scopes(); track s.id) {
-            <button type="button" role="tab" [attr.aria-selected]="choice() === s.id" (click)="pick(s.id)">{{ s.name }}</button>
+            <button
+              type="button"
+              role="tab"
+              [attr.aria-selected]="choice() === s.id"
+              (click)="pick(s.id)"
+            >
+              {{ s.name }}
+            </button>
           }
-          <button type="button" role="tab" [attr.aria-selected]="choice() === 'custom'" (click)="pick('custom')">Other path…</button>
+          <button
+            type="button"
+            role="tab"
+            [attr.aria-selected]="choice() === 'custom'"
+            (click)="pick('custom')"
+          >
+            Other path…
+          </button>
         </div>
         @if (choice() === 'custom') {
           <form class="av-custom" (ngSubmit)="run()">
-            <input name="path" class="mono" [(ngModel)]="path" placeholder="src/Api/Controllers/OrdersController.cs" aria-label="File or folder">
-            <input name="stacks" [(ngModel)]="stacks" placeholder="Stacks, e.g. dotnet, angular" aria-label="Stacks">
+            <input
+              name="path"
+              class="mono"
+              [(ngModel)]="path"
+              placeholder="src/Api/Controllers/OrdersController.cs"
+              aria-label="File or folder"
+            />
+            <input
+              name="stacks"
+              [(ngModel)]="stacks"
+              placeholder="Stacks, e.g. dotnet, angular"
+              aria-label="Stacks"
+            />
             <button class="btn" type="submit">Show</button>
           </form>
         }
@@ -49,15 +97,35 @@ function samplePath(glob: string): string {
 
       @if (result(); as r) {
         <div class="av-summary">
-          <span><span class="quiet">Path</span> <code>{{ r.path || 'repository root' }}</code></span>
-          @if (r.stacks.length) { <span><span class="quiet">Stacks</span> @for (t of r.stacks; track t) { <span class="chip stack">{{ t }}</span> }</span> }
+          <span
+            ><span class="quiet">Path</span> <code>{{ r.path || 'repository root' }}</code></span
+          >
+          @if (r.stacks.length) {
+            <span
+              ><span class="quiet">Stacks</span>
+              @for (t of r.stacks; track t) {
+                <span class="chip stack">{{ t }}</span>
+              }
+            </span>
+          }
           <span><span class="quiet">New learnings go to</span> {{ r.learning_target.label }}</span>
           <span class="av-actions">
             <div class="segmented sm" role="tablist" aria-label="View">
-              <button type="button" role="tab" [attr.aria-selected]="!raw()" (click)="raw.set(false)">Layers</button>
-              <button type="button" role="tab" [attr.aria-selected]="raw()" (click)="raw.set(true)">Exactly as sent</button>
+              <button
+                type="button"
+                role="tab"
+                [attr.aria-selected]="!raw()"
+                (click)="raw.set(false)"
+              >
+                Layers
+              </button>
+              <button type="button" role="tab" [attr.aria-selected]="raw()" (click)="raw.set(true)">
+                Exactly as sent
+              </button>
             </div>
-            <button class="btn sm" type="button" (click)="copy(r.markdown)"><app-icon name="copy" [size]="13" />Copy</button>
+            <button class="btn sm" type="button" (click)="copy(r.markdown)">
+              <app-icon name="copy" [size]="13" />Copy
+            </button>
           </span>
         </div>
 
@@ -70,15 +138,27 @@ function samplePath(glob: string): string {
                 <div class="layer-head">
                   <span class="layer-tag">{{ layerName(b.level) }}</span>
                   <strong>{{ b.label }}</strong>
-                  @if (b.scope) { <span class="quiet">matched by {{ b.scope.reason }}</span> }
-                  <span class="quiet layer-count">{{ count(b) }} {{ count(b) === 1 ? 'section' : 'sections' }}</span>
+                  @if (b.scope) {
+                    <span class="quiet">matched by {{ b.scope.reason }}</span>
+                  }
+                  <span class="quiet layer-count"
+                    >{{ count(b) }} {{ count(b) === 1 ? 'section' : 'sections' }}</span
+                  >
                 </div>
                 @for (d of b.documents; track d.id) {
-                  <details class="layer-doc" [open]="b.level.includes('scope') || b.level === 'project'">
-                    <summary>{{ d.title }} <span class="quiet">· {{ d.sections.length }}</span></summary>
+                  <details
+                    class="layer-doc"
+                    [open]="b.level.includes('scope') || b.level === 'project'"
+                  >
+                    <summary>
+                      {{ d.title }} <span class="quiet">· {{ d.sections.length }}</span>
+                    </summary>
                     @for (s of d.sections; track s.id) {
                       <div class="layer-section">
-                        <div class="layer-section-head"><strong>{{ s.heading }}</strong><app-mode-badge [mode]="s.mode" /></div>
+                        <div class="layer-section-head">
+                          <strong>{{ s.heading }}</strong
+                          ><app-mode-badge [mode]="s.mode" />
+                        </div>
                         <app-md [text]="s.body" />
                       </div>
                     }
@@ -94,14 +174,26 @@ function samplePath(glob: string): string {
               <p class="quiet">Agents can look up these APIs with <code>get_api</code>:</p>
               <ul>
                 @for (s of r.apis; track s.id) {
-                  <li><app-icon name="plug" [size]="13" /><strong>{{ s.name }}</strong>@if (s.version) { {{ s.version }} }
-                    <span class="quiet">· {{ s.relation === 'this' ? 'this project' : s.project_name }} · {{ s.endpoint_count }} endpoints, {{ s.schema_count }} schemas</span></li>
+                  <li>
+                    <app-icon name="plug" [size]="13" /><strong>{{ s.name }}</strong>
+                    @if (s.version) {
+                      {{ s.version }}
+                    }
+                    <span class="quiet"
+                      >· {{ s.relation === 'this' ? 'this project' : s.project_name }} ·
+                      {{ s.endpoint_count }} endpoints, {{ s.schema_count }} schemas</span
+                    >
+                  </li>
                 }
               </ul>
             </div>
           }
           @if (r.related.length) {
-            <p class="quiet av-related">Agents are also told about {{ r.related.length }} linked {{ r.related.length === 1 ? 'project or term' : 'projects and terms' }} and can fetch them with <code>get_related</code>.</p>
+            <p class="quiet av-related">
+              Agents are also told about {{ r.related.length }} linked
+              {{ r.related.length === 1 ? 'project or term' : 'projects and terms' }} and can fetch
+              them with <code>get_related</code>.
+            </p>
           }
         }
       } @else if (loading()) {
@@ -123,7 +215,9 @@ export class AgentView {
   path = '';
   stacks = '';
 
-  readonly nonEmpty = computed(() => (this.result()?.blocks ?? []).filter((b) => b.documents.length));
+  readonly nonEmpty = computed(() =>
+    (this.result()?.blocks ?? []).filter((b) => b.documents.length),
+  );
 
   constructor() {
     effect(() => {

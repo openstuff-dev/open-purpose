@@ -53,110 +53,355 @@ html:root.agent-mode {
   color-scheme: dark;
 }
 
-html.agent-mode body { font-size: 0.8125rem; font-feature-settings: normal; letter-spacing: 0; }
-html.agent-mode *, html.agent-mode *::before, html.agent-mode *::after { border-radius: 0 !important; }
-html.agent-mode ::selection { background: var(--agent); color: var(--accent-ink); }
-html.agent-mode :focus-visible { outline: 1px dashed var(--agent); outline-offset: 2px; box-shadow: none; }
-html.agent-mode * { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+html.agent-mode body {
+  font-size: 0.8125rem;
+  font-feature-settings: normal;
+  letter-spacing: 0;
+}
+html.agent-mode *,
+html.agent-mode *::before,
+html.agent-mode *::after {
+  border-radius: 0 !important;
+}
+html.agent-mode ::selection {
+  background: var(--agent);
+  color: var(--accent-ink);
+}
+html.agent-mode :focus-visible {
+  outline: 1px dashed var(--agent);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+html.agent-mode * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
 
 /* A faint scanline over everything. Purely decorative, never catches clicks. */
 html.agent-mode body::after {
-  content: ''; position: fixed; inset: 0; z-index: 1000; pointer-events: none;
-  background: repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.022) 0 1px, transparent 1px 3px);
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0.022) 0 1px,
+    transparent 1px 3px
+  );
 }
 
 /* No soft shadows; everything is drawn with rules. */
-html.agent-mode .btn, html.agent-mode input, html.agent-mode select, html.agent-mode textarea,
-html.agent-mode .drawer, html.agent-mode .menu, html.agent-mode .notice,
-html.agent-mode .composer { box-shadow: none !important; }
-html.agent-mode .drawer { border-left-width: 1px; }
-html.agent-mode .drawer-backdrop { background: rgb(0 0 0 / 0.55); }
+html.agent-mode .btn,
+html.agent-mode input,
+html.agent-mode select,
+html.agent-mode textarea,
+html.agent-mode .drawer,
+html.agent-mode .menu,
+html.agent-mode .notice,
+html.agent-mode .composer {
+  box-shadow: none !important;
+}
+html.agent-mode .drawer {
+  border-left-width: 1px;
+}
+html.agent-mode .drawer-backdrop {
+  background: rgb(0 0 0 / 0.55);
+}
 
 /* Headings read like prompts. */
-html.agent-mode h1, html.agent-mode h2, html.agent-mode h3 { letter-spacing: 0; font-weight: 600; }
-html.agent-mode .page-head h1, html.agent-mode .drawer-title { text-shadow: 0 0 12px color-mix(in srgb, var(--agent) 35%, transparent); }
-html.agent-mode .page-head h1::before { content: '> '; color: var(--agent); }
-html.agent-mode .page-head h1::after { content: '_'; color: var(--agent); margin-left: 0.1em; animation: agent-blink 1.1s steps(1) infinite; }
-html.agent-mode .panel-head h2::before, html.agent-mode .block h2::before { content: '## '; color: var(--faint); }
-html.agent-mode .drawer-section-head h3, html.agent-mode .two-col h3, html.agent-mode .menu-label, html.agent-mode .nav-label,
-html.agent-mode .lp-kind, html.agent-mode .data-table th { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.6875rem; }
-@keyframes agent-blink { 50% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { html.agent-mode .page-head h1::after { animation: none; } }
+html.agent-mode h1,
+html.agent-mode h2,
+html.agent-mode h3 {
+  letter-spacing: 0;
+  font-weight: 600;
+}
+html.agent-mode .page-head h1,
+html.agent-mode .drawer-title {
+  text-shadow: 0 0 12px color-mix(in srgb, var(--agent) 35%, transparent);
+}
+html.agent-mode .page-head h1::before {
+  content: '> ';
+  color: var(--agent);
+}
+html.agent-mode .page-head h1::after {
+  content: '_';
+  color: var(--agent);
+  margin-left: 0.1em;
+  animation: agent-blink 1.1s steps(1) infinite;
+}
+html.agent-mode .panel-head h2::before,
+html.agent-mode .block h2::before {
+  content: '## ';
+  color: var(--faint);
+}
+html.agent-mode .drawer-section-head h3,
+html.agent-mode .two-col h3,
+html.agent-mode .menu-label,
+html.agent-mode .nav-label,
+html.agent-mode .lp-kind,
+html.agent-mode .data-table th {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.6875rem;
+}
+@keyframes agent-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.agent-mode .page-head h1::after {
+    animation: none;
+  }
+}
 
 /* Buttons are [ bracketed ]; hover inverts. */
-html.agent-mode .btn { background: transparent; font-weight: 500; gap: 0.4rem; }
-html.agent-mode .btn::before { content: '['; color: var(--faint); }
-html.agent-mode .btn::after { content: ']'; color: var(--faint); }
-html.agent-mode .btn:hover:not(:disabled) { background: var(--ink); color: var(--ground); border-color: var(--ink); }
-html.agent-mode .btn:hover:not(:disabled)::before, html.agent-mode .btn:hover:not(:disabled)::after { color: inherit; }
-html.agent-mode .btn.primary { background: var(--agent); color: var(--accent-ink); border-color: var(--agent); }
-html.agent-mode .btn.primary::before, html.agent-mode .btn.primary::after { color: inherit; }
-html.agent-mode .icon-btn:hover { background: var(--hover); }
+html.agent-mode .btn {
+  background: transparent;
+  font-weight: 500;
+  gap: 0.4rem;
+}
+html.agent-mode .btn::before {
+  content: '[';
+  color: var(--faint);
+}
+html.agent-mode .btn::after {
+  content: ']';
+  color: var(--faint);
+}
+html.agent-mode .btn:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--ground);
+  border-color: var(--ink);
+}
+html.agent-mode .btn:hover:not(:disabled)::before,
+html.agent-mode .btn:hover:not(:disabled)::after {
+  color: inherit;
+}
+html.agent-mode .btn.primary {
+  background: var(--agent);
+  color: var(--accent-ink);
+  border-color: var(--agent);
+}
+html.agent-mode .btn.primary::before,
+html.agent-mode .btn.primary::after {
+  color: inherit;
+}
+html.agent-mode .icon-btn:hover {
+  background: var(--hover);
+}
 
 /* Links: dashed underline on hover. */
-html.agent-mode a:hover { text-decoration: underline dashed; text-underline-offset: 3px; }
+html.agent-mode a:hover {
+  text-decoration: underline dashed;
+  text-underline-offset: 3px;
+}
 
 /* Shell: brand and the agent bar. */
-html.agent-mode .brand::after { content: '~agent'; color: var(--agent); font-weight: 400; font-size: var(--fs-sm); }
-html.agent-mode .badge, html.agent-mode .avatar { font-family: var(--mono); }
-html.agent-mode .agent-bar { border-bottom-style: dashed; }
+html.agent-mode .brand::after {
+  content: '~agent';
+  color: var(--agent);
+  font-weight: 400;
+  font-size: var(--fs-sm);
+}
+html.agent-mode .badge,
+html.agent-mode .avatar {
+  font-family: var(--mono);
+}
+html.agent-mode .agent-bar {
+  border-bottom-style: dashed;
+}
 
 /* The transcript reads like a terminal session. */
-html.agent-mode .call { background: transparent; }
-html.agent-mode .call-head { border-bottom-style: dashed; }
-html.agent-mode .call-next { border-top-style: dashed; }
+html.agent-mode .call {
+  background: transparent;
+}
+html.agent-mode .call-head {
+  border-bottom-style: dashed;
+}
+html.agent-mode .call-next {
+  border-top-style: dashed;
+}
 
 /* Tabs and segmented controls invert when active. */
-html.agent-mode .page-tabs { background: var(--ground); border-bottom-style: dashed; }
-html.agent-mode .page-tabs a.active { background: var(--ink); color: var(--ground); border-bottom-color: var(--ink); }
-html.agent-mode .page-tabs a.active .icon, html.agent-mode .page-tabs a.active .tab-count { color: var(--ground); background: transparent; }
-html.agent-mode .tab-count::before { content: '('; } html.agent-mode .tab-count::after { content: ')'; }
-html.agent-mode .tab-count { display: inline; background: transparent; padding: 0; min-width: 0; height: auto; }
-html.agent-mode .tabs [role='tab'][aria-selected='true'] { background: var(--ink); color: var(--ground); }
-html.agent-mode .segmented { background: transparent; border: 1px dashed var(--line-strong); }
-html.agent-mode .segmented [aria-selected='true'] { background: var(--ink); color: var(--ground); box-shadow: none; }
+html.agent-mode .page-tabs {
+  background: var(--ground);
+  border-bottom-style: dashed;
+}
+html.agent-mode .page-tabs a.active {
+  background: var(--ink);
+  color: var(--ground);
+  border-bottom-color: var(--ink);
+}
+html.agent-mode .page-tabs a.active .icon,
+html.agent-mode .page-tabs a.active .tab-count {
+  color: var(--ground);
+  background: transparent;
+}
+html.agent-mode .tab-count::before {
+  content: '(';
+}
+html.agent-mode .tab-count::after {
+  content: ')';
+}
+html.agent-mode .tab-count {
+  display: inline;
+  background: transparent;
+  padding: 0;
+  min-width: 0;
+  height: auto;
+}
+html.agent-mode .tabs [role='tab'][aria-selected='true'] {
+  background: var(--ink);
+  color: var(--ground);
+}
+html.agent-mode .segmented {
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+}
+html.agent-mode .segmented [aria-selected='true'] {
+  background: var(--ink);
+  color: var(--ground);
+  box-shadow: none;
+}
 
 /* Panels, layers, chips. */
-html.agent-mode .layer-path a { background: transparent; }
-html.agent-mode .layer-path .current a { background: transparent; border-color: var(--agent); box-shadow: none; }
-html.agent-mode .layer-path li + li::before { content: '──'; width: auto; height: auto; background: none; color: var(--line-strong); }
-html.agent-mode .chip, html.agent-mode .flag, html.agent-mode .status { font-family: var(--mono); }
-html.agent-mode .status::before { content: '●'; width: auto; height: auto; background: none !important; font-size: 0.6rem; }
-html.agent-mode .status[data-status='pending']::before { color: var(--accent); }
-html.agent-mode .status[data-status='approved']::before { color: var(--open); }
-html.agent-mode .status[data-status='rejected']::before { color: var(--danger); }
-html.agent-mode .status[data-status='changes_requested']::before { color: var(--propose); }
-html.agent-mode .data-table tbody tr:hover, html.agent-mode .data-table tr.selected { background: var(--hover); }
-html.agent-mode .data-table tr.selected { box-shadow: inset 2px 0 0 var(--agent); }
-html.agent-mode code { color: var(--accent-text); }
-html.agent-mode pre { background: var(--sunken); }
-html.agent-mode .notice { background: var(--surface); color: var(--ink); border: 1px dashed var(--agent); }
+html.agent-mode .layer-path a {
+  background: transparent;
+}
+html.agent-mode .layer-path .current a {
+  background: transparent;
+  border-color: var(--agent);
+  box-shadow: none;
+}
+html.agent-mode .layer-path li + li::before {
+  content: '──';
+  width: auto;
+  height: auto;
+  background: none;
+  color: var(--line-strong);
+}
+html.agent-mode .chip,
+html.agent-mode .flag,
+html.agent-mode .status {
+  font-family: var(--mono);
+}
+html.agent-mode .status::before {
+  content: '●';
+  width: auto;
+  height: auto;
+  background: none !important;
+  font-size: 0.6rem;
+}
+html.agent-mode .status[data-status='pending']::before {
+  color: var(--accent);
+}
+html.agent-mode .status[data-status='approved']::before {
+  color: var(--open);
+}
+html.agent-mode .status[data-status='rejected']::before {
+  color: var(--danger);
+}
+html.agent-mode .status[data-status='changes_requested']::before {
+  color: var(--propose);
+}
+html.agent-mode .data-table tbody tr:hover,
+html.agent-mode .data-table tr.selected {
+  background: var(--hover);
+}
+html.agent-mode .data-table tr.selected {
+  box-shadow: inset 2px 0 0 var(--agent);
+}
+html.agent-mode code {
+  color: var(--accent-text);
+}
+html.agent-mode pre {
+  background: var(--sunken);
+}
+html.agent-mode .notice {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px dashed var(--agent);
+}
 
 /* Organization badges: dark text on the bright terminal colours. */
-html.agent-mode .badge:not(.group) { color: var(--accent-ink); font-weight: 700; }
+html.agent-mode .badge:not(.group) {
+  color: var(--accent-ink);
+  font-weight: 700;
+}
 
 /* ---------- Map: boxes, dashed wires, bracketed labels ---------- */
 html.agent-mode .map-stage {
   background:
-    linear-gradient(color-mix(in srgb, var(--line) 55%, transparent) 1px, transparent 1px) 0 0 / 32px 32px,
-    linear-gradient(90deg, color-mix(in srgb, var(--line) 55%, transparent) 1px, transparent 1px) 0 0 / 32px 32px,
+    linear-gradient(color-mix(in srgb, var(--line) 55%, transparent) 1px, transparent 1px) 0 0 /
+      32px 32px,
+    linear-gradient(90deg, color-mix(in srgb, var(--line) 55%, transparent) 1px, transparent 1px) 0
+      0 / 32px 32px,
     var(--ground);
 }
-html.agent-mode .map-svg .edge { stroke: var(--line-strong); stroke-dasharray: 5 3; }
-html.agent-mode .map-svg .edge.defines { stroke-dasharray: 1 3; }
-html.agent-mode .map-svg .edge.hot { stroke: var(--agent); stroke-dasharray: none; }
-html.agent-mode .map-svg marker .arrow { fill: var(--line-strong); }
-html.agent-mode .map-svg marker .arrow-hot { fill: var(--agent); }
-html.agent-mode .map-svg .node rect.box { --c: var(--agent); fill: color-mix(in srgb, var(--c) 16%, var(--ground)); stroke: var(--c); stroke-width: 1.5; }
-html.agent-mode .map-svg .node.group rect.box { --c: var(--ink); fill: var(--ink); }
-html.agent-mode .map-svg .node.organization rect.box { stroke-width: 3; paint-order: stroke; }
-html.agent-mode .map-svg .node.restricted rect.box, html.agent-mode .map-svg .node.missing rect.box {
-  --c: var(--muted); fill: var(--ground); stroke-dasharray: 3 2;
+html.agent-mode .map-svg .edge {
+  stroke: var(--line-strong);
+  stroke-dasharray: 5 3;
 }
-html.agent-mode .map-svg .node.term rect { fill: var(--ground); stroke: var(--node-term); stroke-width: 1.5; }
-html.agent-mode .map-svg .node text { font-family: var(--mono); font-weight: 500; stroke-linejoin: miter; }
-html.agent-mode .map-svg .node.project text { font-weight: 600; }
-html.agent-mode .map-svg .node.term text { fill: var(--node-term); }
-html.agent-mode .map-svg .node.hot rect.box, html.agent-mode .map-svg .node:focus-visible rect.box { stroke: var(--agent); stroke-width: 2.5; fill: color-mix(in srgb, var(--agent) 28%, var(--ground)); }
-html.agent-mode .map-svg .node.hot text { fill: var(--agent); }
-html.agent-mode .legend .dot { border-radius: 0; }
+html.agent-mode .map-svg .edge.defines {
+  stroke-dasharray: 1 3;
+}
+html.agent-mode .map-svg .edge.hot {
+  stroke: var(--agent);
+  stroke-dasharray: none;
+}
+html.agent-mode .map-svg marker .arrow {
+  fill: var(--line-strong);
+}
+html.agent-mode .map-svg marker .arrow-hot {
+  fill: var(--agent);
+}
+html.agent-mode .map-svg .node rect.box {
+  --c: var(--agent);
+  fill: color-mix(in srgb, var(--c) 16%, var(--ground));
+  stroke: var(--c);
+  stroke-width: 1.5;
+}
+html.agent-mode .map-svg .node.group rect.box {
+  --c: var(--ink);
+  fill: var(--ink);
+}
+html.agent-mode .map-svg .node.organization rect.box {
+  stroke-width: 3;
+  paint-order: stroke;
+}
+html.agent-mode .map-svg .node.restricted rect.box,
+html.agent-mode .map-svg .node.missing rect.box {
+  --c: var(--muted);
+  fill: var(--ground);
+  stroke-dasharray: 3 2;
+}
+html.agent-mode .map-svg .node.term rect {
+  fill: var(--ground);
+  stroke: var(--node-term);
+  stroke-width: 1.5;
+}
+html.agent-mode .map-svg .node text {
+  font-family: var(--mono);
+  font-weight: 500;
+  stroke-linejoin: miter;
+}
+html.agent-mode .map-svg .node.project text {
+  font-weight: 600;
+}
+html.agent-mode .map-svg .node.term text {
+  fill: var(--node-term);
+}
+html.agent-mode .map-svg .node.hot rect.box,
+html.agent-mode .map-svg .node:focus-visible rect.box {
+  stroke: var(--agent);
+  stroke-width: 2.5;
+  fill: color-mix(in srgb, var(--agent) 28%, var(--ground));
+}
+html.agent-mode .map-svg .node.hot text {
+  fill: var(--agent);
+}
+html.agent-mode .legend .dot {
+  border-radius: 0;
+}

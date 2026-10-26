@@ -1,12 +1,35 @@
-import { ChangeDetectionStrategy, Component, ElementRef, inject, input, model, signal, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  inject,
+  input,
+  model,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { Api } from '../core/api';
 import type { LinkTarget } from '../core/models';
 import { Icon } from './icon';
 import { MarkdownView } from './markdown';
 
-type Format = 'h2' | 'h3' | 'bold' | 'italic' | 'strike' | 'code' | 'link' | 'wikilink' | 'list-ul' | 'list-ol' | 'list-task' | 'quote' | 'code-block';
+type Format =
+  | 'h2'
+  | 'h3'
+  | 'bold'
+  | 'italic'
+  | 'strike'
+  | 'code'
+  | 'link'
+  | 'wikilink'
+  | 'list-ul'
+  | 'list-ol'
+  | 'list-task'
+  | 'quote'
+  | 'code-block';
 
-const MOD = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+';
+const MOD =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+';
 
 /** Toolbar groups, separated by a divider. */
 const TOOLS: { format: Format; icon: string; label: string; key?: string }[][] = [
@@ -34,7 +57,13 @@ const TOOLS: { format: Format; icon: string; label: string; key?: string }[][] =
 ];
 
 const WRAP: Partial<Record<Format, string>> = { bold: '**', italic: '_', strike: '~~', code: '`' };
-const PREFIX: Partial<Record<Format, string>> = { h2: '## ', h3: '### ', 'list-ul': '- ', 'list-task': '- [ ] ', quote: '> ' };
+const PREFIX: Partial<Record<Format, string>> = {
+  h2: '## ',
+  h3: '### ',
+  'list-ul': '- ',
+  'list-task': '- [ ] ',
+  quote: '> ',
+};
 const SHORTCUTS: Record<string, Format> = { b: 'bold', i: 'italic', e: 'code', k: 'link' };
 /** Any block prefix a line may carry, so switching e.g. a quote to a heading replaces it. */
 const ANY_PREFIX = /^(#{1,6} |> |- \[[ xX]\] |[-*+] |\d+\. )/;
@@ -52,15 +81,37 @@ const LIST_ITEM = /^(\s*)(- \[[ xX]\] |[-*+] |(\d+)\. )(.*)$/;
   template: `
     <div class="editor">
       <div class="editor-tabs" role="tablist">
-        <button type="button" role="tab" [attr.aria-selected]="!preview()" (click)="preview.set(false)">Write</button>
-        <button type="button" role="tab" [attr.aria-selected]="preview()" (click)="preview.set(true)">Preview</button>
+        <button
+          type="button"
+          role="tab"
+          [attr.aria-selected]="!preview()"
+          (click)="preview.set(false)"
+        >
+          Write
+        </button>
+        <button
+          type="button"
+          role="tab"
+          [attr.aria-selected]="preview()"
+          (click)="preview.set(true)"
+        >
+          Preview
+        </button>
         @if (!preview()) {
           <div class="editor-toolbar" role="toolbar" aria-label="Formatting">
             @for (group of tools; track $index) {
               <span class="editor-tool-group">
                 @for (t of group; track t.format) {
-                  <button type="button" class="editor-tool" [attr.aria-label]="t.label" [title]="t.key ? t.label + ' (' + mod + t.key + ')' : t.label"
-                    (mousedown)="$event.preventDefault()" (click)="apply(t.format)"><app-icon [name]="t.icon" /></button>
+                  <button
+                    type="button"
+                    class="editor-tool"
+                    [attr.aria-label]="t.label"
+                    [title]="t.key ? t.label + ' (' + mod + t.key + ')' : t.label"
+                    (mousedown)="$event.preventDefault()"
+                    (click)="apply(t.format)"
+                  >
+                    <app-icon [name]="t.icon" />
+                  </button>
                 }
               </span>
             }
@@ -68,19 +119,39 @@ const LIST_ITEM = /^(\s*)(- \[[ xX]\] |[-*+] |(\d+)\. )(.*)$/;
         }
       </div>
       @if (preview()) {
-        <app-md class="editor-preview" [text]="value()" [fromProject]="fromProject()" [fromOrganization]="fromOrganization()" />
+        <app-md
+          class="editor-preview"
+          [text]="value()"
+          [fromProject]="fromProject()"
+          [fromOrganization]="fromOrganization()"
+        />
       } @else {
         <div class="editor-field">
-          <textarea #ta [rows]="rows()" [value]="value()" [attr.aria-label]="label()"
-            (input)="onInput()" (keydown)="onKeydown($event)" (blur)="closeSoon()"></textarea>
+          <textarea
+            #ta
+            [rows]="rows()"
+            [value]="value()"
+            [attr.aria-label]="label()"
+            (input)="onInput()"
+            (keydown)="onKeydown($event)"
+            (blur)="closeSoon()"
+          ></textarea>
           @if (suggestions().length) {
             <ul class="suggest" role="listbox" aria-label="Link suggestions">
               @for (s of suggestions(); track s.type + s.value; let i = $index) {
-                <li role="option" [attr.aria-selected]="i === active()" [class.active]="i === active()"
-                    (mousedown)="$event.preventDefault(); pick(s)">
-                  <span class="suggest-type" [attr.data-type]="s.type">{{ s.type === 'project' ? 'Project' : 'Term' }}</span>
+                <li
+                  role="option"
+                  [attr.aria-selected]="i === active()"
+                  [class.active]="i === active()"
+                  (mousedown)="$event.preventDefault(); pick(s)"
+                >
+                  <span class="suggest-type" [attr.data-type]="s.type">{{
+                    s.type === 'project' ? 'Project' : 'Term'
+                  }}</span>
                   {{ s.label }}
-                  @if (s.type === 'project') { <code>{{ s.value }}</code> }
+                  @if (s.type === 'project') {
+                    <code>{{ s.value }}</code>
+                  }
                   <span class="suggest-where">{{ s.where }}</span>
                 </li>
               }
@@ -135,11 +206,21 @@ export class MarkdownEditor {
   onKeydown(ev: KeyboardEvent): void {
     const list = this.suggestions();
     if (!list.length) {
-      const shortcut = (ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey ? SHORTCUTS[ev.key.toLowerCase()] : undefined;
+      const shortcut =
+        (ev.ctrlKey || ev.metaKey) && !ev.altKey && !ev.shiftKey
+          ? SHORTCUTS[ev.key.toLowerCase()]
+          : undefined;
       if (shortcut) {
         ev.preventDefault();
         this.apply(shortcut);
-      } else if (ev.key === 'Enter' && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey && !ev.isComposing) {
+      } else if (
+        ev.key === 'Enter' &&
+        !ev.shiftKey &&
+        !ev.ctrlKey &&
+        !ev.metaKey &&
+        !ev.altKey &&
+        !ev.isComposing
+      ) {
         if (this.continueList()) ev.preventDefault();
       }
       return;
@@ -182,14 +263,33 @@ export class MarkdownEditor {
     const selected = value.slice(start, end);
     const wrap = WRAP[format];
     if (wrap) {
-      if (value.slice(start - wrap.length, start) === wrap && value.slice(end, end + wrap.length) === wrap) {
-        this.replace(start - wrap.length, end + wrap.length, selected, start - wrap.length, end - wrap.length);
-      } else if (selected.length > 2 * wrap.length && selected.startsWith(wrap) && selected.endsWith(wrap)) {
+      if (
+        value.slice(start - wrap.length, start) === wrap &&
+        value.slice(end, end + wrap.length) === wrap
+      ) {
+        this.replace(
+          start - wrap.length,
+          end + wrap.length,
+          selected,
+          start - wrap.length,
+          end - wrap.length,
+        );
+      } else if (
+        selected.length > 2 * wrap.length &&
+        selected.startsWith(wrap) &&
+        selected.endsWith(wrap)
+      ) {
         const inner = selected.slice(wrap.length, -wrap.length);
         this.replace(start, end, inner, start, start + inner.length);
       } else {
         const inner = selected || 'text';
-        this.replace(start, end, wrap + inner + wrap, start + wrap.length, start + wrap.length + inner.length);
+        this.replace(
+          start,
+          end,
+          wrap + inner + wrap,
+          start + wrap.length,
+          start + wrap.length + inner.length,
+        );
       }
     } else if (format === 'link') {
       const text = selected || 'link text';
@@ -197,11 +297,22 @@ export class MarkdownEditor {
       const url = start + text.length + 3;
       this.replace(start, end, insert, url, url + 'https://'.length);
     } else if (format === 'wikilink') {
-      this.replace(start, end, '[[' + selected, start + 2 + selected.length, start + 2 + selected.length);
+      this.replace(
+        start,
+        end,
+        '[[' + selected,
+        start + 2 + selected.length,
+        start + 2 + selected.length,
+      );
       this.onInput();
     } else if (format === 'code-block') {
       const from = value.lastIndexOf('\n', start - 1) + 1;
-      const to = end > start && value[end - 1] === '\n' ? end - 1 : value.indexOf('\n', end) < 0 ? value.length : value.indexOf('\n', end);
+      const to =
+        end > start && value[end - 1] === '\n'
+          ? end - 1
+          : value.indexOf('\n', end) < 0
+            ? value.length
+            : value.indexOf('\n', end);
       const body = value.slice(from, to);
       const fenced = /^```[^\n]*\n([\s\S]*)\n```$/.exec(body);
       const insert = fenced ? fenced[1] : '```\n' + body + '\n```';
@@ -221,7 +332,8 @@ export class MarkdownEditor {
     const to = value.indexOf('\n', lastEnd) < 0 ? value.length : value.indexOf('\n', lastEnd);
     const lines = value.slice(from, to).split('\n');
     const prefixFor = (i: number) => (format === 'list-ol' ? `${i + 1}. ` : PREFIX[format]!);
-    const has = (line: string, i: number) => (format === 'list-ol' ? /^\d+\. /.test(line) : line.startsWith(prefixFor(i)));
+    const has = (line: string, i: number) =>
+      format === 'list-ol' ? /^\d+\. /.test(line) : line.startsWith(prefixFor(i));
     const off = lines.every((l, i) => has(l, i) || !l.trim());
     const out = lines.map((l, i) => {
       if (!l.trim() && lines.length > 1) return l;
@@ -257,11 +369,19 @@ export class MarkdownEditor {
   }
 
   /** Replaces a range, keeping the browser's undo history where it supports that. */
-  private replace(start: number, end: number, text: string, selStart: number, selEnd: number): void {
+  private replace(
+    start: number,
+    end: number,
+    text: string,
+    selStart: number,
+    selEnd: number,
+  ): void {
     const el = this.ta()!.nativeElement;
     el.focus();
     el.setSelectionRange(start, end);
-    const done = text ? document.execCommand('insertText', false, text) : document.execCommand('delete');
+    const done = text
+      ? document.execCommand('insertText', false, text)
+      : document.execCommand('delete');
     if (!done) el.setRangeText(text, start, end);
     el.setSelectionRange(selStart, selEnd);
     this.value.set(el.value);

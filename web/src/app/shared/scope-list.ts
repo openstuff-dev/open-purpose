@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
@@ -8,7 +16,11 @@ import { Notices } from './notice';
 import { Icon } from './icon';
 import { RepoPicker } from './repo-picker';
 
-export const splitList = (s: string) => s.split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
+export const splitList = (s: string) =>
+  s
+    .split(/[,\n]/)
+    .map((x) => x.trim())
+    .filter(Boolean);
 
 /** "azure:acme/platform/portal-web" -> "portal-web" */
 export const repoName = (key: string) => key.split('/').pop() || key;
@@ -25,12 +37,24 @@ export const repoName = (key: string) => key.split('/').pop() || key;
           <li>
             <a [routerLink]="['/scopes', s.id]" class="scope-name">{{ s.name }}</a>
             <span class="scope-match">
-              @for (id of s.repository_ids; track id) { <span class="chip repo" [title]="repoKey(id)"><app-icon name="branch" [size]="11" />{{ repoLabel(id) }}</span> }
-              @for (g of s.path_globs; track g) { <code class="chip path">{{ g }}</code> }
-              @for (t of s.stacks; track t) { <span class="chip stack">{{ t }}</span> }
-              @if (!s.repository_ids.length && !s.path_globs.length && !s.stacks.length) { <span class="quiet">Matches nothing automatically</span> }
+              @for (id of s.repository_ids; track id) {
+                <span class="chip repo" [title]="repoKey(id)"
+                  ><app-icon name="branch" [size]="11" />{{ repoLabel(id) }}</span
+                >
+              }
+              @for (g of s.path_globs; track g) {
+                <code class="chip path">{{ g }}</code>
+              }
+              @for (t of s.stacks; track t) {
+                <span class="chip stack">{{ t }}</span>
+              }
+              @if (!s.repository_ids.length && !s.path_globs.length && !s.stacks.length) {
+                <span class="quiet">Matches nothing automatically</span>
+              }
             </span>
-            @if (s.description) { <p class="quiet">{{ s.description }}</p> }
+            @if (s.description) {
+              <p class="quiet multiline">{{ s.description }}</p>
+            }
           </li>
         }
       </ul>
@@ -40,24 +64,64 @@ export const repoName = (key: string) => key.split('/').pop() || key;
     @if (canEdit()) {
       @if (adding()) {
         <form class="inline-form" (ngSubmit)="create()">
-          <label class="grow">Name <input name="name" [(ngModel)]="name" required [placeholder]="projectId() ? 'Frontend' : organizationId() ? 'Angular apps' : 'All .NET code'"></label>
+          <label class="grow"
+            >Name
+            <input
+              name="name"
+              [(ngModel)]="name"
+              required
+              [placeholder]="
+                projectId() ? 'Frontend' : organizationId() ? 'Angular apps' : 'All .NET code'
+              "
+          /></label>
           @if (projectId(); as pid) {
-            <app-repo-picker class="full" [projectId]="pid" [(repositories)]="repos" [(selected)]="repositoryIds" (added)="repositoryAdded.emit($event)" />
+            <app-repo-picker
+              class="full"
+              [projectId]="pid"
+              [(repositories)]="repos"
+              [(selected)]="repositoryIds"
+              (added)="repositoryAdded.emit($event)"
+            />
           }
-          <label class="full">Paths <span class="quiet">(globs relative to the repo root, comma separated{{ projectId() ? '; optional with a repository' : '' }})</span>
-            <input name="globs" [(ngModel)]="globs" class="mono" [placeholder]="projectId() ? 'frontend/**, apps/web/**' : ''"></label>
-          <label class="full">Stacks <span class="quiet">(tags detected from package.json, .csproj and similar)</span>
-            <input name="stacks" [(ngModel)]="stacks" [placeholder]="projectId() ? 'angular' : organizationId() ? 'angular' : 'dotnet'"></label>
-          <p class="quiet full">{{ projectId()
-            ? 'With repositories ticked, the scope applies only inside them: everywhere, or where a path or stack matches. Without, it applies wherever a path or stack matches.'
-            : 'A scope applies when any path or any stack matches the code an agent is working on.' }}</p>
+          <label class="full"
+            >Paths
+            <span class="quiet"
+              >(globs relative to the repo root, comma separated{{
+                projectId() ? '; optional with a repository' : ''
+              }})</span
+            >
+            <input
+              name="globs"
+              [(ngModel)]="globs"
+              class="mono"
+              [placeholder]="projectId() ? 'frontend/**, apps/web/**' : ''"
+          /></label>
+          <label class="full"
+            >Stacks
+            <span class="quiet">(tags detected from package.json, .csproj and similar)</span>
+            <input
+              name="stacks"
+              [(ngModel)]="stacks"
+              [placeholder]="projectId() ? 'angular' : organizationId() ? 'angular' : 'dotnet'"
+          /></label>
+          <p class="quiet full">
+            {{
+              projectId()
+                ? 'With repositories ticked, the scope applies only inside them: everywhere, or where a path or stack matches. Without, it applies wherever a path or stack matches.'
+                : 'A scope applies when any path or any stack matches the code an agent is working on.'
+            }}
+          </p>
           <div class="form-actions full">
-            <button class="btn primary" type="submit" [disabled]="!name.trim()">Create scope</button>
+            <button class="btn primary" type="submit" [disabled]="!name.trim()">
+              Create scope
+            </button>
             <button class="btn" type="button" (click)="adding.set(false)">Cancel</button>
           </div>
         </form>
       } @else {
-        <button class="btn" type="button" (click)="adding.set(true)"><app-icon name="plus" />New scope</button>
+        <button class="btn" type="button" (click)="adding.set(true)">
+          <app-icon name="plus" />New scope
+        </button>
       }
     }
   `,
@@ -98,7 +162,9 @@ export class ScopeList {
 
   private async load(organizationId: string | null, projectId: string | null): Promise<void> {
     try {
-      this.scopes.set(await this.api.scopes({ organization_id: organizationId, project_id: projectId }));
+      this.scopes.set(
+        await this.api.scopes({ organization_id: organizationId, project_id: projectId }),
+      );
     } catch (e) {
       this.notices.error(e);
     }
@@ -107,11 +173,17 @@ export class ScopeList {
 
   async create(): Promise<void> {
     try {
-      const created = await claimingOldSlug((take_alias) => this.api.createScope({
-        organization_id: this.organizationId(), project_id: this.projectId(), name: this.name.trim(),
-        path_globs: splitList(this.globs), stacks: splitList(this.stacks), take_alias,
-        ...(this.projectId() ? { repository_ids: this.repositoryIds() } : {}),
-      }));
+      const created = await claimingOldSlug((take_alias) =>
+        this.api.createScope({
+          organization_id: this.organizationId(),
+          project_id: this.projectId(),
+          name: this.name.trim(),
+          path_globs: splitList(this.globs),
+          stacks: splitList(this.stacks),
+          take_alias,
+          ...(this.projectId() ? { repository_ids: this.repositoryIds() } : {}),
+        }),
+      );
       if (!created) return;
       this.notices.ok(`Created scope ${this.name.trim()}`);
       this.name = this.globs = this.stacks = '';
