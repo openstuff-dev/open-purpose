@@ -4,10 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { Api } from '../core/api';
 import type { Organization, TokenRow } from '../core/models';
-import { Session } from '../core/session';
+import { Session, claimingOldSlug } from '../core/session';
 import { Theme, initials, type ThemeChoice } from '../core/theme';
 import { Icon } from '../shared/icon';
 import { Notices } from '../shared/notice';
+import { SlugRenameField } from '../shared/slug-rename';
 import { GroupsPage } from './groups';
 import { PeoplePage } from './people';
 import { PreviewPage } from './preview';
@@ -40,7 +41,7 @@ group, our organization, the project and the part of the code you are in.
 
 @Component({
   selector: 'app-settings',
-  imports: [FormsModule, DatePipe, RouterLink, RouterLinkActive, Icon, PeoplePage, GroupsPage, PreviewPage],
+  imports: [FormsModule, DatePipe, RouterLink, RouterLinkActive, Icon, PeoplePage, GroupsPage, PreviewPage, SlugRenameField],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="page-head">
@@ -208,16 +209,16 @@ group, our organization, the project and the part of the code you are in.
                     @if (editingOrg() === o.id) {
                       <form class="inline-form" style="margin:0;grid-column:1/-1" (ngSubmit)="saveOrg(o)">
                         <label class="grow">Name <input name="oname" [(ngModel)]="orgDraft.name" required></label>
-                        @if (session.canAdmin(null)) { <label>Slug <input name="oslug" class="mono" [(ngModel)]="orgDraft.slug" required></label> }
                         <label class="full">Summary <input name="osum" [(ngModel)]="orgDraft.summary"></label>
-                        @if (session.canAdmin(null) && orgDraft.slug !== o.slug) {
-                          <p class="quiet full">Changing the slug breaks <code>[[{{ o.slug }}/…]]</code> links and <code>.agentcontext.json</code> files that use it.</p>
-                        }
                         <div class="form-actions full">
                           <button class="btn primary" type="submit">Save</button>
                           <button class="btn" type="button" (click)="editingOrg.set(null)">Cancel</button>
                         </div>
                       </form>
+                      <div style="grid-column:1/-1">
+                        <app-slug-rename kind="organization" [id]="o.id" [slug]="o.slug" [name]="o.name" [aliases]="o.aliases"
+                          [canEdit]="session.canAdmin(null)" (changed)="reloadMe()" />
+                      </div>
                     } @else {
                       <div style="display:flex;gap:0.75rem;align-items:center;min-width:0">
                         <span class="badge" [style.background]="session.orgColor(o.id)">{{ initials(o.name) }}</span>
@@ -324,7 +325,7 @@ export class SettingsPage {
   name = '';
   tokenLabel = '';
   groupName = '';
-  orgDraft = { name: '', slug: '', summary: '' };
+  orgDraft = { name: '', summary: '' };
   newOrg = { name: '', slug: '', summary: '' };
 
   private readonly base = this.session.me()?.public_url ?? location.origin;
@@ -376,7 +377,7 @@ export class SettingsPage {
     }
   }
 
-  private async reloadMe(): Promise<void> {
+  async reloadMe(): Promise<void> {
     this.session.me.set(await this.api.me());
   }
 
@@ -422,16 +423,13 @@ export class SettingsPage {
   }
 
   editOrg(o: Organization): void {
-    this.orgDraft = { name: o.name, slug: o.slug, summary: o.summary };
+    this.orgDraft = { name: o.name, summary: o.summary };
     this.editingOrg.set(o.id);
   }
 
   async saveOrg(o: Organization): Promise<void> {
     await this.run(async () => {
-      await this.api.updateOrganization(o.id, {
-        name: this.orgDraft.name.trim(), summary: this.orgDraft.summary,
-        slug: this.session.canAdmin(null) && this.orgDraft.slug !== o.slug ? this.orgDraft.slug.trim() : undefined,
-      });
+      await this.api.updateOrganization(o.id, { name: this.orgDraft.name.trim(), summary: this.orgDraft.summary });
       this.editingOrg.set(null);
       await this.reloadMe();
     }, `Saved ${this.orgDraft.name.trim()}`);
@@ -447,12 +445,16 @@ export class SettingsPage {
   }
 
   async createOrg(): Promise<void> {
-    await this.run(async () => {
-      await this.api.createOrganization({ name: this.newOrg.name.trim(), slug: this.newOrg.slug.trim() || undefined, summary: this.newOrg.summary.trim() || undefined });
+    try {
+      const body = { name: this.newOrg.name.trim(), slug: this.newOrg.slug.trim() || undefined, summary: this.newOrg.summary.trim() || undefined };
+      if (!await claimingOldSlug((take_alias) => this.api.createOrganization({ ...body, take_alias }))) return;
       this.newOrg = { name: '', slug: '', summary: '' };
       this.addingOrg.set(false);
       await this.reloadMe();
-    }, 'Created organization. Add people and agents to it under People and agents.');
+      this.notices.ok('Created organization. Add people and agents to it under People and agents.');
+    } catch (e) {
+      this.notices.error(e);
+    }
   }
 
   async share(target: Organization, reader: Organization, allowed: boolean): Promise<void> {

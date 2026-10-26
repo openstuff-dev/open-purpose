@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import type { Scope } from '../core/models';
-import { Session } from '../core/session';
+import { Session, claimingOldSlug } from '../core/session';
 import { Notices } from './notice';
 import { Icon } from './icon';
 
@@ -83,10 +83,11 @@ export class ScopeList {
 
   async create(): Promise<void> {
     try {
-      await this.api.createScope({
+      const created = await claimingOldSlug((take_alias) => this.api.createScope({
         organization_id: this.organizationId(), project_id: this.projectId(), name: this.name.trim(),
-        path_globs: splitList(this.globs), stacks: splitList(this.stacks),
-      });
+        path_globs: splitList(this.globs), stacks: splitList(this.stacks), take_alias,
+      }));
+      if (!created) return;
       this.notices.ok(`Created scope ${this.name.trim()}`);
       this.name = this.globs = this.stacks = '';
       this.adding.set(false);

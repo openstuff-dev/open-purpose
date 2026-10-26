@@ -7,10 +7,11 @@ import { Session } from '../core/session';
 import { DocList } from '../shared/doc-list';
 import { Notices } from '../shared/notice';
 import { splitList } from '../shared/scope-list';
+import { SlugRenameField } from '../shared/slug-rename';
 
 @Component({
   selector: 'app-scope',
-  imports: [DocList, FormsModule, RouterLink],
+  imports: [DocList, FormsModule, RouterLink, SlugRenameField],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (scope(); as s) {
@@ -29,7 +30,6 @@ import { splitList } from '../shared/scope-list';
         @if (editing()) {
           <form class="inline-form" (ngSubmit)="save()">
             <label class="grow">Name <input name="name" [(ngModel)]="draft.name" required></label>
-            <label>Slug <input name="slug" class="mono" [(ngModel)]="draft.slug" required></label>
             <label class="full">Description <input name="description" [(ngModel)]="draft.description"></label>
             <label class="full">Paths <input name="globs" class="mono" [(ngModel)]="draft.globs" placeholder="frontend/**"></label>
             <label class="full">Stacks <input name="stacks" [(ngModel)]="draft.stacks" placeholder="angular"></label>
@@ -44,8 +44,6 @@ import { splitList } from '../shared/scope-list';
             <dd>@for (g of s.path_globs; track g) { <code class="chip path">{{ g }}</code> } @empty { <span class="quiet">Any path</span> }</dd>
             <dt>Stacks</dt>
             <dd>@for (t of s.stacks; track t) { <span class="chip stack">{{ t }}</span> } @empty { <span class="quiet">Any stack</span> }</dd>
-            <dt>Slug</dt>
-            <dd><code>{{ s.slug }}</code></dd>
           </dl>
           <p class="quiet">Applies when an agent works on a file matching any path, or in code whose manifest has any of these stacks.</p>
           @if (s.can_edit) {
@@ -55,6 +53,8 @@ import { splitList } from '../shared/scope-list';
             </div>
           }
         }
+        <app-slug-rename kind="scope" [id]="s.id" [slug]="s.slug" [name]="s.name" [aliases]="s.aliases"
+          [canEdit]="s.can_edit" (changed)="reload()" />
       </section>
 
       <section class="block">
@@ -73,10 +73,14 @@ export class ScopePage {
   private notices = inject(Notices);
   readonly scope = signal<ScopeDetail | null>(null);
   readonly editing = signal(false);
-  draft = { name: '', slug: '', description: '', globs: '', stacks: '' };
+  draft = { name: '', description: '', globs: '', stacks: '' };
 
   constructor() {
     effect(() => void this.load(this.id()));
+  }
+
+  reload(): void {
+    void this.load(this.id());
   }
 
   private async load(id: string): Promise<void> {
@@ -89,14 +93,14 @@ export class ScopePage {
 
   startEdit(): void {
     const s = this.scope()!;
-    this.draft = { name: s.name, slug: s.slug, description: s.description, globs: s.path_globs.join(', '), stacks: s.stacks.join(', ') };
+    this.draft = { name: s.name, description: s.description, globs: s.path_globs.join(', '), stacks: s.stacks.join(', ') };
     this.editing.set(true);
   }
 
   async save(): Promise<void> {
     try {
       await this.api.updateScope(this.id(), {
-        name: this.draft.name, slug: this.draft.slug, description: this.draft.description,
+        name: this.draft.name, description: this.draft.description,
         path_globs: splitList(this.draft.globs), stacks: splitList(this.draft.stacks),
       });
       this.editing.set(false);

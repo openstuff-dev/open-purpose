@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseRemote, slugify } from '../src/domain/remote.js';
 import { detectStacks } from '../src/domain/stacks.js';
 import { matchScopes, mostSpecific, normalizePath } from '../src/domain/scopes.js';
-import { extractLinks } from '../src/domain/links.js';
+import { extractLinks, rewriteLinks } from '../src/domain/links.js';
 
 describe('parseRemote', () => {
   const key = 'azure:acme/big project/portal-frontend';
@@ -113,5 +113,23 @@ describe('extractLinks', () => {
 
   it('ignores code', () => {
     expect(extractLinks('`[[a]]`\n```\n[[b]]\n```\n[[c]]').map((l) => l.target)).toEqual(['c']);
+  });
+});
+
+describe('rewriteLinks', () => {
+  const rename = (from: string, to: string) => (l: { target: string }) => (l.target === from ? to : null);
+
+  it('keeps prefixes, anchors and labels', () => {
+    expect(rewriteLinks('[[billing]], [[Project: Billing#Auth|the bill]] and [[billing-v2]]', rename('billing', 'payments')))
+      .toBe('[[payments]], [[Project: payments#Auth|the bill]] and [[billing-v2]]');
+  });
+
+  it('ignores code', () => {
+    expect(rewriteLinks('`[[a]]`\n```\n[[a]]\n```\n[[a]]', rename('a', 'b'))).toBe('`[[a]]`\n```\n[[a]]\n```\n[[b]]');
+  });
+
+  it('leaves text untouched when nothing matches', () => {
+    const md = 'See [[Customer Portal]].';
+    expect(rewriteLinks(md, rename('customer-portal', 'portal'))).toBe(md);
   });
 });

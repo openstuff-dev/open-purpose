@@ -3,6 +3,7 @@ import type { Db, Queryable } from '../db.js';
 import { tx } from '../db.js';
 import { AppError, badRequest, mapPgError, notFound } from '../errors.js';
 import { parseRemote, slugify, type RemoteInfo } from '../domain/remote.js';
+import { claimSlug } from './aliases.js';
 import { insertDocument, insertSection } from './content.js';
 import type { Project, Repository } from './types.js';
 
@@ -52,8 +53,17 @@ export async function getProject(db: Queryable, a: Access, ref: string): Promise
     const org = a.orgBySlug(orgSlug);
     if (!org) throw notFound(`Organization "${orgSlug}"`);
     rows = (await db.query<Project>(`SELECT ${PROJECT_COLS} FROM projects p WHERE p.organization_id = $1 AND p.slug = $2`, [org.id, slug])).rows;
+    if (!rows.length) {
+      rows = (await db.query<Project>(
+        `SELECT ${PROJECT_COLS} FROM projects p JOIN slug_aliases x ON x.project_id = p.id WHERE p.organization_id = $1 AND x.old_slug = $2`,
+        [org.id, slug])).rows;
+    }
   } else {
-    const all = (await db.query<Project>(`SELECT ${PROJECT_COLS} FROM projects p WHERE p.slug = lower($1)`, [ref])).rows;
+    let all = (await db.query<Project>(`SELECT ${PROJECT_COLS} FROM projects p WHERE p.slug = lower($1)`, [ref])).rows;
+    if (!all.length) {
+      all = (await db.query<Project>(
+        `SELECT ${PROJECT_COLS} FROM projects p JOIN slug_aliases x ON x.project_id = p.id WHERE x.old_slug = lower($1)`, [ref])).rows;
+    }
     const own = all.filter((p) => p.organization_id === a.orgId);
     const readable = all.filter((p) => a.canRead(p.organization_id));
     rows = own.length ? own : readable;
@@ -76,6 +86,8 @@ export interface ProjectInput {
   purpose?: string;
   /** Optional git remote to map to the new project straight away. */
   remote_url?: string;
+  /** Take the slug even if it is another project's old slug. */
+  take_alias?: boolean;
 }
 
 /**
@@ -91,6 +103,7 @@ export async function createProject(db: Db, a: Access, input: ProjectInput): Pro
   const slug = input.slug ? input.slug.toLowerCase() : slugify(input.name);
   try {
     return await tx(db, async (c) => {
+      await claimSlug(c, 'project', { organization_id: orgId }, slug, null, input.take_alias);
       const { rows } = await c.query<Project>(
         `INSERT INTO projects (organization_id, slug, name, summary, reviewed, created_by)
          VALUES ($1, $2, $3, $4, $5, $6)
@@ -219,6 +232,8 @@ export interface Resolution {
   /** How the project was found: an explicit slug (e.g. from .agentcontext.json) or the git remote. */
   via: 'project' | 'remote' | null;
   remote: RemoteInfo | null;
+  /** The project was asked for by an old slug (e.g. in .agentcontext.json); `current` is what to use now. */
+  renamed: { asked: string; current: string } | null;
   /** When nothing matched: projects whose name looks like the repo, for the agent to offer the user. */
   suggestions: Array<{ slug: string; name: string; summary: string; organization_slug: string }>;
 }
@@ -235,7 +250,11 @@ export async function resolveProject(
     }
   }
   if (input.project) {
-    return { project: await getProject(db, a, input.project), via: 'project', remote, suggestions: [] };
+    const project = await getProject(db, a, input.project);
+    const asked = input.project.trim().toLowerCase();
+    const current = `${a.org(project.organization_id)?.slug}/${project.slug}`;
+    const stale = !isUuid(asked) && asked !== project.slug && asked !== current;
+    return { project, via: 'project', remote, renamed: stale ? { asked, current } : null, suggestions: [] };
   }
   if (remote) {
     const { rows } = await db.query<Project & { org_name: string }>(
@@ -246,7 +265,7 @@ export async function resolveProject(
       if (!a.canRead(rows[0].organization_id)) {
         throw new AppError('forbidden', `This repository belongs to a project in ${a.org(rows[0].organization_id)?.name}, which you can't read. Ask a group admin for read access.`);
       }
-      return { project: rows[0], via: 'remote', remote, suggestions: [] };
+      return { project: rows[0], via: 'remote', remote, renamed: null, suggestions: [] };
     }
   }
   const words = remote ? remote.repo.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3) : [];
@@ -262,5 +281,5 @@ export async function resolveProject(
     );
     suggestions = rows;
   }
-  return { project: null, via: null, remote, suggestions };
+  return { project: null, via: null, remote, renamed: null, suggestions };
 }

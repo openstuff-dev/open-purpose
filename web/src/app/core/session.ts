@@ -141,6 +141,27 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   );
 };
 
+/** Set when a create or rename failed because the slug is still another one's old slug. */
+export function aliasConflict(err: unknown): { id: string; name: string; slug: string } | null {
+  const body = (err as HttpErrorResponse)?.error as { error?: string; alias_of?: { id: string; name: string; slug: string } } | undefined;
+  return body?.error === 'conflict' && body.alias_of ? body.alias_of : null;
+}
+
+/**
+ * Run a create that may land on another one's old slug. If it does, ask before
+ * taking the slug over, since repositories and links using it would follow.
+ * Resolves to undefined when the person says no.
+ */
+export async function claimingOldSlug<T>(run: (take_alias?: boolean) => Promise<T>): Promise<T | undefined> {
+  try {
+    return await run();
+  } catch (e) {
+    if (!aliasConflict(e)) throw e;
+    if (!confirm(`${errorMessage(e)}\n\nTake the slug anyway?`)) return undefined;
+    return run(true);
+  }
+}
+
 /** Pull the server's message out of an HttpErrorResponse. */
 export function errorMessage(err: unknown): string {
   const e = err as HttpErrorResponse;

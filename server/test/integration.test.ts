@@ -443,6 +443,68 @@ definitions:`);
     expect((await api('GET', `/documents/${nav.data.document_id}`)).data.organization_id).toBe(o.payments);
   });
 
+  it('renames slugs throughout, keeping the old ones as aliases', async () => {
+    const treasury = (await api('POST', '/organizations', { name: 'Acme Treasury', slug: 'treasury' })).data.id;
+    const ledger = (await api('POST', '/projects', { organization_id: treasury, name: 'General Ledger', slug: 'ledger' })).data;
+    expect(ledger.slug).toBe('ledger');
+    const mk = async (body: object) => (await api('POST', '/members', body)).data.token as string;
+    const tove = await mk({ name: 'Tove', kind: 'human', organization_id: treasury, role: 'editor' });
+    const bot = await mk({ name: 'Treasury bot', kind: 'agent', organization_id: treasury });
+    const section = async (level: object, title: string, body: string) => {
+      const doc = (await api('POST', '/documents', { ...level, kind: 'reference', title })).data;
+      return (await api('POST', `/documents/${doc.id}/sections`, { heading: title, body })).data.section;
+    };
+    const own = await section({ organization_id: treasury }, 'Notes', 'Post to [[ledger]], see [[General Ledger|the books]] and `[[ledger]]`.');
+    const shared = await section({}, 'Group notes', 'Treasury keeps [[treasury/ledger#Auth|its ledger]].');
+
+    // The preview says what changes and what can't, and changes nothing.
+    const preview = await api('POST', `/projects/${ledger.id}/rename`, { slug: 'books', dry_run: true }, { token: tove });
+    expect(preview.status).toBe(200);
+    expect(preview.data).toMatchObject({ from: 'ledger', to: 'books', applied: false, alias_of: null });
+    expect(preview.data.rewrite.map((r: any) => [r.heading, r.links])).toEqual([['Notes', 1]]);
+    expect(preview.data.cannot_edit.map((r: any) => r.heading)).toEqual(['Group notes']);
+    expect((await api('GET', `/projects/${ledger.id}`)).data.slug).toBe('ledger');
+
+    const done = await api('POST', `/projects/${ledger.id}/rename`, { slug: 'books' }, { token: tove });
+    expect(done.data.applied).toBe(true);
+    expect((await api('GET', `/sections/${own.id}`)).data.body).toBe('Post to [[books]], see [[General Ledger|the books]] and `[[ledger]]`.');
+    expect((await api('GET', `/sections/${own.id}/versions`)).data[0].note).toBe('Renamed ledger to books');
+    expect((await api('GET', `/sections/${shared.id}`)).data.body).toContain('[[treasury/ledger#Auth|its ledger]]');
+    expect((await api('GET', `/projects/${ledger.id}`)).data.aliases.map((x: any) => x.old_slug)).toEqual(['ledger']);
+
+    // The old slug still works for links, people and agents, and agents are told to update it.
+    const g = await api('GET', '/graph');
+    expect(g.data.edges.some((e: any) => e.source === 'group' && e.target === `project:${ledger.id}`)).toBe(true);
+    expect((await api('GET', '/projects/treasury%2Fledger')).data.id).toBe(ledger.id);
+    const { client, call } = await mcp(bot);
+    const ctx = await call('get_context', { project: 'treasury/ledger' });
+    expect(ctx.text).toContain('`treasury/ledger` is an old slug of this project.** Use `treasury/books`');
+
+    // Renaming the organization rewrites org/… links.
+    await api('POST', `/organizations/${treasury}/rename`, { slug: 'vault' });
+    expect((await api('GET', `/sections/${shared.id}`)).data.body).toBe('Treasury keeps [[vault/ledger#Auth|its ledger]].');
+    expect((await call('get_context', { project: 'treasury/books' })).isError).toBe(false);
+
+    // Reusing an old slug is refused until the caller says to take it over.
+    const reuse = await api('POST', '/projects', { organization_id: treasury, name: 'Ledger' });
+    expect(reuse.status).toBe(409);
+    expect(reuse.data.alias_of).toMatchObject({ id: ledger.id, slug: 'books' });
+    const taken = await api('POST', '/projects', { organization_id: treasury, name: 'Ledger', take_alias: true });
+    expect(taken.status).toBe(201);
+    expect((await api('GET', '/projects/vault%2Fledger')).data.id).toBe(taken.data.id);
+    expect((await api('GET', `/projects/${ledger.id}`)).data.aliases).toEqual([]);
+
+    // Scopes: a PATCH keeps an alias too, and get_context accepts the old slug.
+    const scope = (await api('POST', '/scopes', { project_id: ledger.id, name: 'UI', slug: 'ui' })).data;
+    await api('PATCH', `/scopes/${scope.id}`, { slug: 'frontend' }, { token: tove });
+    const scoped = await call('get_context', { project: 'vault/books', scopes: ['ui'] });
+    expect(scoped.text).toContain('requested explicitly by its old slug "ui"; use "frontend"');
+    const alias = (await api('GET', `/scopes/${scope.id}`)).data.aliases[0];
+    expect((await api('DELETE', `/aliases/${alias.id}`, undefined, { token: tove })).status).toBe(204);
+    expect((await call('get_context', { project: 'vault/books', scopes: ['ui'] })).text).not.toContain('old slug "ui"');
+    await client.close();
+  });
+
   it('isolates groups from each other with row-level security', async () => {
     const g2 = await api('POST', '/groups', { name: 'Other Corp', organization_name: 'Other', admin_name: 'Olga' });
     expect(g2.status).toBe(201);

@@ -20,7 +20,7 @@ export const orgNode = (id: string) => `org:${id}`;
 export const projectNode = (id: string) => `project:${id}`;
 export const termNode = (sectionId: string) => `term:${sectionId}`;
 
-interface ProjectRow { id: string; organization_id: string; slug: string; name: string; summary: string; purpose: string | null }
+interface ProjectRow { id: string; organization_id: string; slug: string; name: string; summary: string; purpose: string | null; aliases: string[] }
 interface TermRow { id: string; heading: string; body: string; organization_id: string | null; project_id: string | null; document_id: string }
 interface LinkRow {
   section_id: string; heading: string; target_kind: 'project' | 'term' | 'any'; target: string;
@@ -47,6 +47,11 @@ class LinkIndex {
       const m = this.projectsByOrg.get(p.organization_id)!;
       m.set(p.slug, p);
       m.set(normalizeTarget(p.name), p);
+    }
+    // Old slugs, after every current slug and name so those win.
+    for (const p of projects) {
+      const m = this.projectsByOrg.get(p.organization_id)!;
+      for (const old of p.aliases) if (!m.has(old)) m.set(old, p);
     }
     for (const t of terms) {
       const key = normalizeTarget(t.heading);
@@ -118,7 +123,8 @@ async function loadIndex(db: Queryable, a: Access, includeArchived: boolean): Pr
       `SELECT p.id, p.organization_id, p.slug, p.name, p.summary,
               (SELECT s.body FROM documents d JOIN sections s ON s.document_id = d.id
                 WHERE d.project_id = p.id AND d.scope_id IS NULL AND d.kind = 'purpose'
-                ORDER BY d.position, s.position LIMIT 1) AS purpose
+                ORDER BY d.position, s.position LIMIT 1) AS purpose,
+              ARRAY(SELECT x.old_slug FROM slug_aliases x WHERE x.project_id = p.id) AS aliases
          FROM projects p WHERE $1 OR p.archived_at IS NULL`,
       [includeArchived],
   );
@@ -127,6 +133,12 @@ async function loadIndex(db: Queryable, a: Access, includeArchived: boolean): Pr
          FROM sections s JOIN documents d ON d.id = s.document_id WHERE d.kind = 'glossary'`,
   );
   return new LinkIndex(a, projects, terms);
+}
+
+/** Resolve [[link]] targets with the same rules as the graph (archived projects included). */
+export async function linkResolver(db: Queryable, a: Access): Promise<LinkIndex['resolve']> {
+  const index = await loadIndex(db, a, true);
+  return index.resolve.bind(index);
 }
 
 export async function buildGraph(

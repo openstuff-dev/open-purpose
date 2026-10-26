@@ -19,9 +19,9 @@ const ORG_B = 'org-payments';
 const ORG_C = 'org-secret';
 
 const orgs: OrgRef[] = [
-  { id: ORG_A, slug: 'platform', name: 'Platform', archived_at: null },
-  { id: ORG_B, slug: 'payments', name: 'Payments', archived_at: null },
-  { id: ORG_C, slug: 'secret', name: 'Secret', archived_at: null },
+  { id: ORG_A, slug: 'platform', name: 'Platform', archived_at: null, aliases: [] },
+  { id: ORG_B, slug: 'payments', name: 'Payments', archived_at: null, aliases: [] },
+  { id: ORG_C, slug: 'secret', name: 'Secret', archived_at: null, aliases: [] },
 ];
 
 const actor: Actor = { id: 'actor-1', name: 'Anders', kind: 'human', is_superadmin: false };
@@ -29,7 +29,7 @@ const memberships: Membership[] = [{ group_id: 'g1', organization_id: ORG_A, rol
 const grants = new Map([[ORG_A, new Set([ORG_B])]]);
 const access = new Access(actor, { id: 'g1', slug: 'acme', name: 'Acme Group' }, orgs, memberships, grants, ORG_A);
 
-interface ProjectFixture { id: string; organization_id: string; slug: string; name: string; summary: string; purpose: string | null; archived?: boolean }
+interface ProjectFixture { id: string; organization_id: string; slug: string; name: string; summary: string; purpose: string | null; archived?: boolean; aliases?: string[] }
 interface TermFixture { id: string; heading: string; body: string; organization_id: string | null; project_id: string | null; document_id: string }
 interface LinkFixture {
   section_id: string; heading: string; target_kind: 'project' | 'term' | 'any'; target: string;
@@ -71,7 +71,7 @@ function fakeDb(links: LinkFixture[], data = { projects, terms }): Queryable {
     }
     if (sql.includes('FROM projects p')) {
       const includeArchived = params[0] as boolean;
-      return { rows: data.projects.filter((p) => includeArchived || !p.archived).map(({ archived: _a, ...row }) => row) };
+      return { rows: data.projects.filter((p) => includeArchived || !p.archived).map(({ archived: _a, ...row }) => ({ aliases: [], ...row })) };
     }
     if (sql.includes("d.kind = 'glossary'")) return { rows: data.terms };
     throw new Error(`unexpected query: ${sql}`);
@@ -231,6 +231,24 @@ describe('buildGraph: link resolution', () => {
 
   it('resolves org-qualified targets like "payments/payment-gateway"', async () => {
     const g = await buildGraph(fakeDb([link('s1', 'payments/payment-gateway', { org: ORG_A, project: 'p-portal' })]), access);
+    expect(edge(g, projectNode('p-portal'), projectNode('p-gateway'))).toBeDefined();
+  });
+
+  it('resolves an old slug, but a current slug or name wins over it', async () => {
+    const renamed = projects.map((p) =>
+      p.id === 'p-gateway' ? { ...p, slug: 'gateway', aliases: ['payment-gateway', 'billing'] } : p);
+    const g = await buildGraph(fakeDb([
+      link('s1', 'payments/payment-gateway', { org: ORG_A, project: 'p-portal' }),
+      link('s2', 'billing', { org: ORG_B, project: 'p-shared-b' }),
+    ], { projects: renamed, terms }), access);
+    expect(edge(g, projectNode('p-portal'), projectNode('p-gateway'))).toBeDefined();
+    expect(edge(g, projectNode('p-shared-b'), projectNode('p-billing-b'))).toBeDefined();
+  });
+
+  it('resolves an organization by its old slug', async () => {
+    const renamedOrgs = orgs.map((o) => (o.id === ORG_B ? { ...o, slug: 'money', aliases: ['payments'] } : o));
+    const a = new Access(actor, { id: 'g1', slug: 'acme', name: 'Acme Group' }, renamedOrgs, memberships, grants, ORG_A);
+    const g = await buildGraph(fakeDb([link('s1', 'payments/payment-gateway', { org: ORG_A, project: 'p-portal' })]), a);
     expect(edge(g, projectNode('p-portal'), projectNode('p-gateway'))).toBeDefined();
   });
 

@@ -18,6 +18,8 @@ export interface OrgRef {
   slug: string;
   name: string;
   archived_at: string | null;
+  /** Old slugs the organization still answers to. */
+  aliases: string[];
 }
 
 /**
@@ -98,7 +100,7 @@ export class Access {
 
   orgBySlug(slug: string): OrgRef | null {
     const s = slug.toLowerCase();
-    return this.orgs.find((o) => o.slug === s || o.id === slug) ?? null;
+    return this.orgs.find((o) => o.slug === s || o.id === slug) ?? this.orgs.find((o) => o.aliases.includes(s)) ?? null;
   }
 
   requireRead(orgId: string | null, what = 'this'): void {
@@ -197,7 +199,9 @@ export async function resolveAccess(
   if (!group) throw new AppError('forbidden', 'You are not a member of that group');
 
   return withScope(pool, { groupId: group.id }, async (c) => {
-    const orgs = await c.query<OrgRef>('SELECT id, slug, name, archived_at FROM organizations ORDER BY name');
+    const orgs = await c.query<OrgRef>(`SELECT o.id, o.slug, o.name, o.archived_at,
+              ARRAY(SELECT x.old_slug FROM slug_aliases x WHERE x.organization_id = o.id) AS aliases
+         FROM organizations o ORDER BY o.name`);
     const memberships = await c.query<Membership>('SELECT group_id, organization_id, role FROM memberships WHERE actor_id = $1', [actor.id]);
     const grants = await c.query<{ reader_org_id: string; target_org_id: string }>('SELECT reader_org_id, target_org_id FROM org_read_grants');
     const grantMap = new Map<string, Set<string>>();

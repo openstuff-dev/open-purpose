@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import type { Project } from '../core/models';
-import { Session } from '../core/session';
+import { Session, claimingOldSlug } from '../core/session';
 import { Notices } from '../shared/notice';
 import { Icon } from '../shared/icon';
 
@@ -123,14 +123,16 @@ export class ProjectsPage {
 
   async create(): Promise<void> {
     try {
-      const p = await this.api.createProject({
+      const p = await claimingOldSlug((take_alias) => this.api.createProject({
         organization_id: this.session.orgId(),
         name: this.draft.name.trim(),
         slug: this.draft.slug.trim() || undefined,
         remote_url: this.draft.remote_url.trim() || undefined,
         purpose: this.draft.purpose.trim() || undefined,
         summary: this.draft.purpose.trim().split('\n')[0].slice(0, 200) || undefined,
-      });
+        take_alias,
+      }));
+      if (!p) return;
       this.notices.ok(`Created ${p.name}`);
       await this.router.navigate(['/projects', p.id]);
     } catch (e) {

@@ -5,7 +5,7 @@ import type {
   ContextResult, Doc, DocDetail, DocKind, EditMode, EditResult, Graph, GroupRef, GroupRow, Level, LinkRef,
   LinkResolution, LinkTarget, Me, Member, Organization, Project, ProjectDetail, Proposal, ProposalStatus, Role,
   Scope, ScopeDetail, SearchHit, Section, SectionVersion, GraphNode, TokenRow, ProposalCounts, Review, ReviewThread,
-  ApiSpec, ApiSpecDetail,
+  ApiSpec, ApiSpecDetail, SlugKind, SlugRename,
 } from './models';
 
 const lv = (id: string | null | undefined) => id ?? 'group';
@@ -39,7 +39,7 @@ export class Api {
     this.send<{ group: GroupRef; organization: Organization; token?: string }>('POST', '/groups', body);
 
   organizations = () => this.get<Organization[]>('/organizations');
-  createOrganization = (body: { name: string; slug?: string; summary?: string }) => this.send<Organization>('POST', '/organizations', body);
+  createOrganization = (body: { name: string; slug?: string; summary?: string; take_alias?: boolean }) => this.send<Organization>('POST', '/organizations', body);
   updateOrganization = (id: string, body: { name?: string; slug?: string; summary?: string; archived?: boolean }) =>
     this.send<Organization>('PATCH', `/organizations/${id}`, body);
   setReader = (targetId: string, readerId: string, allowed: boolean) =>
@@ -48,7 +48,7 @@ export class Api {
   projects = (opts: { q?: string; archived?: boolean; organizationId?: string | null } = {}) =>
     this.get<Project[]>('/projects', { q: opts.q, archived: opts.archived ? '1' : undefined, organization_id: opts.organizationId ?? undefined });
   project = (idOrSlug: string) => this.get<ProjectDetail>(`/projects/${encodeURIComponent(idOrSlug)}`);
-  createProject = (body: { organization_id: string | null; name: string; slug?: string; summary?: string; purpose?: string; remote_url?: string }) =>
+  createProject = (body: { organization_id: string | null; name: string; slug?: string; summary?: string; purpose?: string; remote_url?: string; take_alias?: boolean }) =>
     this.send<Project>('POST', '/projects', body);
   updateProject = (id: string, body: Partial<Pick<Project, 'name' | 'slug' | 'summary' | 'reviewed' | 'organization_id'>> & { archived?: boolean }) =>
     this.send<Project>('PATCH', `/projects/${id}`, body);
@@ -71,9 +71,14 @@ export class Api {
   scopes = (level: { organization_id: string | null; project_id?: string | null }) =>
     this.get<Scope[]>('/scopes', { organization_id: lv(level.organization_id), project_id: level.project_id ?? undefined });
   scope = (id: string) => this.get<ScopeDetail>(`/scopes/${id}`);
-  createScope = (body: Partial<Scope> & { name: string }) => this.send<Scope>('POST', '/scopes', body);
+  createScope = (body: Partial<Scope> & { name: string; take_alias?: boolean }) => this.send<Scope>('POST', '/scopes', body);
   updateScope = (id: string, body: Partial<Scope>) => this.send<Scope>('PATCH', `/scopes/${id}`, body);
   deleteScope = (id: string) => this.send<void>('DELETE', `/scopes/${id}`);
+
+  /** Rename a slug; with dry_run, only report what it touches. */
+  renameSlug = (kind: SlugKind, id: string, body: { slug: string; rewrite_links?: boolean; take_alias?: boolean; dry_run?: boolean }) =>
+    this.send<SlugRename>('POST', `/${kind === 'organization' ? 'organizations' : kind + 's'}/${id}/rename`, body);
+  deleteAlias = (id: string) => this.send<void>('DELETE', `/aliases/${id}`);
 
   documents = (level: Level) =>
     this.get<Doc[]>('/documents', { organization_id: lv(level.organization_id), project_id: level.project_id ?? undefined, scope_id: level.scope_id ?? undefined });

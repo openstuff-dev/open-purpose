@@ -1,10 +1,10 @@
 /** Shapes identical on server and web live in @openpurpose/contracts; the rest are API response shapes. */
-import type { Actor, DocKind, EditMode, GraphNode, GroupRef, ProposalKind, ProposalStatus, Repository, Role, Scope } from '@openpurpose/contracts';
+import type { Actor, DocKind, EditMode, GraphNode, GroupRef, ProposalKind, ProposalStatus, Repository, Role, Scope, SlugAlias } from '@openpurpose/contracts';
 
 export type {
   Actor, ActorKind, DocKind, EditMode, Graph, GraphEdge, GraphNode, GroupRef, LinkRef, LinkResolution, NodeType,
   ProposalCounts, ProposalKind, ProposalStatus, Repository, Review, ReviewComment, ReviewEvent, ReviewRevision,
-  ReviewThread, Role, Scope,
+  ReviewThread, Role, Scope, SlugAlias, SlugKind, SlugRename, SlugRenameRef,
 } from '@openpurpose/contracts';
 
 export const EDIT_MODES: EditMode[] = ['locked', 'propose', 'open'];
@@ -45,6 +45,8 @@ export interface Organization {
   projects: number | null;
   /** Organizations whose members may read this one. */
   readers: string[];
+  /** Old slugs it still answers to. */
+  aliases: SlugAlias[];
 }
 
 export interface Me {
@@ -123,6 +125,7 @@ export interface ProjectDetail extends Project {
   scopes: Scope[];
   documents: Doc[];
   apis: ApiSpec[];
+  aliases: SlugAlias[];
 }
 
 /** An OpenAPI / Swagger spec attached to a project. */
@@ -167,6 +170,7 @@ export interface ScopeDetail extends Scope {
   project: Project | null;
   organization: OrgRef | null;
   can_edit: boolean;
+  aliases: SlugAlias[];
 }
 
 export interface SectionVersion {

@@ -134,6 +134,7 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       via: r.via,
       remote_key: r.remote?.key ?? null,
       suggestions: r.suggestions.map((s) => ({ ref: `${s.organization_slug}/${s.slug}`, name: s.name, summary: s.summary })),
+      renamed: r.renamed && `"${r.renamed.asked}" is an old slug. Use "${r.renamed.current}" from now on, and update .agentcontext.json if it has the old one.`,
       next: r.project ? 'Call get_context.' : 'Ask the user which project this is, then call register_repository or create_project.',
     });
   }));
@@ -321,9 +322,10 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       target = { organization_id: project.organization_id, project_id: project.id, scope_id: null, label: project.name };
     } else if (x.scope) {
       const { rows } = await db.query<Scope>(
-        `SELECT id, organization_id, project_id, name FROM scopes WHERE slug = $1
+        `SELECT id, organization_id, project_id, name FROM scopes s
+          WHERE (slug = $1 OR EXISTS (SELECT 1 FROM slug_aliases x WHERE x.scope_id = s.id AND x.old_slug = $1))
             AND ((project_id = $2::uuid) OR (project_id IS NULL AND organization_id = $3::uuid) OR (organization_id IS NULL))
-          ORDER BY project_id NULLS LAST, organization_id NULLS LAST LIMIT 1`,
+          ORDER BY slug = $1 DESC, project_id NULLS LAST, organization_id NULLS LAST LIMIT 1`,
         [x.scope, project?.id ?? null, orgId]);
       const s = rows[0];
       if (!s) throw new AppError('not_found', `Scope "${x.scope}" not found; call list_scopes`);

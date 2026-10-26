@@ -8,6 +8,8 @@ export interface ScopeRule {
   project_id: string | null;
   path_globs: string[];
   stacks: string[];
+  /** Old slugs, still accepted when a scope is requested explicitly. */
+  aliases?: string[];
 }
 
 export interface ScopeMatch<T extends ScopeRule = ScopeRule> {
@@ -53,6 +55,11 @@ export function matchScopes<T extends ScopeRule>(
   for (const scope of scopes) {
     if (explicit.has(scope.slug)) {
       out.push({ scope, reason: 'requested explicitly' });
+      continue;
+    }
+    const old = scope.aliases?.find((s) => explicit.has(s));
+    if (old) {
+      out.push({ scope, reason: `requested explicitly by its old slug "${old}"; use "${scope.slug}"` });
       continue;
     }
     const glob = scope.path_globs.find((g) => globMatches(g, path));

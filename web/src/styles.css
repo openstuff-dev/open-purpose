@@ -406,6 +406,21 @@ kbd {
 .callout.warn { box-shadow: inset 3px 0 0 var(--propose); background: var(--propose-soft); border-color: transparent; }
 .danger-zone { border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--line)); border-radius: var(--r-lg); padding: 1.1rem 1.25rem; }
 .danger-zone h2 { color: var(--danger); }
+.callout.danger { box-shadow: inset 3px 0 0 var(--danger); background: var(--danger-soft); border-color: transparent; }
+.slug-field { display: grid; gap: 0.4rem; min-width: 0; }
+.slug-field > p { margin: 0; font-size: var(--fs-sm); }
+.slug-current { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.slug-current code { overflow-wrap: anywhere; }
+.slug-label { font-weight: 500; font-size: var(--fs-sm); }
+.slug-rename { display: grid; gap: 0.75rem; margin-top: 0.25rem; }
+.slug-rename .callout { margin: 0; }
+.impact { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.35rem; font-size: var(--fs-sm); }
+.impact details { margin-top: 0.2rem; }
+.impact details ul { margin: 0.25rem 0 0; padding-left: 1rem; }
+.impact summary { cursor: pointer; color: var(--muted); font-size: var(--fs-xs); }
+.alias-list { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; font-size: var(--fs-sm); }
+.chip-x { border: 0; background: none; padding: 0 0.1rem; color: var(--muted); cursor: pointer; font: inherit; line-height: 1; }
+.chip-x:hover, .chip-x:focus-visible { color: var(--danger); }
 .flag {
   display: inline-flex; align-items: center; gap: 0.25rem; font-size: var(--fs-xs); font-weight: 500;
   color: var(--propose); background: var(--propose-soft); border-radius: 999px; padding: 0.1rem 0.5rem; line-height: 1.5;
@@ -1161,6 +1176,7 @@ mark { background: color-mix(in srgb, var(--propose) 22%, transparent); color: i
 .panel-head-row { display: flex; align-items: end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .tab-panel .two-col > div { background: var(--ground); }
 .tab-panel .two-col h3 { display: flex; align-items: center; gap: 0.4rem; }
+.tab-panel .slug-section { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
 .tab-panel .danger-zone { margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
 .tab-panel .danger-zone h2 { font-size: var(--fs-md); color: var(--danger); margin: 0; }
 .tab-panel .danger-zone p { margin: 0.3rem 0 0.8rem; font-size: var(--fs-sm); }

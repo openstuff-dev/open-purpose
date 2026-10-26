@@ -34,7 +34,7 @@ export interface ContextResult {
   group: { name: string };
   organization: { id: string; slug: string; name: string } | null;
   project: Project | null;
-  resolution: Pick<Resolution, 'via' | 'remote' | 'suggestions'>;
+  resolution: Pick<Resolution, 'via' | 'remote' | 'renamed' | 'suggestions'>;
   path: string;
   stacks: string[];
   blocks: ContextBlock[];
@@ -58,7 +58,8 @@ function byKind(a: Document, b: Document): number {
   return KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.position - b.position || a.title.localeCompare(b.title);
 }
 
-const SCOPE_COLS = 'id, organization_id, project_id, slug, name, description, path_globs, stacks, position';
+const SCOPE_COLS = `id, organization_id, project_id, slug, name, description, path_globs, stacks, position,
+  ARRAY(SELECT x.old_slug FROM slug_aliases x WHERE x.scope_id = scopes.id) AS aliases`;
 
 async function scopesAt(db: Queryable, organizationId: string | null, projectId: string | null): Promise<Scope[]> {
   const { rows } = await db.query<Scope>(
@@ -164,7 +165,7 @@ export async function buildContext(db: Queryable, a: Access, req: ContextRequest
     group: { name: g },
     organization: org ? { id: org.id, slug: org.slug, name: org.name } : null,
     project,
-    resolution: { via: resolution.via, remote: resolution.remote, suggestions: resolution.suggestions },
+    resolution: { via: resolution.via, remote: resolution.remote, renamed: resolution.renamed, suggestions: resolution.suggestions },
     path: normalizePath(req.path),
     stacks,
     blocks,
@@ -207,6 +208,12 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
   const scoped = ctx.blocks.filter((b) => b.scope);
   out.push(`- Scopes applied: ${scoped.length ? scoped.map((b) => `${b.label} (${b.scope!.reason})`).join('; ') : '_none_'}`);
   out.push('');
+
+  if (ctx.resolution.renamed) {
+    const { asked, current } = ctx.resolution.renamed;
+    out.push(`> **\`${asked}\` is an old slug of this project.** Use \`${current}\` from now on. If \`.agentcontext.json\` in this repository still says \`${asked}\`, update it (ask the user first if you can't edit files).`);
+    out.push('');
+  }
 
   if (!ctx.project) {
     out.push(`> **No project found for this repository.** Only ${ctx.organization ? 'group and organization' : 'group'}-wide context is included below.`);

@@ -6,6 +6,7 @@ import { normalizePath } from '../domain/scopes.js';
 import { normalizeTags } from '../domain/stacks.js';
 import { slugify } from '../domain/remote.js';
 import { extractLinks } from '../domain/links.js';
+import { claimSlug } from './aliases.js';
 import type { DocKind, Document, EditMode, Level, Scope, Section, SectionVersion } from './types.js';
 import { DOC_KINDS, EDIT_MODES } from './types.js';
 
@@ -65,6 +66,8 @@ export interface ScopeInput {
   path_globs?: string[];
   stacks?: string[];
   position?: number;
+  /** Take the slug even if it is another scope's old slug. */
+  take_alias?: boolean;
 }
 
 const SCOPE_COLS = 'id, organization_id, project_id, slug, name, description, path_globs, stacks, position';
@@ -99,13 +102,17 @@ export async function createScope(
   const lv = await resolveLevel(db, level);
   a.requireEdit(lv.organization_id);
   if (!input.name?.trim()) throw badRequest('name is required');
-  const { rows } = await wrap(db.query<Scope>(
-    `INSERT INTO scopes (organization_id, project_id, slug, name, description, path_globs, stacks, position)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ${SCOPE_COLS}`,
-    [lv.organization_id, lv.project_id, input.slug || slugify(input.name), input.name.trim(), input.description ?? '',
-      cleanGlobs(input.path_globs), normalizeTags(input.stacks ?? []), input.position ?? 0],
-  ));
-  return rows[0];
+  const slug = input.slug || slugify(input.name);
+  return wrap(tx(db, async (c) => {
+    await claimSlug(c, 'scope', lv, slug, null, input.take_alias);
+    const { rows } = await c.query<Scope>(
+      `INSERT INTO scopes (organization_id, project_id, slug, name, description, path_globs, stacks, position)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING ${SCOPE_COLS}`,
+      [lv.organization_id, lv.project_id, slug, input.name.trim(), input.description ?? '',
+        cleanGlobs(input.path_globs), normalizeTags(input.stacks ?? []), input.position ?? 0],
+    );
+    return rows[0];
+  }));
 }
 
 export async function updateScope(db: Db, a: Access, id: string, input: Partial<ScopeInput>): Promise<Scope> {

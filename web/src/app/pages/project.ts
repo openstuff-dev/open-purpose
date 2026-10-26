@@ -11,6 +11,7 @@ import { Icon } from '../shared/icon';
 import { AgentView } from '../shared/agent-view';
 import { ApiSpecs } from '../shared/api-specs';
 import { ScopeList } from '../shared/scope-list';
+import { SlugRenameField } from '../shared/slug-rename';
 
 interface Connection { node: GraphNode; refs: LinkRef[] }
 
@@ -19,7 +20,7 @@ const TABS: Tab[] = ['documents', 'scopes', 'apis', 'agents', 'connections', 're
 
 @Component({
   selector: 'app-project',
-  imports: [DocList, ScopeList, FormsModule, RouterLink, Icon, AgentView, ApiSpecs],
+  imports: [DocList, ScopeList, FormsModule, RouterLink, Icon, AgentView, ApiSpecs, SlugRenameField],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (project(); as p) {
@@ -158,7 +159,6 @@ const TABS: Tab[] = ['documents', 'scopes', 'apis', 'agents', 'connections', 're
             </div>
             <form class="inline-form settings-form" (ngSubmit)="save()">
               <label class="grow">Name <input name="name" [(ngModel)]="draft.name" required></label>
-              <label>Slug <input name="slug" class="mono" [(ngModel)]="draft.slug" required></label>
               <label class="full">Summary <input name="summary" [(ngModel)]="draft.summary"></label>
               @if (movableTo().length) {
                 <label class="full">Organization
@@ -168,12 +168,15 @@ const TABS: Tab[] = ['documents', 'scopes', 'apis', 'agents', 'connections', 're
                   </select>
                 </label>
               }
-              <p class="quiet full">Changing the slug breaks <code>.agentcontext.json</code> files and [[links]] that use the old one.</p>
               <div class="form-actions full">
                 <button class="btn primary" type="submit">Save</button>
                 <button class="btn" type="button" (click)="resetDraft()">Reset</button>
               </div>
             </form>
+            <section class="slug-section">
+              <app-slug-rename kind="project" [id]="p.id" [slug]="p.slug" [name]="p.name" [aliases]="p.aliases"
+                [prefix]="p.organization.slug + '/'" (changed)="reload()" />
+            </section>
             <section class="danger-zone">
               <h2>Archive or delete</h2>
               <p class="quiet">Archived projects stay readable but are hidden from lists and the map. Deleting removes every document, scope and learning in the project.</p>
@@ -202,7 +205,7 @@ export class ProjectPage {
   readonly project = signal<ProjectDetail | null>(null);
   readonly missing = signal(false);
   readonly graph = signal<Graph>({ nodes: [], edges: [], organizations: [] });
-  draft = { name: '', slug: '', summary: '', organization_id: '' };
+  draft = { name: '', summary: '', organization_id: '' };
   remote = '';
 
   readonly agentContext = computed(() => {
@@ -294,7 +297,7 @@ export class ProjectPage {
 
   resetDraft(): void {
     const p = this.project();
-    if (p) this.draft = { name: p.name, slug: p.slug, summary: p.summary, organization_id: p.organization_id };
+    if (p) this.draft = { name: p.name, summary: p.summary, organization_id: p.organization_id };
   }
 
   async save(): Promise<void> {

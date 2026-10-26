@@ -17,6 +17,8 @@ import { backlinks, buildGraph, focusGraph, projectNode, resolveLink, trimRefs }
 import * as projects from './service/projects.js';
 import * as proposals from './service/proposals.js';
 import * as review from './service/review.js';
+import { deleteAlias, listAliases } from './service/aliases.js';
+import { renameSlug } from './service/slugs.js';
 import { DOC_KINDS, EDIT_MODES } from './service/types.js';
 
 export const VERSION = '0.2.0';
@@ -197,16 +199,35 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       return { ok: true };
     });
 
+    // slug renames: dry_run previews what a rename touches
+    const renameBody = z.object({
+      slug: z.string().min(1), rewrite_links: z.boolean().optional(), take_alias: z.boolean().optional(), dry_run: z.boolean().optional(),
+    });
+    api.delete('/aliases/:id', async (req, reply) => {
+      await deleteAlias(req.db, req.access, (req.params as { id: string }).id);
+      return reply.status(204).send();
+    });
+
     // organizations
     api.get('/organizations', async (req) => admin.listOrganizations(req.db, req.access));
     api.post('/organizations', async (req, reply) => {
-      const body = parse(z.object({ name: z.string().min(1), slug: z.string().optional(), summary: z.string().optional() }), req.body);
+      const body = parse(z.object({ name: z.string().min(1), slug: z.string().optional(), summary: z.string().optional(), take_alias: z.boolean().optional() }), req.body);
       return reply.status(201).send(await admin.createOrganization(req.db, req.access, body));
     });
     api.patch('/organizations/:id', async (req) => {
-      const body = parse(z.object({ name: z.string().min(1).optional(), slug: z.string().optional(), summary: z.string().optional(), archived: z.boolean().optional() }), req.body);
-      return admin.updateOrganization(req.db, req.access, (req.params as { id: string }).id, body);
+      const { slug, take_alias, ...body } = parse(z.object({
+        name: z.string().min(1).optional(), slug: z.string().optional(), summary: z.string().optional(),
+        archived: z.boolean().optional(), take_alias: z.boolean().optional(),
+      }), req.body);
+      const orgId = (req.params as { id: string }).id;
+      // A slug change still leaves an alias behind; /rename also updates links.
+      if (slug && slug.toLowerCase() !== req.access.org(orgId)?.slug) {
+        await renameSlug(req.db, req.access, 'organization', orgId, { slug, take_alias, rewrite_links: false });
+      }
+      return admin.updateOrganization(req.db, req.access, orgId, body);
     });
+    api.post('/organizations/:id/rename', async (req) =>
+      renameSlug(req.db, req.access, 'organization', (req.params as { id: string }).id, parse(renameBody, req.body)));
     api.put('/organizations/:id/readers/:reader', async (req) => {
       const p = req.params as { id: string; reader: string };
       const body = parse(z.object({ allowed: z.boolean() }), req.body);
@@ -224,7 +245,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
     api.post('/projects', async (req, reply) => {
       const body = parse(z.object({
         organization_id: optId, name: z.string().min(1), slug: z.string().optional(), summary: z.string().optional(),
-        purpose: z.string().optional(), remote_url: z.string().optional(),
+        purpose: z.string().optional(), remote_url: z.string().optional(), take_alias: z.boolean().optional(),
       }), req.body);
       return reply.status(201).send(await projects.createProject(req.db, req.access, body));
     });
@@ -237,15 +258,24 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       const documents = await content.listDocuments(req.db, a, { ...level, scope_id: null });
       const org = a.org(p.organization_id)!;
       const apiSpecs = await apis.listApis(req.db, a, p.id);
-      return { ...p, organization: { id: org.id, slug: org.slug, name: org.name }, can_edit: a.canEdit(p.organization_id), repositories, scopes, documents, apis: apiSpecs };
+      const aliases = await listAliases(req.db, 'project', p.id);
+      return { ...p, organization: { id: org.id, slug: org.slug, name: org.name }, can_edit: a.canEdit(p.organization_id), repositories, scopes, documents, apis: apiSpecs, aliases };
     });
     api.patch('/projects/:id', async (req) => {
-      const body = parse(z.object({
+      const { slug, take_alias, ...body } = parse(z.object({
         name: z.string().min(1).optional(), slug: z.string().optional(), summary: z.string().optional(),
         reviewed: z.boolean().optional(), archived: z.boolean().optional(), organization_id: id.optional(),
+        take_alias: z.boolean().optional(),
       }), req.body);
-      return projects.updateProject(req.db, req.access, (req.params as { id: string }).id, body);
+      const projectId = (req.params as { id: string }).id;
+      // A slug change still leaves an alias behind; /rename also updates links.
+      if (slug && slug.toLowerCase() !== (await projects.getProject(req.db, req.access, projectId)).slug) {
+        await renameSlug(req.db, req.access, 'project', projectId, { slug, take_alias, rewrite_links: false });
+      }
+      return projects.updateProject(req.db, req.access, projectId, body);
     });
+    api.post('/projects/:id/rename', async (req) =>
+      renameSlug(req.db, req.access, 'project', (req.params as { id: string }).id, parse(renameBody, req.body)));
     api.delete('/projects/:id', async (req, reply) => {
       await projects.deleteProject(req.db, req.access, (req.params as { id: string }).id);
       return reply.status(204).send();
@@ -307,6 +337,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
     const scopeBody = z.object({
       name: z.string().min(1), slug: z.string().optional(), description: z.string().optional(),
       path_globs: z.array(z.string()).optional(), stacks: z.array(z.string()).optional(), position: z.number().int().optional(),
+      take_alias: z.boolean().optional(),
     });
     api.get('/scopes', async (req) => {
       const q = req.query as { organization_id?: string; project_id?: string };
@@ -322,9 +353,20 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       const documents = await content.listDocuments(req.db, a, { scope_id: scope.id });
       const project = scope.project_id ? await projects.getProject(req.db, a, scope.project_id) : null;
       const org = a.org(scope.organization_id);
-      return { ...scope, documents, project, organization: org && { id: org.id, slug: org.slug, name: org.name }, can_edit: a.canEdit(scope.organization_id) };
+      const aliases = await listAliases(req.db, 'scope', scope.id);
+      return { ...scope, documents, project, organization: org && { id: org.id, slug: org.slug, name: org.name }, can_edit: a.canEdit(scope.organization_id), aliases };
     });
-    api.patch('/scopes/:id', async (req) => content.updateScope(req.db, req.access, (req.params as { id: string }).id, parse(scopeBody.partial(), req.body)));
+    api.patch('/scopes/:id', async (req) => {
+      const { slug, take_alias, ...body } = parse(scopeBody.partial(), req.body);
+      const scopeId = (req.params as { id: string }).id;
+      // A slug change still leaves an alias behind.
+      if (slug && slug.toLowerCase() !== (await content.getScope(req.db, req.access, scopeId)).slug) {
+        await renameSlug(req.db, req.access, 'scope', scopeId, { slug, take_alias, rewrite_links: false });
+      }
+      return content.updateScope(req.db, req.access, scopeId, body);
+    });
+    api.post('/scopes/:id/rename', async (req) =>
+      renameSlug(req.db, req.access, 'scope', (req.params as { id: string }).id, parse(renameBody, req.body)));
     api.delete('/scopes/:id', async (req, reply) => {
       await content.deleteScope(req.db, req.access, (req.params as { id: string }).id);
       return reply.status(204).send();

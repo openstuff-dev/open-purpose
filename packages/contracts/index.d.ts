@@ -169,3 +169,39 @@ export type LinkResolution =
   | { type: 'project'; id: string; slug: string; name: string; organization_slug: string | null; restricted: boolean }
   | { type: 'term'; section_id: string; document_id: string; heading: string; restricted: boolean }
   | { type: 'missing'; target: string };
+
+// ───────────────────────────── slug renames ─────────────────────────────
+
+export type SlugKind = 'organization' | 'project' | 'scope';
+
+/** An old slug that still resolves to its organization, project or scope. */
+export interface SlugAlias {
+  id: string;
+  old_slug: string;
+  created_at: string;
+}
+
+/** A section with [[links]] that use the old slug. */
+export interface SlugRenameRef extends LinkRef {
+  document_id: string;
+  /** How many links in the section use the old slug. */
+  links: number;
+}
+
+/** What renaming a slug touches; with `applied` false it is a preview. */
+export interface SlugRename {
+  kind: SlugKind;
+  from: string;
+  to: string;
+  applied: boolean;
+  /** Something else here used to be called `to`. Renaming takes the name over from it. */
+  alias_of: { id: string; name: string; slug: string } | null;
+  /** Sections whose links get the new slug (or got it, once applied). */
+  rewrite: SlugRenameRef[];
+  /** Sections that use the old slug but the viewer can't edit. They keep working through the alias. */
+  cannot_edit: SlugRenameRef[];
+  /** Repositories mapped to the project(s), whose .agentcontext.json may name the old slug. */
+  repositories: number;
+  /** Open proposals that mention the old slug. They are not rewritten. */
+  open_proposals: number;
+}

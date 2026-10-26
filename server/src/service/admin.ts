@@ -12,8 +12,10 @@ import type { Db, Pool, Queryable } from '../db.js';
 import { tx, withScope } from '../db.js';
 import { AppError, badRequest, forbidden, mapPgError, notFound } from '../errors.js';
 import { slugify } from '../domain/remote.js';
+import { claimSlug } from './aliases.js';
 import { insertDocument, insertSection } from './content.js';
 import type { Group, Organization } from './types.js';
+import type { SlugAlias } from '@openpurpose/contracts';
 
 // ───────────────────────────── tokens ─────────────────────────────
 
@@ -131,12 +133,16 @@ export interface OrgListItem extends Organization {
   projects: number | null;
   /** Organizations whose members may read this one. */
   readers: string[];
+  /** Old slugs it still answers to. */
+  aliases: SlugAlias[];
 }
 
 export async function listOrganizations(db: Queryable, a: Access): Promise<OrgListItem[]> {
-  const { rows } = await db.query<Organization & { projects: number }>(
+  const { rows } = await db.query<Organization & { projects: number; aliases: SlugAlias[] }>(
     `SELECT o.id, o.slug, o.name, o.summary, o.created_at, o.archived_at,
-            (SELECT count(*)::int FROM projects p WHERE p.organization_id = o.id AND p.archived_at IS NULL) AS projects
+            (SELECT count(*)::int FROM projects p WHERE p.organization_id = o.id AND p.archived_at IS NULL) AS projects,
+            COALESCE((SELECT json_agg(json_build_object('id', x.id, 'old_slug', x.old_slug, 'created_at', x.created_at) ORDER BY x.created_at DESC)
+                        FROM slug_aliases x WHERE x.organization_id = o.id), '[]') AS aliases
        FROM organizations o ORDER BY o.archived_at NULLS FIRST, o.name`);
   const readers = new Map<string, string[]>();
   for (const [reader, targets] of a.grants) {
@@ -164,11 +170,17 @@ async function insertOrganization(c: Queryable, input: { name: string; slug?: st
   return rows[0];
 }
 
-export async function createOrganization(db: Db, a: Access, input: { name: string; slug?: string; summary?: string }): Promise<Organization> {
+export async function createOrganization(
+  db: Db, a: Access, input: { name: string; slug?: string; summary?: string; take_alias?: boolean },
+): Promise<Organization> {
   a.requireAdmin(null);
   if (!input.name?.trim()) throw badRequest('name is required');
+  const slug = input.slug || slugify(input.name);
   try {
-    return await tx(db, (c) => insertOrganization(c, input, a.actor.id));
+    return await tx(db, async (c) => {
+      await claimSlug(c, 'organization', {}, slug, null, input.take_alias);
+      return insertOrganization(c, { ...input, slug }, a.actor.id);
+    });
   } catch (err) {
     throw mapPgError(err);
   }

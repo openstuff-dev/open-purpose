@@ -55,3 +55,29 @@ export function extractLinks(markdown: string): WikiLink[] {
   }
   return [...seen.values()];
 }
+
+/**
+ * Rewrite the targets of [[wikilinks]] outside code. `fn` gets each parsed link
+ * and its target as written, and returns the new target, or null to leave it
+ * alone. The `project:`/`term:` prefix, `#anchor` and `|label` are kept as written.
+ */
+export function rewriteLinks(markdown: string, fn: (link: WikiLink, written: string) => string | null): string {
+  const masked = stripCode(markdown);
+  let out = '';
+  let last = 0;
+  for (const m of masked.matchAll(LINK_RE)) {
+    const link = parseLink(m[1], m[2]);
+    if (!link) continue;
+    const inner = m[1];
+    const hash = inner.indexOf('#');
+    const head = hash >= 0 ? inner.slice(0, hash) : inner;
+    const prefix = /^\s*(?:project|term)\s*:\s*/i.exec(head)?.[0] ?? '';
+    const next = fn(link, head.slice(prefix.length).trim());
+    if (!next) continue;
+    const rebuilt = prefix + next + (hash >= 0 ? inner.slice(hash) : '');
+    const start = m.index!;
+    out += markdown.slice(last, start) + `[[${rebuilt}${m[2] !== undefined ? '|' + m[2] : ''}]]`;
+    last = start + m[0].length;
+  }
+  return out + markdown.slice(last);
+}
