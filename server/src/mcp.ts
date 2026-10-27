@@ -12,7 +12,8 @@ import { findApi, loadApi, refreshStale, renderApiText } from './service/apis.js
 import { recordRequest, type Track } from './service/activity.js';
 import { buildContext, resolveTarget } from './service/context.js';
 import { relatedTo } from './service/graph.js';
-import { addRepository, createProject, getProject, listProjects, resolveProject } from './service/projects.js';
+import { tryParseRemote } from './domain/remote.js';
+import { addRepository, createProject, getProject, listProjects, listRepositories, resolveProject } from './service/projects.js';
 import { addSection, editSection, getProposalDetail, listProposals, proposeLearning } from './service/proposals.js';
 import { addComment, applySuggestion, getReview, renderReviewForAgent, reviseProposal, setResolved, waitingOn } from './service/review.js';
 import type { Level, Scope } from './service/types.js';
@@ -459,7 +460,14 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
   }, (x) => run('register_repository', async (db, track) => {
     const repo = await addRepository(db, a, x.project, x.remote_url);
     track.projectId = repo.project_id;
-    return text(`Mapped ${repo.remote_key} to project "${x.project}". Also write .openpurpose.json with {"project": "${x.project}"} in the repo root.`);
+    // Same repository name under another remote: most likely the repository moved.
+    const name = tryParseRemote(repo.remote_url)?.repo.toLowerCase();
+    const moved = (await listRepositories(db, repo.project_id))
+      .filter((r) => r.id !== repo.id && tryParseRemote(r.remote_url)?.repo.toLowerCase() === name);
+    const note = moved.length
+      ? `\n\nThis project is also mapped to ${moved.map((r) => `\`${r.remote_key}\``).join(', ')}. If the repository moved, tell the user they can remove the old mapping on the project's page in OpenPurpose.`
+      : '';
+    return text(`Mapped ${repo.remote_key} to project "${x.project}". Also write .openpurpose.json with {"project": "${x.project}"} in the repo root.${note}`);
   }));
 
   server.registerTool('create_project', {

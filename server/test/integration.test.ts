@@ -671,6 +671,18 @@ definitions:`);
       c.query(`UPDATE projects SET name = 'hijacked' WHERE id = $1 RETURNING id`, [projectId]).then((r) => r.rowCount))).resolves.toBe(0);
   });
 
+  it('points out the old mapping when a repository is registered under a new remote', async () => {
+    const { client, call } = await mcp(t.jonas);
+    const moved = await call('register_repository', { project: 'customer-portal', remote_url: 'https://github.com/acme-moved/customer-portal.git' });
+    expect(moved.isError).toBe(false);
+    expect(moved.text).toContain('also mapped to `azure:acme/platform/customer-portal`');
+    const other = await call('register_repository', { project: 'customer-portal', remote_url: 'https://github.com/acme/portal-docs.git' });
+    expect(other.text).not.toContain('also mapped');
+    await client.close();
+    const repos = (await api('GET', `/projects/${projectId}`)).data.repositories;
+    for (const r of repos.filter((r: any) => r.remote_key.startsWith('github.com/'))) await api('DELETE', `/repositories/${r.id}`);
+  });
+
   it('counts agent reads and writes per organization and section', async () => {
     const activity = async (period = '7d') => (await api('GET', `/organizations/${o.logistics}/activity?period=${period}`)).data;
     const before = await activity();
