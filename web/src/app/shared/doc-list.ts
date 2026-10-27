@@ -36,7 +36,7 @@ const KIND_HINT: Record<DocKind, string> = {
     @if (docs().length) {
       <ul class="doc-list">
         @for (d of docs(); track d.id) {
-          <li>
+          <li [class.disabled]="d.disabled_at">
             <a [routerLink]="['/documents', d.id]">
               <span class="doc-glyph" [attr.data-kind]="d.kind"
                 ><app-icon [name]="glyph[d.kind]"
@@ -45,6 +45,13 @@ const KIND_HINT: Record<DocKind, string> = {
                 <span class="doc-title">{{ d.title }}</span>
                 <span class="doc-kind">{{ kindLabel[d.kind] }}</span>
               </span>
+              @if (d.disabled_at) {
+                <span class="flag muted" title="Agents don't get this document">Disabled</span>
+              } @else if (d.staleness) {
+                <span class="flag stale" title="Agents haven't requested it. Consider disabling it."
+                  >Not requested in a {{ d.staleness }}</span
+                >
+              }
               <span class="doc-count">Updated {{ d.updated_at | date: 'd MMM' }}</span>
               <app-mode-badge [mode]="d.mode" />
             </a>

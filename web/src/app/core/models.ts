@@ -1,6 +1,8 @@
 /** Shapes identical on server and web live in @openpurpose/contracts; the rest are API response shapes. */
 import type {
   Actor,
+  DocumentActivity,
+  SectionActivity,
   DocKind,
   EditMode,
   GraphNode,
@@ -46,6 +48,12 @@ export type {
   ImportOptions,
   ImportOrgChoice,
   ImportReport,
+  ActivityFigure,
+  ActivityPeriod,
+  DocumentActivity,
+  OrgActivity,
+  SectionActivity,
+  Staleness,
 } from '@openpurpose/contracts';
 
 export const EDIT_MODES: EditMode[] = ['locked', 'propose', 'open'];
@@ -159,7 +167,12 @@ export interface Doc {
   title: string;
   mode: EditMode;
   position: number;
+  created_at: string;
   updated_at: string;
+  /** Disabled documents stay here, but agents don't get them. */
+  disabled_at: string | null;
+  /** Set on document lists; missing on a document just created. */
+  staleness?: DocumentActivity['staleness'];
 }
 
 export interface Section {
@@ -175,8 +188,8 @@ export interface Section {
   updated_by_name: string | null;
 }
 
-export interface DocDetail extends Doc {
-  sections: Section[];
+export interface DocDetail extends Omit<Doc, 'staleness'>, DocumentActivity {
+  sections: Array<Section & { activity: SectionActivity }>;
   project: Project | null;
   scope: Scope | null;
   organization: OrgRef | null;

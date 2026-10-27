@@ -482,9 +482,9 @@ async function apply(run: Run): Promise<void> {
           AND scope_id IS NOT DISTINCT FROM $3 AND slug = $4`, [orgId, projectId, scopeId, d.slug]);
     if (!found[0]) {
       const { rows } = await c.query<{ id: string }>(
-        `INSERT INTO documents (organization_id, project_id, scope_id, kind, slug, title, mode, position, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-        [orgId, projectId, scopeId, d.kind, d.slug, d.title, d.mode, d.position, d.created_at, d.updated_at]);
+        `INSERT INTO documents (organization_id, project_id, scope_id, kind, slug, title, mode, position, created_at, updated_at, disabled_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+        [orgId, projectId, scopeId, d.kind, d.slug, d.title, d.mode, d.position, d.created_at, d.updated_at, d.disabled_at ?? null]);
       ids.docs.set(d.key, rows[0].id);
       kept.docs.add(rows[0].id);
       counts.documents++;

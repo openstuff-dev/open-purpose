@@ -177,7 +177,7 @@ export async function buildContext(db: Queryable, a: Access, req: ContextRequest
   const includeLearnings = req.include_learnings ?? true;
   const keepDoc = (d: Document) => includeLearnings || d.kind !== 'learnings';
   const docsPerLevel: Document[][] = [];
-  for (const l of levels) docsPerLevel.push(await documentsAt(db, l.level));
+  for (const l of levels) docsPerLevel.push(await documentsAt(db, l.level, { forAgents: true }));
   const sections = await listSections(db, docsPerLevel.flat().filter(keepDoc).map((d) => d.id));
   const sectionsByDoc = new Map<string, Section[]>();
   for (const s of sections) sectionsByDoc.set(s.document_id, [...(sectionsByDoc.get(s.document_id) ?? []), s]);

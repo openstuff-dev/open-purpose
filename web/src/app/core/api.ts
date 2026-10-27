@@ -2,6 +2,8 @@ import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, type Observable } from 'rxjs';
 import type {
+  ActivityPeriod,
+  OrgActivity,
   ContextResult,
   Doc,
   DocDetail,
@@ -118,6 +120,8 @@ export class Api {
     this.send<ImportReport>('POST', '/groups/import', { ...upload, ...opts });
 
   organizations = () => this.get<Organization[]>('/organizations');
+  orgActivity = (id: string, period: ActivityPeriod) =>
+    this.get<OrgActivity>(`/organizations/${id}/activity`, { period });
   createOrganization = (body: {
     name: string;
     slug?: string;
@@ -218,8 +222,10 @@ export class Api {
   document = (id: string) => this.get<DocDetail>(`/documents/${id}`);
   createDocument = (body: Level & { kind: DocKind; title: string; mode?: EditMode }) =>
     this.send<Doc>('POST', '/documents', body);
-  updateDocument = (id: string, body: Partial<Pick<Doc, 'title' | 'mode' | 'kind' | 'position'>>) =>
-    this.send<Doc>('PATCH', `/documents/${id}`, body);
+  updateDocument = (
+    id: string,
+    body: Partial<Pick<Doc, 'title' | 'mode' | 'kind' | 'position'>> & { disabled?: boolean },
+  ) => this.send<Doc>('PATCH', `/documents/${id}`, body);
   deleteDocument = (id: string) => this.send<void>('DELETE', `/documents/${id}`);
   addSection = (docId: string, body: { heading: string; body?: string; mode?: EditMode }) =>
     this.send<EditResult>('POST', `/documents/${docId}/sections`, body);

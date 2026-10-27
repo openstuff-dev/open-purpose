@@ -9,6 +9,7 @@ import { withScope } from './db.js';
 import { AppError } from './errors.js';
 import { getSection, listSections, documentsAt, searchSections } from './service/content.js';
 import { findApi, loadApi, refreshStale, renderApiText } from './service/apis.js';
+import { recordRequest, type Track } from './service/activity.js';
 import { buildContext, resolveTarget } from './service/context.js';
 import { relatedTo } from './service/graph.js';
 import { addRepository, createProject, getProject, listProjects, resolveProject } from './service/projects.js';
@@ -63,6 +64,12 @@ type ToolResult = { content: Array<{ type: 'text'; text: string }>; isError?: bo
 const text = (t: string): ToolResult => ({ content: [{ type: 'text', text: t }] });
 const json = (v: unknown): ToolResult => text(JSON.stringify(v, null, 2));
 
+/** Tools that change something; the activity overview counts them as writes, every other tool as a read. */
+const WRITE_TOOLS = [
+  'update_section', 'add_section', 'propose_learning', 'reply_to_review', 'revise_proposal', 'apply_suggestion',
+  'register_repository', 'create_project',
+];
+
 /** Tools that only read. Agent mode in the UI may call these, and nothing else. */
 export const READ_TOOLS = [
   'get_context', 'resolve_project', 'list_organizations', 'list_projects', 'list_scopes',
@@ -97,10 +104,21 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
     { instructions: SERVER_INSTRUCTIONS, capabilities: { tools: {} } },
   );
 
-  /** Each tool call runs in its own transaction, scoped to the caller's group. */
-  const run = async (fn: (db: Queryable) => Promise<ToolResult>): Promise<ToolResult> => {
+  /**
+   * Each tool call runs in its own transaction, scoped to the caller's group.
+   * A successful call by a real agent is recorded for the activity overview;
+   * `track` says what it touched. Agent mode in the UI isn't recorded.
+   */
+  const run = async (tool: string, fn: (db: Queryable, track: Track) => Promise<ToolResult>): Promise<ToolResult> => {
     try {
-      return await withScope(pool, { groupId: a.group.id }, fn);
+      return await withScope(pool, { groupId: a.group.id }, async (db) => {
+        const track: Track = {};
+        const result = await fn(db, track);
+        if (!opts.simulated && a.isAgent && !result.isError) {
+          await recordRequest(db, a, tool, WRITE_TOOLS.includes(tool) ? 'write' : 'read', track);
+        }
+        return result;
+      });
     } catch (err) {
       const message = err instanceof AppError ? `${err.code}: ${err.message}` : `error: ${(err as Error).message ?? String(err)}`;
       return { content: [{ type: 'text', text: message }], isError: true };
@@ -117,8 +135,10 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       scopes: z.array(z.string()).optional().describe('Scope slugs to include even if path/stack do not match'),
       include_learnings: z.boolean().optional().describe('Default true'),
     },
-  }, (args) => run(async (db) => {
+  }, (args) => run('get_context', async (db, track) => {
     const built = await buildContext(db, a, args);
+    track.projectId = built.project?.id;
+    track.sections = built.blocks.flatMap((b) => b.documents.flatMap((d) => d.sections.map((s) => ({ id: s.id, document_id: d.id }))));
     if (apiConfig) refreshStale(pool, a.group.id, built.apis, apiConfig);
     const ctx = built.markdown;
     const waiting = opts.simulated ? [] : await waitingOn(db, a);
@@ -131,8 +151,9 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
     title: 'Resolve project',
     description: 'Find which OpenPurpose project a repository belongs to. Returns the project, or suggestions when unknown.',
     inputSchema: { project: locate.project, remote_url: locate.remote_url },
-  }, (args) => run(async (db) => {
+  }, (args) => run('resolve_project', async (db, track) => {
     const r = await resolveProject(db, a, args);
+    track.projectId = r.project?.id;
     return json({
       found: !!r.project,
       project: r.project && { slug: r.project.slug, ref: ref(r.project.organization_id, r.project.slug), name: r.project.name, summary: r.project.summary },
@@ -148,7 +169,7 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
     title: 'List organizations',
     description: 'Organizations in your group and whether you can read them.',
     inputSchema: {},
-  }, () => run(async () => json({
+  }, () => run('list_organizations', async () => json({
     group: a.group.name,
     yours: a.org(a.orgId)?.slug ?? null,
     organizations: a.orgs.filter((o) => !o.archived_at).map((o) => ({ slug: o.slug, name: o.name, readable: a.canRead(o.id) })),
@@ -161,7 +182,7 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       q: z.string().optional().describe('Search text'),
       organization: z.string().optional().describe('Organization slug; default: every organization you can read'),
     },
-  }, ({ q, organization }) => run(async (db) => {
+  }, ({ q, organization }) => run('list_projects', async (db) => {
     const org = organization ? a.orgBySlug(organization) : null;
     if (organization && !org) throw new AppError('not_found', `Organization "${organization}" not found`);
     const rows = await listProjects(db, a, { q, organizationId: org?.id ?? null });
@@ -172,8 +193,9 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
     title: 'List scopes',
     description: 'List the scopes (parts of a project: some of its repositories and/or folders; or stacks across the organization or group) that guidelines and learnings can be filed under.',
     inputSchema: { project: z.string().optional().describe('Project slug. Omit for group and organization scopes only.') },
-  }, ({ project }) => run(async (db) => {
+  }, ({ project }) => run('list_scopes', async (db, track) => {
     const p = project ? await getProject(db, a, project) : null;
+    track.projectId = p?.id;
     const orgId = p?.organization_id ?? a.orgId;
     const at = async (org: string | null, proj: string | null) => (await db.query<Scope & { repositories: string[] }>(
       `SELECT slug, name, path_globs, stacks, description,
@@ -199,8 +221,9 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       project: z.string().describe('Project slug or org/slug'),
       include_purpose: z.boolean().optional().describe('Include each related project\'s purpose text (default true)'),
     },
-  }, ({ project, include_purpose }) => run(async (db) => {
+  }, ({ project, include_purpose }) => run('get_related', async (db, track) => {
     const p = await getProject(db, a, project);
+    track.projectId = p.id;
     const related = await relatedTo(db, a, p.id);
     if (related.length === 0) return text(`Nothing links to or from ${p.name} yet.`);
     const out: string[] = [`# Related to ${p.name}`];
@@ -213,7 +236,7 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       if (r.node.restricted) {
         out.push('', `_It belongs to ${a.org(r.node.organization_id)?.name ?? 'another organization'}, which you can't read._`);
       } else if (r.node.type === 'project' && include_purpose !== false && r.node.project_id && r.node.organization_id) {
-        const docs = (await documentsAt(db, { organization_id: r.node.organization_id, project_id: r.node.project_id, scope_id: null }))
+        const docs = (await documentsAt(db, { organization_id: r.node.organization_id, project_id: r.node.project_id, scope_id: null }, { forAgents: true }))
           .filter((d) => d.kind === 'purpose');
         for (const s of await listSections(db, docs.map((d) => d.id))) out.push('', `### ${s.heading}`, s.body.trim());
       } else if (r.node.summary) {
@@ -237,7 +260,7 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       search: z.string().optional().describe('Only list endpoints whose path, summary, tag or operationId contain these words'),
       tag: z.string().optional().describe('Only list endpoints with this tag'),
     },
-  }, (args) => run(async (db) => {
+  }, (args) => run('get_api', async (db, track) => {
     let projectId: string;
     if (args.project) projectId = (await getProject(db, a, args.project)).id;
     else if (args.remote_url) {
@@ -245,6 +268,7 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       if (!r.project) throw new AppError('not_found', 'No project is registered for that remote. Pass project instead.');
       projectId = r.project.id;
     } else throw new AppError('bad_request', 'Pass project (slug or org/slug) or remote_url');
+    track.projectId = projectId;
     const meta = await findApi(db, a, projectId, args.api);
     const { api } = await loadApi(db, a, meta.id);
     const p = await getProject(db, a, projectId);
@@ -259,8 +283,9 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       query: z.string().describe('Words to search for'),
       project: z.string().optional().describe('Limit to this project plus its organization and group-wide content'),
     },
-  }, ({ query, project }) => run(async (db) => {
+  }, ({ query, project }) => run('search', async (db, track) => {
     const projectId = project ? (await getProject(db, a, project)).id : null;
+    track.projectId = projectId;
     const hits = await searchSections(db, a, query, { projectId, limit: 15 });
     return json(hits.map((h) => ({
       section_id: h.section_id.slice(0, 8), heading: h.heading, mode: h.mode, document: h.document_title,
@@ -272,8 +297,9 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
     title: 'Read section',
     description: 'Read one section in full, with its version (needed for update_section) and edit mode.',
     inputSchema: { section_id: z.string().describe('Section id or its 8-character prefix, as shown in [s:xxxxxxxx]') },
-  }, ({ section_id }) => run(async (db) => {
+  }, ({ section_id }) => run('read_section', async (db, track) => {
     const s = await getSection(db, a, section_id);
+    track.sections = [{ id: s.id, document_id: s.document_id }];
     return json({ id: s.id, heading: s.heading, mode: s.mode, version: s.version, document_id: s.document_id, body: s.body });
   }));
 
@@ -287,10 +313,12 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       expected_version: z.number().int().optional().describe('Version you read; protects against overwriting someone else\'s change'),
       reason: z.string().describe('Why this change is needed, shown to the reviewer'),
     },
-  }, (x) => run(async (db) => {
+  }, (x) => run('update_section', async (db, track) => {
     const r = await editSection(db, a, x.section_id, {
       body: x.body, heading: x.heading, expected_version: x.expected_version, note: x.reason, rationale: x.reason,
     });
+    track.documentId = r.status === 'applied' ? r.section.document_id : r.proposal.document_id;
+    track.projectId = r.status === 'applied' ? null : r.proposal.project_id;
     return r.status === 'applied'
       ? text(`Applied. Section is now at version ${r.section.version}.`)
       : text(`Proposed for review (proposal ${r.proposal.id.slice(0, 8)}). A person will approve or reject it in OpenPurpose.`);
@@ -300,8 +328,9 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
     title: 'Add section',
     description: 'Add a section to a document. Depends on the document\'s mode, like update_section. For lessons learned from a user\'s correction, use propose_learning instead.',
     inputSchema: { document_id: z.string(), heading: z.string(), body: z.string(), reason: z.string() },
-  }, (x) => run(async (db) => {
+  }, (x) => run('add_section', async (db, track) => {
     const r = await addSection(db, a, x.document_id, { heading: x.heading, body: x.body, note: x.reason, rationale: x.reason });
+    track.documentId = r.status === 'applied' ? r.section.document_id : r.proposal.document_id;
     return r.status === 'applied'
       ? text(`Added section ${r.section.id.slice(0, 8)}.`)
       : text(`Proposed for review (proposal ${r.proposal.id.slice(0, 8)}).`);
@@ -318,9 +347,10 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       scope: z.string().optional().describe('File under this scope slug instead of the automatic choice'),
       level: z.enum(['auto', 'project', 'organization', 'group']).optional().describe('auto (default): most specific scope. project: whole project. organization: your whole organization. group: every organization (a reviewer must agree).'),
     },
-  }, (x) => run(async (db) => {
+  }, (x) => run('propose_learning', async (db, track) => {
     const r = await resolveProject(db, a, { project: x.project, remote_url: x.remote_url });
     const project = r.project;
+    track.projectId = project?.id;
     const orgId = project?.organization_id ?? a.orgId;
     let target: Level & { label: string };
     if (x.level === 'group') {
@@ -357,7 +387,7 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
     title: 'List my proposals',
     description: 'Your proposals and learnings that are still open, with whether the next move is yours (feedback waiting) or the reviewers\'.',
     inputSchema: {},
-  }, () => run(async (db) => {
+  }, () => run('list_my_proposals', async (db) => {
     const rows = await listProposals(db, a, { status: 'open', createdBy: a.actor.id, limit: 50 });
     if (!rows.length) return text('You have no open proposals.');
     return json(rows.map((p) => ({
@@ -371,7 +401,7 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
     title: 'Get review',
     description: 'Read the review of a proposal: current text with line numbers, open comment threads, suggested replacements and the reviewers\' verdict.',
     inputSchema: { proposal_id: z.string().describe('Proposal id') },
-  }, ({ proposal_id }) => run(async (db) => {
+  }, ({ proposal_id }) => run('get_review', async (db) => {
     const p = await getProposalDetail(db, a, proposal_id);
     return text(renderReviewForAgent(p, await getReview(db, a, p.id)));
   }));
@@ -387,7 +417,7 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       line_end: z.number().int().optional(),
       resolve: z.boolean().optional().describe('Also mark the thread resolved'),
     },
-  }, (x) => run(async (db) => {
+  }, (x) => run('reply_to_review', async (db) => {
     const t = await addComment(db, a, x.proposal_id, { body: x.body, thread_id: x.thread_id, line_start: x.line_start, line_end: x.line_end });
     if (x.resolve) await setResolved(db, a, t.id, true);
     return text(`Replied in thread ${t.id}${x.resolve ? ' and resolved it' : ''}.`);
@@ -403,8 +433,9 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       note: z.string().describe('What you changed and why, shown in the review timeline'),
       resolve: z.array(z.string()).optional().describe('Ids of threads this revision addresses'),
     },
-  }, (x) => run(async (db) => {
+  }, (x) => run('revise_proposal', async (db, track) => {
     const p = await reviseProposal(db, a, x.proposal_id, { body: x.body, heading: x.heading, note: x.note, resolve: x.resolve });
+    Object.assign(track, { projectId: p.project_id, documentId: p.document_id });
     return text(`Saved revision ${p.revision}. Status: ${p.status.replace('_', ' ')}.`);
   }));
 
@@ -412,8 +443,9 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
     title: 'Apply suggestion',
     description: 'Accept a reviewer\'s suggested replacement for some lines. Creates a new revision and resolves the thread.',
     inputSchema: { comment_id: z.string().describe('The comment id given in get_review') },
-  }, ({ comment_id }) => run(async (db) => {
+  }, ({ comment_id }) => run('apply_suggestion', async (db, track) => {
     const p = await applySuggestion(db, a, comment_id);
+    Object.assign(track, { projectId: p.project_id, documentId: p.document_id });
     return text(`Applied. The proposal is now at revision ${p.revision}.`);
   }));
 
@@ -424,8 +456,9 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       remote_url: z.string().describe('Output of `git remote get-url origin`'),
       project: z.string().describe('Project slug'),
     },
-  }, (x) => run(async (db) => {
+  }, (x) => run('register_repository', async (db, track) => {
     const repo = await addRepository(db, a, x.project, x.remote_url);
+    track.projectId = repo.project_id;
     return text(`Mapped ${repo.remote_key} to project "${x.project}". Also write .openpurpose.json with {"project": "${x.project}"} in the repo root.`);
   }));
 
@@ -438,8 +471,9 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       purpose: z.string().describe('What the project does, in the user\'s words'),
       remote_url: z.string().optional().describe('Repository to map to the project'),
     },
-  }, (x) => run(async (db) => {
+  }, (x) => run('create_project', async (db, track) => {
     const p = await createProject(db, a, { name: x.name, slug: x.slug, purpose: x.purpose, summary: x.purpose.split('\n')[0].slice(0, 200), remote_url: x.remote_url });
+    track.projectId = p.id;
     return text(`Created project "${p.slug}" in ${a.org(p.organization_id)?.name} (pending review).${x.remote_url ? ' Repository mapped.' : ''}`);
   }));
 

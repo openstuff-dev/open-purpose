@@ -61,6 +61,7 @@ const fileSchema = z.object({
   documents: z.array(z.object({
     key, organization: ref, project: ref, scope: ref, kind: z.enum(DOC_KINDS as [ExportDocument['kind'], ...ExportDocument['kind'][]]),
     slug, title: z.string().min(1), mode, position: z.number().int(), created_at: time, updated_at: time,
+    disabled_at: time.nullable().optional(),
     sections: z.array(z.object({
       key, heading: z.string().min(1), body: z.string(), mode, position: z.number().int(), version: z.number().int().min(1),
       created_at: time, updated_at: time, updated_by: ref,

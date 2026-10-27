@@ -9,6 +9,7 @@ import type { Config } from './config.js';
 import { beginScope, endScope, type Pool } from './db.js';
 import { AppError, badRequest } from './errors.js';
 import { callReadTool, createMcpServer } from './mcp.js';
+import * as activity from './service/activity.js';
 import * as admin from './service/admin.js';
 import * as apis from './service/apis.js';
 import * as content from './service/content.js';
@@ -261,6 +262,10 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       }
       return admin.updateOrganization(req.db, req.access, orgId, body);
     });
+    api.get('/organizations/:id/activity', async (req) => {
+      const { period } = parse(z.object({ period: z.enum(['7d', '30d', 'all']).default('30d') }), req.query);
+      return activity.organizationActivity(req.db, req.access, (req.params as { id: string }).id, period);
+    });
     api.post('/organizations/:id/rename', async (req) =>
       renameSlug(req.db, req.access, 'organization', (req.params as { id: string }).id, parse(renameBody, req.body)));
     api.put('/organizations/:id/readers/:reader', async (req) => {
@@ -425,21 +430,28 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
     api.get('/documents/:id', async (req) => {
       const a = req.access;
       const doc = await content.getDocument(req.db, a, (req.params as { id: string }).id);
-      const sections = await content.listSections(req.db, [doc.id]);
+      const rows = await content.listSections(req.db, [doc.id]);
+      const reads = await activity.sectionActivity(req.db, rows.map((s) => s.id));
+      const sections = rows.map((s) => ({ ...s, activity: reads.get(s.id)! }));
+      const docActivity = (await activity.documentActivity(req.db, [doc])).get(doc.id)!;
       const project = doc.project_id ? await projects.getProject(req.db, a, doc.project_id) : null;
       const scope = doc.scope_id ? await content.getScope(req.db, a, doc.scope_id) : null;
       const org = a.org(doc.organization_id);
       return {
-        ...doc, sections, project, scope, organization: org && { id: org.id, slug: org.slug, name: org.name },
+        ...doc, ...docActivity, sections, project, scope, organization: org && { id: org.id, slug: org.slug, name: org.name },
         can_edit: a.canEdit(doc.organization_id),
       };
     });
     api.patch('/documents/:id', async (req) => {
       const body = parse(z.object({
         title: z.string().min(1).optional(), slug: z.string().optional(), mode: mode.optional(),
-        position: z.number().int().optional(), kind: kind.optional(),
+        position: z.number().int().optional(), kind: kind.optional(), disabled: z.boolean().optional(),
       }), req.body);
-      return content.updateDocument(req.db, req.access, (req.params as { id: string }).id, body);
+      const { disabled, ...rest } = body;
+      const docId = (req.params as { id: string }).id;
+      if (disabled !== undefined) await content.setDocumentDisabled(req.db, req.access, docId, disabled);
+      if (disabled !== undefined && !Object.keys(rest).length) return content.getDocument(req.db, req.access, docId);
+      return content.updateDocument(req.db, req.access, docId, rest);
     });
     api.delete('/documents/:id', async (req, reply) => {
       await content.deleteDocument(req.db, req.access, (req.params as { id: string }).id);

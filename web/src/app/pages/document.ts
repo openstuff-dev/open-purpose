@@ -28,6 +28,8 @@ import { MarkdownEditor } from '../shared/md-editor';
 import { ModeBadge, ModePicker } from '../shared/mode';
 import { Notices } from '../shared/notice';
 import { Icon } from '../shared/icon';
+import { ActivityFigure, StatStyleSwitch } from '../shared/activity-figure';
+import { dateTime, lastDays, since } from '../core/time';
 
 interface Draft {
   heading: string;
@@ -46,6 +48,8 @@ interface Draft {
     ModeBadge,
     ModePicker,
     Icon,
+    ActivityFigure,
+    StatStyleSwitch,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -119,8 +123,38 @@ interface Draft {
           }
           <span class="quiet">{{ modeHelp[d.mode] }}</span>
         </div>
+        @if (d.disabled_at) {
+          <div class="doc-notice disabled" role="status">
+            <app-icon name="eye-off" />
+            <p>
+              <strong>Disabled:</strong> agents don't get this document, so it costs no tokens.
+              People can still read and edit it.
+            </p>
+            @if (d.can_edit) {
+              <button class="btn" type="button" (click)="setDisabled(false)">Enable</button>
+            }
+          </div>
+        } @else if (d.staleness) {
+          <div class="doc-notice stale" role="status">
+            <app-icon name="history" />
+            <p>
+              Agents haven't requested this document in the last
+              {{ d.staleness === 'month' ? 'month' : 'week' }}. Disable it to stop sending it to
+              agents and save tokens. You can turn it back on at any time.
+            </p>
+            @if (d.can_edit) {
+              <button class="btn" type="button" (click)="setDisabled(true)">
+                <app-icon name="eye-off" />Disable document
+              </button>
+            }
+          </div>
+        }
       </header>
 
+      <div class="sections-head">
+        <span class="quiet">Agent requests per section</span>
+        <app-stat-style-switch />
+      </div>
       <div class="sections">
         @for (s of d.sections; track s.id; let first = $first; let last = $last) {
           <article class="section" [attr.data-mode]="s.mode" [id]="'s-' + s.id.slice(0, 8)">
@@ -171,6 +205,34 @@ interface Draft {
                   }
                   , {{ s.updated_at | date: 'd MMM y, HH:mm' }}</span
                 >
+                <span class="section-reads">
+                  @if (s.activity.last_read_at; as last) {
+                    Requested
+                    <app-activity-figure
+                      size="sm"
+                      [count]="s.activity.reads"
+                      [previous]="s.activity.previous_week"
+                      [current]="s.activity.week"
+                      [daily]="s.activity.daily"
+                      [days]="days28"
+                      compare="the week before"
+                      unit="requests"
+                      [title]="
+                        s.activity.week +
+                        ' this week, ' +
+                        s.activity.previous_week +
+                        ' the week before'
+                      "
+                    />
+                    {{ s.activity.reads === 1 ? 'time' : 'times' }} by agents, last
+                    <time [attr.datetime]="last" [title]="dateTime(last)">{{ since(last) }}</time>
+                    @if (quietFor30Days(last)) {
+                      <span class="flag quiet-flag">Not requested in the last month</span>
+                    }
+                  } @else {
+                    <span class="quiet">Not requested by agents yet</span>
+                  }
+                </span>
                 <code class="sid" title="Section id agents use">s:{{ s.id.slice(0, 8) }}</code>
                 <span class="section-actions">
                   @if (d.can_edit) {
@@ -336,6 +398,25 @@ export class DocumentPage {
   draft: Draft = { heading: '', body: '', note: '' };
   newDraft = { heading: '', body: '' };
   titleDraft = '';
+  readonly since = since;
+  readonly dateTime = dateTime;
+  readonly days28 = lastDays(28);
+
+  quietFor30Days(lastRead: string): boolean {
+    return Date.now() - new Date(lastRead).getTime() > 30 * 86_400_000;
+  }
+
+  async setDisabled(disabled: boolean): Promise<void> {
+    try {
+      await this.api.updateDocument(this.id(), { disabled });
+      this.notices.ok(
+        disabled ? 'Disabled. Agents no longer get this document' : 'Enabled. Agents get it again',
+      );
+      await this.reload();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
 
   readonly where = computed(() => {
     const d = this.doc();

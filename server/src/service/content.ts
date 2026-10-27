@@ -6,6 +6,7 @@ import { normalizePath } from '../domain/scopes.js';
 import { normalizeTags } from '../domain/stacks.js';
 import { slugify } from '../domain/remote.js';
 import { extractLinks } from '../domain/links.js';
+import { documentActivity, type DocumentActivity } from './activity.js';
 import { claimSlug } from './aliases.js';
 import type { DocKind, Document, EditMode, Level, Scope, Section, SectionVersion } from './types.js';
 import { DOC_KINDS, EDIT_MODES } from './types.js';
@@ -157,24 +158,30 @@ export async function deleteScope(db: Db, a: Access, id: string): Promise<void> 
 
 // ───────────────────────────── documents ─────────────────────────────
 
-const DOC_COLS = 'id, organization_id, project_id, scope_id, kind, slug, title, mode, position, updated_at';
+const DOC_COLS = 'id, organization_id, project_id, scope_id, kind, slug, title, mode, position, created_at, updated_at, disabled_at';
 
-/** Documents at exactly one level. No permission check; callers check. */
-export async function documentsAt(db: Queryable, level: Level): Promise<Document[]> {
+/**
+ * Documents at exactly one level. No permission check; callers check.
+ * `forAgents` leaves out disabled documents, which agents never get.
+ */
+export async function documentsAt(db: Queryable, level: Level, opts: { forAgents?: boolean } = {}): Promise<Document[]> {
   const { rows } = await db.query<Document>(
     `SELECT ${DOC_COLS} FROM documents
       WHERE organization_id IS NOT DISTINCT FROM $1 AND project_id IS NOT DISTINCT FROM $2
-        AND scope_id IS NOT DISTINCT FROM $3
+        AND scope_id IS NOT DISTINCT FROM $3 AND ($4::boolean IS NOT TRUE OR disabled_at IS NULL)
       ORDER BY kind, position, title`,
-    [level.organization_id, level.project_id, level.scope_id],
+    [level.organization_id, level.project_id, level.scope_id, opts.forAgents ?? false],
   );
   return rows;
 }
 
-export async function listDocuments(db: Queryable, a: Access, level: Partial<Level>): Promise<Document[]> {
+/** Documents at a level, with how much agents use them. Agents only see enabled ones. */
+export async function listDocuments(db: Queryable, a: Access, level: Partial<Level>): Promise<Array<Document & DocumentActivity>> {
   const lv = await resolveLevel(db, level);
   a.requireRead(lv.organization_id);
-  return documentsAt(db, lv);
+  const docs = await documentsAt(db, lv, { forAgents: a.isAgent });
+  const activity = await documentActivity(db, docs);
+  return docs.map((d) => ({ ...d, ...activity.get(d.id)! }));
 }
 
 /** Internal: load without a permission check. */
@@ -188,7 +195,24 @@ export async function loadDocument(db: Queryable, id: string): Promise<Document>
 export async function getDocument(db: Queryable, a: Access, id: string): Promise<Document> {
   const doc = await loadDocument(db, id);
   a.requireRead(doc.organization_id);
+  if (a.isAgent && doc.disabled_at) throw disabledForAgents();
   return doc;
+}
+
+const disabledForAgents = () =>
+  new AppError('not_found', 'This document is disabled, so agents can\'t read or change it. A person can enable it again in OpenPurpose.');
+
+/** Disable a document (agents stop getting it) or enable it again. */
+export async function setDocumentDisabled(db: Db, a: Access, id: string, disabled: boolean): Promise<Document> {
+  const cur = await getDocument(db, a, id);
+  a.requireEdit(cur.organization_id);
+  const { rows } = await db.query<Document>(
+    `UPDATE documents SET disabled_at = CASE WHEN $2 THEN COALESCE(disabled_at, now()) END,
+            disabled_by = CASE WHEN $2 THEN $3::uuid END
+      WHERE id = $1 RETURNING ${DOC_COLS}`,
+    [id, disabled, a.actor.id],
+  );
+  return rows[0];
 }
 
 export interface DocumentInput {
@@ -238,9 +262,17 @@ export async function deleteDocument(db: Db, a: Access, id: string): Promise<voi
   await db.query('DELETE FROM documents WHERE id = $1', [id]);
 }
 
-/** Find (or create) the "Learnings" document at a level. */
+/**
+ * Find (or create) the "Learnings" document at a level. A newly approved
+ * learning must reach agents, so a disabled one is enabled again.
+ */
 export async function ensureLearningsDocument(db: Queryable, level: Level): Promise<Document> {
   const existing = (await documentsAt(db, level)).find((d) => d.kind === 'learnings');
+  if (existing?.disabled_at) {
+    const { rows } = await db.query<Document>(
+      `UPDATE documents SET disabled_at = NULL, disabled_by = NULL WHERE id = $1 RETURNING ${DOC_COLS}`, [existing.id]);
+    return rows[0];
+  }
   if (existing) return existing;
   return insertDocument(db, level, { kind: 'learnings', title: 'Learnings', slug: 'learnings', mode: 'propose', position: 100 });
 }
@@ -280,6 +312,7 @@ export async function getSection(
   const s = await loadSection(db, ref, opts);
   const doc = await loadDocument(db, s.document_id);
   a.requireRead(doc.organization_id);
+  if (a.isAgent && doc.disabled_at) throw disabledForAgents();
   return { ...s, organization_id: doc.organization_id };
 }
 
@@ -478,9 +511,10 @@ export async function searchSections(db: Queryable, a: Access, query: string, op
         AND ($4::uuid IS NULL OR d.project_id IS NULL OR d.project_id = $4::uuid)
         AND ($8::text IS DISTINCT FROM 'project' OR d.project_id = $6::uuid)
         AND ($8::text IS DISTINCT FROM 'organization' OR d.organization_id = $7::uuid)
+        AND ($9::boolean IS NOT TRUE OR d.disabled_at IS NULL)
       ORDER BY rank DESC, s.updated_at DESC
       LIMIT $5`,
-    [q, a.readableOrgIds(), orgFilter, opts.projectId ?? null, limit, nearProject, nearOrg, opts.within ?? null],
+    [q, a.readableOrgIds(), orgFilter, opts.projectId ?? null, limit, nearProject, nearOrg, opts.within ?? null, a.isAgent],
   );
   return rows;
 }

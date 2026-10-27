@@ -80,7 +80,7 @@ export async function exportContent(
 
   const documents = (await db.query<Omit<ExportDocument, 'sections'>>(
     `SELECT d.id AS key, d.organization_id AS organization, d.project_id AS project, d.scope_id AS scope, d.kind, d.slug,
-            d.title, d.mode, d.position, d.created_at, d.updated_at
+            d.title, d.mode, d.position, d.created_at, d.updated_at, d.disabled_at
        FROM documents d WHERE $1::uuid IS NULL OR d.organization_id = $1
       ORDER BY d.organization_id NULLS FIRST, d.project_id NULLS FIRST, d.scope_id NULLS FIRST, d.position, d.slug`, [org])).rows
     .map((d) => ({

@@ -671,6 +671,114 @@ definitions:`);
       c.query(`UPDATE projects SET name = 'hijacked' WHERE id = $1 RETURNING id`, [projectId]).then((r) => r.rowCount))).resolves.toBe(0);
   });
 
+  it('counts agent reads and writes per organization and section', async () => {
+    const activity = async (period = '7d') => (await api('GET', `/organizations/${o.logistics}/activity?period=${period}`)).data;
+    const before = await activity();
+    expect(before.days).toHaveLength(7);
+    expect(before.reads.daily).toHaveLength(7);
+
+    // Other organizations' agents don't count toward Logistics.
+    const lars = await mcp(t.lars);
+    await lars.call('get_context', { project: 'payments/payment-gateway' });
+    await lars.client.close();
+    const { client, call } = await mcp(t.jonas);
+    const args = { remote_url: SSH_REMOTE, path: 'frontend/src/app.ts' };
+    const ctx = await call('get_context', args);
+    await call('get_context', args);
+    const sid = ctx.text.match(/\[s:([0-9a-f]{8}) · (?:open|propose)\]/)![1];
+    const read = JSON.parse((await call('read_section', { section_id: sid })).text);
+    const docBefore = (await api('GET', `/documents/${read.document_id}`)).data.sections.find((s: any) => s.id === read.id).activity;
+    await call('read_section', { section_id: sid });
+    expect((await call('update_section', { section_id: sid, body: `${read.body}\n\nOne more line.`, reason: 'Test' })).isError).toBe(false);
+    await client.close();
+    // Agent mode and people browsing don't count.
+    await api('POST', '/agent/tool', { name: 'get_context', args }, { token: ADMIN, org: o.logistics, agent: true });
+    await api('GET', `/documents/${read.document_id}`);
+
+    const after = await activity();
+    expect(after.reads.count).toBe(before.reads.count + 4);
+    expect(after.writes.count).toBe(before.writes.count + 1);
+    expect(after.reads.daily.at(-1)).toBeGreaterThanOrEqual(4);
+    expect(after.reads.previous).toBe(0);
+    expect(after.most_read_projects[0]).toMatchObject({ slug: 'customer-portal' });
+    expect(after.most_read_documents.length).toBeGreaterThan(0);
+    expect(after.most_written_documents.map((d: any) => d.id)).toContain(read.document_id);
+    expect(after.top_writers[0]).toMatchObject({ name: 'Agent Jonas' });
+    const all = await activity('all');
+    expect(all.reads.previous).toBeNull();
+    expect(all.days).toHaveLength(53 * 7);
+    expect((await api('GET', `/organizations/${o.logistics}/activity?period=year`)).status).toBe(400);
+    expect((await api('GET', `/organizations/${o.logistics}/activity`, undefined, { token: t.ida })).status).toBe(200);
+
+    const section = (await api('GET', `/documents/${read.document_id}`)).data.sections.find((s: any) => s.id === read.id).activity;
+    expect(section.reads).toBe(docBefore.reads + 1);
+    expect(section.week).toBe(docBefore.week + 1);
+    expect(section.last_read_at).not.toBeNull();
+    expect(section.daily).toHaveLength(28);
+
+    // Row-level security keeps the log inside the group.
+    const other = (await pool.query(`SELECT id FROM groups WHERE slug <> 'acme-group' LIMIT 1`)).rows[0].id;
+    for (const table of ['agent_requests', 'section_reads']) {
+      const count = (groupId: string | null) => withScope(pool, { groupId }, async (c) =>
+        (await c.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${table}`)).rows[0].n);
+      expect(await count(other)).toBe(0);
+      expect(await count(null)).toBe(0);
+    }
+  });
+
+  it('warns about documents agents stopped requesting, and hides disabled ones from agents', async () => {
+    const doc = (await api('POST', '/documents', { organization_id: o.logistics, kind: 'reference', title: 'Pallet runbook' })).data;
+    await api('POST', `/documents/${doc.id}/sections`, { heading: 'Stacking pallets', body: 'Never stack zxqvpallet crates above two.', mode: 'open' });
+    const fresh = (await api('POST', '/documents', { organization_id: o.logistics, kind: 'reference', title: 'New runbook' })).data;
+    const listed = async () => (await api('GET', `/documents?organization_id=${o.logistics}`)).data;
+    expect((await listed()).find((d: any) => d.id === doc.id).staleness).toBeNull();
+
+    // Pretend the document, and tracking, started 40 days ago, and nobody has read it since.
+    await withScope(pool, { groupId: null, bypass: true }, async (c) => {
+      await c.query(`UPDATE documents SET created_at = now() - interval '40 days' WHERE id = $1`, [doc.id]);
+      await c.query(`UPDATE agent_requests SET created_at = now() - interval '40 days'
+                      WHERE id = (SELECT min(id) FROM agent_requests WHERE organization_id = $1)`, [o.logistics]);
+    });
+    expect((await api('GET', `/documents/${doc.id}`)).data.staleness).toBe('month');
+    expect((await listed()).find((d: any) => d.id === fresh.id).staleness).toBeNull();
+    const stale = async (period: string) =>
+      (await api('GET', `/organizations/${o.logistics}/activity?period=${period}`)).data.stale_documents.map((d: any) => d.id);
+    expect(await stale('30d')).toContain(doc.id);
+    expect(await stale('7d')).toContain(doc.id);
+    expect(await stale('30d')).not.toContain(fresh.id);
+
+    const { client, call } = await mcp(t.jonas);
+    const args = { remote_url: SSH_REMOTE, path: 'frontend/src/app.ts' };
+    expect((await call('get_context', args)).text).toContain('Stacking pallets');
+
+    // Disabled: people still see it, agents don't.
+    expect((await api('PATCH', `/documents/${doc.id}`, { disabled: true }, { token: t.anders })).status).toBe(403);
+    expect((await api('PATCH', `/documents/${doc.id}`, { disabled: true })).data.disabled_at).not.toBeNull();
+    const disabled = (await api('GET', `/documents/${doc.id}`)).data;
+    expect(disabled).toMatchObject({ staleness: null });
+    expect(disabled.disabled_at).not.toBeNull();
+    expect((await call('get_context', args)).text).not.toContain('Stacking pallets');
+    const sid = disabled.sections[0].id.slice(0, 8);
+    const blocked = await call('read_section', { section_id: sid });
+    expect(blocked.isError).toBe(true);
+    expect(blocked.text).toContain('disabled');
+    expect((await call('update_section', { section_id: sid, body: 'x', reason: 'x' })).isError).toBe(true);
+    expect((await call('search', { query: 'zxqvpallet' })).text).toBe('[]');
+    expect((await api('GET', '/search?q=zxqvpallet')).data.length).toBe(1);
+    expect((await api('GET', `/documents?organization_id=${o.logistics}`, undefined, { token: ADMIN, org: o.logistics, agent: true }))
+      .data.map((d: any) => d.id)).not.toContain(doc.id);
+    expect(await stale('30d')).not.toContain(doc.id);
+    const exported = (await api('GET', `/export?organization_id=${o.logistics}`)).data;
+    expect(exported.documents.find((d: any) => d.title === 'Pallet runbook').disabled_at).not.toBeNull();
+
+    // Enabled again, agents get it back.
+    await api('PATCH', `/documents/${doc.id}`, { disabled: false });
+    expect((await call('get_context', args)).text).toContain('Stacking pallets');
+    await client.close();
+    await api('DELETE', `/documents/${doc.id}`);
+    await api('DELETE', `/documents/${fresh.id}`);
+  });
+
   it('runs a pull-request style review between a person and an agent', async () => {
     const jonas = await mcp(t.jonas);
     await jonas.call('propose_learning', {

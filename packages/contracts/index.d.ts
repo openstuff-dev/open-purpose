@@ -208,6 +208,59 @@ export interface SlugRename {
   open_proposals: number;
 }
 
+// ───────────────────────────── agent activity ─────────────────────────────
+
+/** The overview's window: the last 7 or 30 days (today included), or everything. */
+export type ActivityPeriod = '7d' | '30d' | 'all';
+
+/** A document agents haven't requested for a week or a month, while it existed. */
+export type Staleness = 'week' | 'month';
+
+/** How often something happened in a period. */
+export interface ActivityFigure {
+  count: number;
+  /** The same count for the period just before; null for all time. */
+  previous: number | null;
+  /** One count per day of `OrgActivity.days`. */
+  daily: number[];
+}
+
+export interface OrgActivity {
+  period: ActivityPeriod;
+  /** The days the `daily` arrays cover, as YYYY-MM-DD, oldest first. All time shows the last 53 weeks. */
+  days: string[];
+  /** When the first agent request in the group was recorded; null = none yet. */
+  tracking_since: string | null;
+  reads: ActivityFigure;
+  writes: ActivityFigure;
+  /** Top 3 each, most first. Documents include the group-wide ones every organization gets. */
+  most_read_documents: Array<ActivityFigure & { id: string; title: string; where: string }>;
+  most_read_projects: Array<ActivityFigure & { id: string; name: string; slug: string }>;
+  most_written_documents: Array<ActivityFigure & { id: string; title: string; where: string }>;
+  top_writers: Array<ActivityFigure & { id: string; name: string }>;
+  /** Enabled documents agents stopped requesting: week-stale for 7d, month-stale otherwise. */
+  stale_documents: Array<{ id: string; title: string; where: string; staleness: Staleness; last_read_at: string | null }>;
+}
+
+/** How often agents requested one section. */
+export interface SectionActivity {
+  /** All time. */
+  reads: number;
+  last_read_at: string | null;
+  /** The last 28 days, oldest first, today last. */
+  daily: number[];
+  /** Reads in the last 7 days, and in the 7 days before. */
+  week: number;
+  previous_week: number;
+}
+
+/** What the document page and document lists add to a document. */
+export interface DocumentActivity {
+  disabled_at: string | null;
+  staleness: Staleness | null;
+  last_read_at: string | null;
+}
+
 // ───────────────────────────── export and import ─────────────────────────────
 
 /**
@@ -338,6 +391,8 @@ export interface ExportDocument {
   position: number;
   created_at: string;
   updated_at: string;
+  /** Missing in files from before documents could be disabled; null = enabled. */
+  disabled_at?: string | null;
   sections: ExportSection[];
 }
 

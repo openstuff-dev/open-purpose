@@ -64,6 +64,10 @@ import {
   Download,
   Upload,
   ArrowLeftRight,
+  ChartSpline,
+  EyeOff,
+  Grid3x3,
+  Hash,
   type IconNode,
 } from 'lucide';
 
@@ -126,6 +130,10 @@ const ICONS: Record<string, IconNode> = {
   transfer: ArrowLeftRight,
   quote: Quote,
   brackets: Brackets,
+  hash: Hash,
+  dots: Grid3x3,
+  chart: ChartSpline,
+  'eye-off': EyeOff,
 };
 
 function esc(v: unknown): string {

@@ -1,16 +1,41 @@
-import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
-import type { Project } from '../core/models';
+import type {
+  ActivityFigure as Figure,
+  ActivityPeriod,
+  OrgActivity,
+  Project,
+} from '../core/models';
 import { Session } from '../core/session';
+import { StatStyle } from '../core/stat-style';
 import { initials } from '../core/theme';
+import { ActivityFigure, StatStyleSwitch } from '../shared/activity-figure';
 import { DocList } from '../shared/doc-list';
 import { Icon } from '../shared/icon';
 import { ScopeList } from '../shared/scope-list';
 
+const PERIOD_KEY = 'openpurpose.activityPeriod';
+
+function readPeriod(): ActivityPeriod {
+  try {
+    const v = localStorage.getItem(PERIOD_KEY);
+    return v === '7d' || v === 'all' ? v : '30d';
+  } catch {
+    return '30d';
+  }
+}
+
 @Component({
   selector: 'app-organization',
-  imports: [DocList, ScopeList, RouterLink, Icon],
+  imports: [DocList, ScopeList, RouterLink, Icon, ActivityFigure, StatStyleSwitch],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (session.org(); as org) {
@@ -45,6 +70,130 @@ import { ScopeList } from '../shared/scope-list';
           }}
         </p>
       </header>
+
+      <section class="block activity" aria-labelledby="activity-h">
+        <div class="block-head">
+          <div>
+            <h2 id="activity-h">Agent activity</h2>
+            <p class="quiet">What agents in {{ org.name }} requested over MCP.</p>
+          </div>
+          <div class="activity-controls">
+            <span class="segmented" role="group" aria-label="Period">
+              @for (p of periods; track p.value) {
+                <button
+                  type="button"
+                  [attr.aria-pressed]="period() === p.value"
+                  (click)="period.set(p.value)"
+                >
+                  {{ p.label }}
+                </button>
+              }
+            </span>
+            <app-stat-style-switch />
+          </div>
+        </div>
+        @if (activity(); as a) {
+          @if (!a.tracking_since) {
+            <p class="empty">
+              No agent requests yet. Counts start when an agent calls <code>get_context</code>.
+            </p>
+          } @else {
+            <div class="stat-tiles">
+              <div class="stat-tile">
+                <span class="stat-label">Read requests</span>
+                <app-activity-figure
+                  [count]="a.reads.count"
+                  [previous]="a.reads.previous"
+                  [daily]="a.reads.daily"
+                  [days]="a.days"
+                  [compare]="compare()"
+                  unit="reads"
+                />
+              </div>
+              <div class="stat-tile">
+                <span class="stat-label">Write requests</span>
+                <app-activity-figure
+                  [count]="a.writes.count"
+                  [previous]="a.writes.previous"
+                  [daily]="a.writes.daily"
+                  [days]="a.days"
+                  [compare]="compare()"
+                  unit="writes"
+                />
+              </div>
+              @for (t of tops(a); track t.label) {
+                <div class="stat-tile">
+                  <span class="stat-label">{{ t.label }}</span>
+                  @if (t.items[0]; as top) {
+                    <a class="stat-name" [routerLink]="top.link">{{ top.name }}</a>
+                    @if (top.where) {
+                      <span class="stat-where">{{ top.where }}</span>
+                    }
+                    <app-activity-figure
+                      [count]="top.count"
+                      [previous]="top.previous"
+                      [daily]="top.daily"
+                      [days]="a.days"
+                      [compare]="compare()"
+                      [unit]="t.unit"
+                      size="sm"
+                    />
+                    @if (t.items.length > 1) {
+                      <ol class="stat-rest" start="2">
+                        @for (r of t.items.slice(1); track r.name) {
+                          <li>
+                            @if (r.link) {
+                              <a [routerLink]="r.link">{{ r.name }}</a>
+                            } @else {
+                              {{ r.name }}
+                            }
+                            @if (r.where) {
+                              <span class="quiet">{{ r.where }}</span>
+                            }
+                            <span class="stat-count">{{ r.count }}</span>
+                          </li>
+                        }
+                      </ol>
+                    }
+                  } @else {
+                    <span class="quiet">Nothing in this period</span>
+                  }
+                </div>
+              }
+              <div class="stat-tile" [class.warn]="a.stale_documents.length">
+                <span class="stat-label"
+                  >Not requested in the last {{ period() === '7d' ? 'week' : 'month' }}</span
+                >
+                @if (a.stale_documents.length) {
+                  <span class="fig-num static">{{ a.stale_documents.length }}</span>
+                  <ul class="stat-rest">
+                    @for (d of a.stale_documents.slice(0, 4); track d.id) {
+                      <li>
+                        <a [routerLink]="['/documents', d.id]">{{ d.title }}</a>
+                        @if (d.where) {
+                          <span class="quiet">{{ d.where }}</span>
+                        }
+                      </li>
+                    }
+                  </ul>
+                  <span class="quiet"
+                    >Disable them to stop sending them to agents and save tokens.</span
+                  >
+                } @else {
+                  <span class="quiet">Agents use every document.</span>
+                }
+              </div>
+            </div>
+            @if (style.choice() === 'dots') {
+              <p class="dots-legend" aria-hidden="true">
+                Less <span class="dot" data-level="0"></span><span class="dot" data-level="1"></span
+                ><span class="dot" data-level="2"></span><span class="dot" data-level="3"></span
+                ><span class="dot" data-level="4"></span> More
+              </p>
+            }
+          }
+        }
+      </section>
 
       @if (recent().length) {
         <section class="block">
@@ -127,8 +276,73 @@ export class OrganizationPage {
   private api = inject(Api);
   readonly initials = initials;
   readonly recent = signal<Project[]>([]);
+  readonly style = inject(StatStyle);
+  readonly activity = signal<OrgActivity | null>(null);
+  readonly period = signal<ActivityPeriod>(readPeriod());
+  readonly periods: Array<{ value: ActivityPeriod; label: string }> = [
+    { value: '7d', label: '7 days' },
+    { value: '30d', label: '30 days' },
+    { value: 'all', label: 'All time' },
+  ];
+  readonly compare = computed(() =>
+    this.period() === '7d' ? 'the 7 days before' : 'the 30 days before',
+  );
+
+  /** The "most …" tiles: one leader, with the runners-up below it. */
+  tops(
+    a: OrgActivity,
+  ): Array<{
+    label: string;
+    unit: string;
+    items: Array<Figure & { name: string; where?: string; link: unknown[] | null }>;
+  }> {
+    return [
+      {
+        label: 'Most read document',
+        unit: 'requests',
+        items: a.most_read_documents.map((d) => ({
+          ...d,
+          name: d.title,
+          link: ['/documents', d.id],
+        })),
+      },
+      {
+        label: 'Most read project',
+        unit: 'requests',
+        items: a.most_read_projects.map((p) => ({ ...p, link: ['/projects', p.id] })),
+      },
+      {
+        label: 'Written most',
+        unit: 'writes',
+        items: a.most_written_documents.map((d) => ({
+          ...d,
+          name: d.title,
+          link: ['/documents', d.id],
+        })),
+      },
+      {
+        label: 'Most active writing agent',
+        unit: 'writes',
+        items: a.top_writers.map((w) => ({ ...w, link: null })),
+      },
+    ];
+  }
 
   constructor() {
+    effect(() => {
+      const id = this.session.orgId();
+      const period = this.period();
+      try {
+        localStorage.setItem(PERIOD_KEY, period);
+      } catch {
+        /* storage unavailable */
+      }
+      if (id)
+        void this.api
+          .orgActivity(id, period)
+          .then((a) => this.activity.set(a))
+          .catch(() => this.activity.set(null));
+    });
     effect(() => {
       const id = this.session.orgId();
       if (id)

@@ -58,7 +58,10 @@ export interface Document {
   title: string;
   mode: EditMode;
   position: number;
+  created_at: string;
   updated_at: string;
+  /** Disabled documents stay here, but agents don't get them. */
+  disabled_at: string | null;
 }
 
 export interface Section {
