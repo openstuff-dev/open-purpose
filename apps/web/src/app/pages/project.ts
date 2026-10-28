@@ -133,13 +133,13 @@ const TABS: Tab[] = [
         here reach all of {{ p.name }}; a scope's documents reach only its part of the code.
       </p>
 
-      <nav class="page-tabs" aria-label="Project sections">
+      <nav class="os-tab-list page-tabs" aria-label="Project sections">
         @for (t of tabs(); track t.key) {
           <a
+            class="os-tab"
             [routerLink]="[]"
             [queryParams]="{ tab: t.key === 'documents' ? null : t.key }"
             replaceUrl
-            [class.active]="current() === t.key"
             [attr.aria-current]="current() === t.key ? 'page' : null"
           >
             <app-icon [name]="t.icon" [size]="15" />{{ t.label }}

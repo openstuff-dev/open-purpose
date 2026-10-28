@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Button, Chip, Control, Field } from '@openstuff-dev/ui-angular';
+import { Button, Chip, Control, Field, Tab, Tabs } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ContextResult, Project } from '../core/models';
 import { MarkdownView } from '../shared/markdown';
@@ -11,7 +11,7 @@ import { splitList } from '../shared/scope-list';
 
 @Component({
   selector: 'app-preview',
-  imports: [FormsModule, RouterLink, MarkdownView, Button, Field, Control, Chip],
+  imports: [FormsModule, RouterLink, MarkdownView, Button, Field, Control, Chip, Tabs, Tab],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -125,22 +125,19 @@ import { splitList } from '../shared/scope-list';
           <dt>Size</dt>
           <dd>{{ size(r) }}</dd>
         </dl>
-        <div class="tabs" role="tablist">
-          <button type="button" role="tab" [attr.aria-selected]="!raw()" (click)="raw.set(false)">
-            Rendered
-          </button>
-          <button type="button" role="tab" [attr.aria-selected]="raw()" (click)="raw.set(true)">
-            Exactly as sent
-          </button>
+        <div class="preview-copy">
           <button type="button" os-button variant="link" size="sm" (click)="copy(r.markdown)">
             Copy
           </button>
         </div>
-        @if (raw()) {
-          <pre class="raw"><code>{{ r.markdown }}</code></pre>
-        } @else {
-          <app-md class="preview-render" [text]="r.markdown" />
-        }
+        <os-tabs label="Show the context">
+          <ng-template os-tab="rendered" label="Rendered">
+            <app-md class="preview-render" [text]="r.markdown" />
+          </ng-template>
+          <ng-template os-tab="raw" label="Exactly as sent">
+            <pre class="raw"><code>{{ r.markdown }}</code></pre>
+          </ng-template>
+        </os-tabs>
       </section>
     }
   `,
@@ -151,7 +148,6 @@ export class PreviewPage {
   private notices = inject(Notices);
   readonly projects = signal<Project[]>([]);
   readonly result = signal<ContextResult | null>(null);
-  readonly raw = signal(false);
   project = '';
   remote = '';
   path = '';

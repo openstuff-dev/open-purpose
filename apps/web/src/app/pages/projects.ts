@@ -28,13 +28,20 @@ import { Icon } from '../shared/icon';
       </p>
     </header>
 
-    <div class="tabs" role="tablist" aria-label="Which organizations">
+    <div class="os-tab-list list-tabs" role="tablist" aria-label="Which organizations">
       @if (session.org(); as org) {
-        <button type="button" role="tab" [attr.aria-selected]="!all()" (click)="setAll(false)">
+        <button
+          class="os-tab"
+          type="button"
+          role="tab"
+          [attr.aria-selected]="!all()"
+          (click)="setAll(false)"
+        >
           {{ org.name }}
         </button>
       }
       <button
+        class="os-tab"
         type="button"
         role="tab"
         [attr.aria-selected]="all() || !session.org()"

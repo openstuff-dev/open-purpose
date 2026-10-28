@@ -80,8 +80,9 @@ const LIST_ITEM = /^(\s*)(- \[[ xX]\] |[-*+] |(\d+)\. )(.*)$/;
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="editor">
-      <div class="editor-tabs" role="tablist">
+      <div class="os-tab-list editor-tabs" role="tablist">
         <button
+          class="os-tab"
           type="button"
           role="tab"
           [attr.aria-selected]="!preview()"
@@ -90,6 +91,7 @@ const LIST_ITEM = /^(\s*)(- \[[ xX]\] |[-*+] |(\d+)\. )(.*)$/;
           Write
         </button>
         <button
+          class="os-tab"
           type="button"
           role="tab"
           [attr.aria-selected]="preview()"
