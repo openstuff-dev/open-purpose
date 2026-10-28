@@ -171,6 +171,8 @@ export class Icon {
     effect(() => {
       const node = ICONS[this.name()];
       const s = this.size();
+      // Safe: the markup comes from the bundled Lucide icons and a number, never from data.
+      // eslint-disable-next-line no-restricted-syntax
       this.el.nativeElement.innerHTML = node
         ? `<svg xmlns="http://www.w3.org/2000/svg" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${render(node)}</svg>`
         : '';

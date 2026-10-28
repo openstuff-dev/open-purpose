@@ -72,6 +72,8 @@ export class MarkdownView {
   private el = inject(ElementRef<HTMLElement>);
 
   readonly html = computed(() =>
+    // renderMarkdown sanitizes with DOMPurify; Angular's sanitizer would drop data-wikilink.
+    // eslint-disable-next-line no-restricted-syntax
     this.sanitizer.bypassSecurityTrustHtml(renderMarkdown(this.text())),
   );
 

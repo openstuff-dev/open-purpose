@@ -181,7 +181,7 @@ docker compose exec openpurpose node dist/export-cli.js --group my-group --out /
 # Options: --organization <slug>, --zip, --people, --no-history, --no-proposals, --no-api-specs, --no-findings
 ```
 
-Without Docker, use `npm run -s export -w server -- --group my-group --out backup.json`.
+Without Docker, use `npm run -s export -w apps/server -- --group my-group --out backup.json`.
 For a backup of the whole server, every group at once, use `pg_dump`.
 
 ### Without Docker
@@ -192,11 +192,11 @@ the shared types:
 
 ```bash
 npm ci
-npm run build -w web
-DATABASE_URL=postgres://user:pass@localhost:5432/openpurpose npm run dev -w server
+npx nx build web
+DATABASE_URL=postgres://user:pass@localhost:5432/openpurpose npx nx dev server
 ```
 
-The server serves the built UI from `web/dist/web/browser`, the API under
+The server serves the built UI from `apps/web/dist/web/browser`, the API under
 `/api` and MCP at `/mcp`.
 
 If the database user is a superuser (the Docker default), OpenPurpose creates a
@@ -263,11 +263,21 @@ into your repo's `AGENTS.md` or `CLAUDE.md`.
 ## Layout
 
 ```
-server/               Fastify + TypeScript 7 + pg. REST API, MCP endpoint, migrations, tests
-web/                  Angular 22 + TypeScript 6 (standalone components, signals)
+apps/server/          Fastify + TypeScript 7 + pg. REST API, MCP endpoint, migrations, tests
+apps/web/             Angular 22 + TypeScript 6 (standalone components, signals)
 packages/contracts/   Types the server sends and the web reads, defined once (declarations only)
 agent/                Instruction snippet and .openpurpose.json example for repos
+vendor/               The OpenStuff packages (@openstuff-dev/tokens, @openstuff-dev/lint) until they are on npm
 ```
+
+The repository is an Nx workspace. The projects are `server`, `web` and `contracts`:
+`npx nx build web`, `npx nx run-many -t typecheck`, `npx nx affected -t test`. The old
+`npm run build`, `npm test`, `npm run typecheck` and `npm run lint` still work and run the
+same targets for every project.
+
+The colours, spacing and fonts come from `@openstuff-dev/tokens`, generated from the
+`primaryColor` in `apps/web/tokens.config.json` (`npx nx tokens web`, run before every build).
+Lint uses `@openstuff-dev/lint` and reports warnings only for now.
 
 Run the tests with a Postgres available at `TEST_DATABASE_URL`
 (default `postgres://openpurpose:openpurpose@localhost:5432/openpurpose_test`; the test
@@ -278,7 +288,8 @@ upgrade from v0.1:
 npm test
 ```
 
-`npm run typecheck` checks the shared types, the server and the web app.
+`npm run typecheck` checks the shared types, the server and the web app. `npm run lint` runs
+ESLint and Stylelint.
 
 ## Not in this version
 

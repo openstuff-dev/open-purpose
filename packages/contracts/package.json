@@ -12,5 +12,16 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
+  },
+  "nx": {
+    "name": "contracts",
+    "tags": [
+      "type:package"
+    ],
+    "targets": {
+      "typecheck": {
+        "cache": true
+      }
+    }
   }
 }

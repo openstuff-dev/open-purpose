@@ -1,0 +1,46 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "targetDefaults": {
+    "build": {
+      "cache": true
+    },
+    "test": {
+      "cache": true
+    },
+    "lint": {
+      "cache": true,
+      "inputs": [
+        "default",
+        "{workspaceRoot}/eslint.config.mjs",
+        {
+          "externalDependencies": [
+            "eslint",
+            "@openstuff-dev/lint"
+          ]
+        }
+      ]
+    },
+    "stylelint": {
+      "cache": true,
+      "inputs": [
+        "default",
+        "{workspaceRoot}/stylelint.config.mjs",
+        {
+          "externalDependencies": [
+            "stylelint",
+            "@openstuff-dev/lint"
+          ]
+        }
+      ]
+    }
+  },
+  "defaultBase": "master",
+  "plugins": [
+    {
+      "plugin": "@nx/eslint/plugin",
+      "options": {
+        "targetName": "lint"
+      }
+    }
+  ]
+}

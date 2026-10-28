@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    services:
+      # For the server's integration tests (TEST_DATABASE_URL).
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: openpurpose
+          POSTGRES_PASSWORD: openpurpose
+          POSTGRES_DB: openpurpose_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U openpurpose"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          filter: tree:0
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - run: npm ci
+      - uses: nrwl/nx-set-shas@v4
+
+      # Lint reports warnings only for now; it fails on errors.
+      - run: npx nx affected -t lint stylelint typecheck test build
