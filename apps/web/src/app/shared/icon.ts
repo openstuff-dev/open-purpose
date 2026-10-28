@@ -73,7 +73,7 @@ import {
 } from 'lucide';
 
 /** The icons OpenPurpose uses, by name. Lucide, ISC licensed. */
-const ICONS: Record<string, IconNode> = {
+const ICONS: Partial<Record<string, IconNode>> = {
   'arrow-right': ArrowRight,
   book: BookOpen,
   bot: Bot,
@@ -139,10 +139,11 @@ const ICONS: Record<string, IconNode> = {
 };
 
 function esc(v: unknown): string {
-  return String(v).replace(
-    /[&<>"]/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!,
-  );
+  return String(v)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
 }
 
 function render(node: IconNode): string {

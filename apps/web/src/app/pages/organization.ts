@@ -64,12 +64,9 @@ function readPeriod(): ActivityPeriod {
             </nav>
           }
           <div class="title-row">
-            <span
-              class="badge"
-              style="width:2.25rem;height:2.25rem;font-size:0.8rem"
-              [style.background]="session.orgColor(org.id)"
-              >{{ initials(org.name) }}</span
-            >
+            <span class="badge lg" [style.background]="session.orgColor(org.id)">{{
+              initials(org.name)
+            }}</span>
             <h1 class="os-page-title">{{ org.name }}</h1>
           </div>
           <p class="os-page-description">
@@ -296,21 +293,22 @@ export class OrganizationPage {
   readonly style = inject(StatStyle);
   readonly activity = signal<OrgActivity | null>(null);
   readonly period = signal<ActivityPeriod>(readPeriod());
-  readonly periods: Array<{ value: ActivityPeriod; label: string }> = [
+  readonly periods: { value: ActivityPeriod; label: string }[] = [
     { value: '7d', label: '7 days' },
     { value: '30d', label: '30 days' },
     { value: 'all', label: 'All time' },
   ];
+
   readonly compare = computed(() =>
     this.period() === '7d' ? 'the 7 days before' : 'the 30 days before',
   );
 
   /** The "most …" tiles: one leader, with the runners-up below it. */
-  tops(a: OrgActivity): Array<{
+  tops(a: OrgActivity): {
     label: string;
     unit: string;
-    items: Array<Figure & { name: string; where?: string; link: unknown[] | null }>;
-  }> {
+    items: (Figure & { name: string; where?: string; link: unknown[] | null })[];
+  }[] {
     return [
       {
         label: 'Most read document',
@@ -355,16 +353,16 @@ export class OrganizationPage {
       if (id)
         void this.api
           .orgActivity(id, period)
-          .then((a) => this.activity.set(a))
-          .catch(() => this.activity.set(null));
+          .then((a) => { this.activity.set(a); })
+          .catch(() => { this.activity.set(null); });
     });
     effect(() => {
       const id = this.session.orgId();
       if (id)
         void this.api
           .projects({ organizationId: id })
-          .then((p) => this.recent.set(p.slice(0, 6)))
-          .catch(() => {});
+          .then((p) => { this.recent.set(p.slice(0, 6)); })
+          .catch(() => undefined);
     });
   }
 }

@@ -24,7 +24,7 @@ export const splitList = (s: string) =>
     .filter(Boolean);
 
 /** "azure:acme/platform/portal-web" -> "portal-web" */
-export const repoName = (key: string) => key.split('/').pop() || key;
+export const repoName = (key: string) => key.slice(key.lastIndexOf('/') + 1) || key;
 
 /** Scopes at the org level (projectId null) or inside a project. */
 @Component({
@@ -159,7 +159,9 @@ export class ScopeList {
 
   constructor() {
     effect(() => void this.load(this.organizationId(), this.projectId()));
-    effect(() => this.repos.set(this.repositories()));
+    effect(() => {
+      this.repos.set(this.repositories());
+    });
   }
 
   repoKey(id: string): string {

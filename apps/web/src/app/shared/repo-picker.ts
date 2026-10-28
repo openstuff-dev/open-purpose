@@ -6,7 +6,10 @@ import type { Repository } from '../core/models';
 import { Notices } from './notice';
 import { Icon } from './icon';
 
-/** Which of a project's repositories a scope is bound to, with a shortcut to register another one. */
+/**
+ * Which of a project's repositories a scope is bound to, with a shortcut to register
+ * another one.
+ */
 @Component({
   selector: 'app-repo-picker',
   imports: [FormsModule, Icon, Button, Control, Check, Checkbox],

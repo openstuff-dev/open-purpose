@@ -26,7 +26,7 @@ import { DiffView } from '../shared/diff';
 import { Icon } from '../shared/icon';
 import { Notices } from '../shared/notice';
 
-const POLICIES: Array<{ value: ImportChangePolicy; label: string; hint: string }> = [
+const POLICIES: { value: ImportChangePolicy; label: string; hint: string }[] = [
   {
     value: 'propose',
     label: 'Propose the changes',
@@ -58,7 +58,9 @@ function download(blob: Blob, name: string): void {
   a.href = url;
   a.download = name;
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 1000);
 }
 
 async function readUpload(file: File): Promise<ImportUpload> {
@@ -485,6 +487,7 @@ export class TransferPage {
   readonly adminOrgs = computed(() =>
     this.session.orgs().filter((o) => this.session.canAdmin(o.id)),
   );
+
   readonly busy = signal(false);
 
   what = this.session.canAdmin(null) ? '' : (this.adminOrgs()[0]?.id ?? '');
@@ -493,10 +496,12 @@ export class TransferPage {
     { value: 'json', label: 'JSON' },
     { value: 'zip', label: 'Markdown (.zip)' },
   ] as const;
+
   readonly targets = [
     { value: 'group', label: 'This group' },
     { value: 'new', label: 'A new group' },
   ] as const;
+
   includes: ExportIncludes = {
     history: true,
     proposals: true,
@@ -518,6 +523,7 @@ export class TransferPage {
   readonly merging = computed(() =>
     Object.values(this.choices()).some((c) => c.action === 'merge'),
   );
+
   groupName = '';
   groupSlug = '';
 
@@ -566,7 +572,7 @@ export class TransferPage {
   }
 
   choiceValue(key: string): string {
-    const c = this.choices()[key];
+    const c = this.choices()[key] as ImportOrgChoice | undefined;
     return !c ? 'new' : c.action === 'merge' ? `merge:${c.into}` : c.action;
   }
 

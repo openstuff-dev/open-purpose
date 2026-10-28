@@ -181,7 +181,7 @@ organization, the project and the part of the code you are in (a repository or a
                   title="Copy your new token now. It is not shown again."
                   role="alert"
                 >
-                  <div class="copy-block" style="width:100%">
+                  <div class="copy-block wide">
                     <pre><code>{{ t }}</code></pre>
                     <button os-button size="sm" type="button" (click)="copy(t)">
                       <app-icon name="copy" [size]="13" />Copy
@@ -440,11 +440,7 @@ organization, the project and the part of the code you are in (a repository or a
                 @for (o of manageableOrgs(); track o.id) {
                   <div class="os-setting-row" data-inline [style.opacity]="o.archived_at ? 0.6 : 1">
                     @if (editingOrg() === o.id) {
-                      <form
-                        class="inline-form"
-                        style="margin:0;grid-column:1/-1"
-                        (ngSubmit)="saveOrg(o)"
-                      >
+                      <form class="inline-form full-row" (ngSubmit)="saveOrg(o)">
                         <os-field label="Name" class="grow"
                           ><input os-input name="oname" [(ngModel)]="orgDraft.name" required
                         /></os-field>
@@ -482,7 +478,7 @@ organization, the project and the part of the code you are in (a repository or a
                           </button>
                         </div>
                       </form>
-                      <div style="grid-column:1/-1">
+                      <div class="full-row">
                         <app-slug-rename
                           kind="organization"
                           [id]="o.id"
@@ -494,11 +490,11 @@ organization, the project and the part of the code you are in (a repository or a
                         />
                       </div>
                     } @else {
-                      <div style="display:flex;gap:0.75rem;align-items:center;min-width:0">
+                      <div class="org-row">
                         <span class="badge" [style.background]="session.orgColor(o.id)">{{
                           initials(o.name)
                         }}</span>
-                        <div class="os-setting-text" style="min-width:0">
+                        <div class="os-setting-text">
                           <h3>
                             {{ o.name }} <code class="quiet">{{ o.slug }}</code>
                             @if (o.archived_at) {
@@ -541,11 +537,7 @@ organization, the project and the part of the code you are in (a repository or a
                 @if (session.canAdmin(null)) {
                   <div class="os-setting-row" data-inline>
                     @if (addingOrg()) {
-                      <form
-                        class="inline-form"
-                        style="margin:0;grid-column:1/-1"
-                        (ngSubmit)="createOrg()"
-                      >
+                      <form class="inline-form full-row" (ngSubmit)="createOrg()">
                         <os-field label="Name" class="grow"
                           ><input
                             os-input
@@ -623,7 +615,7 @@ organization, the project and the part of the code you are in (a repository or a
                   at the top. Reading only: agents never write outside their own organization.
                   People with a role in the group read everything.
                 </p>
-                <div class="os-setting-card" style="overflow-x:auto">
+                <div class="os-setting-card">
                   <table class="matrix">
                     <thead>
                       <tr>
@@ -637,11 +629,9 @@ organization, the project and the part of the code you are in (a repository or a
                       @for (r of activeOrgs(); track r.id) {
                         <tr>
                           <th scope="row">
-                            <span
-                              class="badge sm"
-                              [style.background]="session.orgColor(r.id)"
-                              style="margin-right:0.5rem"
-                              >{{ initials(r.name) }}</span
+                            <span class="badge sm" [style.background]="session.orgColor(r.id)">{{
+                              initials(r.name)
+                            }}</span
                             >{{ r.name }}
                           </th>
                           @for (t of activeOrgs(); track t.id) {
@@ -703,7 +693,7 @@ export class SettingsPage {
     return allowed.includes(t) ? t : 'account';
   });
 
-  readonly themes: Array<{ value: ThemeChoice; label: string; icon: string }> = [
+  readonly themes: { value: ThemeChoice; label: string; icon: string }[] = [
     { value: 'system', label: 'System', icon: 'monitor' },
     { value: 'light', label: 'Light', icon: 'sun' },
     { value: 'dark', label: 'Dark', icon: 'moon' },
@@ -716,6 +706,7 @@ export class SettingsPage {
   readonly manageableOrgs = computed(() =>
     (this.session.me()?.organizations ?? []).filter((o) => this.session.canAdmin(o.id)),
   );
+
   readonly activeOrgs = computed(() => this.session.orgs());
   name = '';
   tokenLabel = '';
@@ -726,6 +717,7 @@ export class SettingsPage {
     summary: '',
     budget: null,
   };
+
   newOrg = { name: '', slug: '', summary: '' };
 
   private readonly base = this.session.me()?.public_url ?? location.origin;
@@ -743,6 +735,7 @@ export class SettingsPage {
     null,
     2,
   );
+
   readonly agentsSnippet = AGENTS_SNIPPET;
   readonly agentContext = JSON.stringify(
     { project: `${this.session.org()?.slug ?? 'org'}/project-slug` },

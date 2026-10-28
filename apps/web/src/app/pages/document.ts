@@ -453,7 +453,7 @@ export class DocumentPage {
   readonly historyFor = signal<string | null>(null);
   readonly refsFor = signal<string | null>(null);
   readonly versions = signal<SectionVersion[]>([]);
-  readonly refs = signal<Array<{ source: GraphNode; refs: LinkRef[] }>>([]);
+  readonly refs = signal<{ source: GraphNode; refs: LinkRef[] }[]>([]);
   readonly adding = signal(false);
   readonly editingTitle = signal(false);
   readonly newMode = signal<EditMode>('propose');
@@ -527,7 +527,9 @@ export class DocumentPage {
 
   startAdd(): void {
     this.newDraft = { heading: '', body: '' };
-    this.newMode.set(this.doc()!.mode);
+    const d = this.doc();
+    if (!d) return;
+    this.newMode.set(d.mode);
     this.adding.set(true);
   }
 
@@ -637,7 +639,9 @@ export class DocumentPage {
   }
 
   async move(s: Section, delta: number): Promise<void> {
-    const ids = this.doc()!.sections.map((x) => x.id);
+    const d = this.doc();
+    if (!d) return;
+    const ids = d.sections.map((x) => x.id);
     const i = ids.indexOf(s.id);
     const j = i + delta;
     if (j < 0 || j >= ids.length) return;
@@ -668,7 +672,8 @@ export class DocumentPage {
   }
 
   async removeDoc(): Promise<void> {
-    const d = this.doc()!;
+    const d = this.doc();
+    if (!d) return;
     const remove = await this.confirmDialog.confirm({
       title: `Delete “${d.title}”?`,
       message: 'All its sections are deleted too.',

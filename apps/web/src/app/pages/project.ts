@@ -452,6 +452,7 @@ export class ProjectPage {
     const p = this.project();
     return JSON.stringify({ project: p ? `${p.organization.slug}/${p.slug}` : '' }, null, 2);
   });
+
   readonly movableTo = computed(() => {
     const p = this.project();
     if (!p) return [];
@@ -459,6 +460,7 @@ export class ProjectPage {
       .orgs()
       .filter((o) => o.id !== p.organization_id && this.session.canEdit(o.id));
   });
+
   private connections(dir: 'out' | 'in'): Connection[] {
     const p = this.project();
     if (!p) return [];
@@ -468,9 +470,12 @@ export class ProjectPage {
       .edges.filter(
         (e) => e.kind === 'link' && (dir === 'out' ? e.source === self : e.target === self),
       )
-      .map((e) => ({ node: nodes.get(dir === 'out' ? e.target : e.source)!, refs: e.refs }))
-      .filter((c) => c.node);
+      .flatMap((e) => {
+        const node = nodes.get(dir === 'out' ? e.target : e.source);
+        return node ? [{ node, refs: e.refs }] : [];
+      });
   }
+
   readonly uses = computed(() => this.connections('out'));
   readonly usedBy = computed(() => this.connections('in'));
 
@@ -484,7 +489,7 @@ export class ProjectPage {
   readonly tabs = computed(() => {
     const p = this.project();
     if (!p) return [];
-    const all: Array<{ key: Tab; label: string; icon: string; count: number | null }> = [
+    const all: { key: Tab; label: string; icon: string; count: number | null }[] = [
       { key: 'documents', label: 'Documents', icon: 'file', count: p.documents.length },
       { key: 'scopes', label: 'Scopes', icon: 'layers', count: p.scopes.length },
       { key: 'apis', label: 'API', icon: 'plug', count: p.apis.length },
@@ -534,7 +539,7 @@ export class ProjectPage {
       this.resetDraft();
       this.missing.set(false);
       this.graph.set(await this.api.graph({ focus: p.id, depth: 1 }));
-    } catch (e) {
+    } catch {
       this.project.set(null);
       this.missing.set(true);
     }
@@ -556,9 +561,11 @@ export class ProjectPage {
   }
 
   async save(): Promise<void> {
+    const project = this.project();
+    if (!project) return;
     try {
-      const moved = this.draft.organization_id !== this.project()!.organization_id;
-      const p = await this.api.updateProject(this.project()!.id, this.draft);
+      const moved = this.draft.organization_id !== project.organization_id;
+      const p = await this.api.updateProject(project.id, this.draft);
       this.notices.ok(
         moved ? `Moved to ${this.session.orgName(p.organization_id)}` : 'Saved project details',
       );
@@ -569,23 +576,29 @@ export class ProjectPage {
   }
 
   async markReviewed(): Promise<void> {
+    const p = this.project();
+    if (!p) return;
     await this.run(
-      () => this.api.updateProject(this.project()!.id, { reviewed: true }),
+      () => this.api.updateProject(p.id, { reviewed: true }),
       'Marked reviewed',
     );
   }
 
   async toggleArchive(): Promise<void> {
-    const archived = !this.project()!.archived_at;
+    const p = this.project();
+    if (!p) return;
+    const archived = !p.archived_at;
     await this.run(
-      () => this.api.updateProject(this.project()!.id, { archived }),
+      () => this.api.updateProject(p.id, { archived }),
       archived ? 'Archived project' : 'Restored project',
     );
   }
 
   async addRepo(): Promise<void> {
+    const p = this.project();
+    if (!p) return;
     await this.run(
-      () => this.api.addRepository(this.project()!.id, this.remote.trim()),
+      () => this.api.addRepository(p.id, this.remote.trim()),
       'Added repository',
     );
     this.remote = '';
@@ -596,7 +609,8 @@ export class ProjectPage {
   }
 
   async remove(): Promise<void> {
-    const p = this.project()!;
+    const p = this.project();
+    if (!p) return;
     const remove = await this.confirmDialog.confirm({
       title: `Delete ${p.name}?`,
       message: "Its documents, scopes and learnings are deleted too. You can't undo this.",
@@ -617,7 +631,8 @@ export class ProjectPage {
     try {
       await fn();
       this.notices.ok(ok);
-      await this.load(this.project()!.id);
+      const p = this.project();
+      if (p) await this.load(p.id);
     } catch (e) {
       this.notices.error(e);
     }

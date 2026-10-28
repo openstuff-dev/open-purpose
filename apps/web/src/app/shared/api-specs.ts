@@ -295,7 +295,7 @@ export class ApiSpecs {
   readonly projectId = input.required<string>();
   readonly specs = input<ApiSpec[]>([]);
   readonly canEdit = input(false);
-  readonly changed = output<void>();
+  readonly changed = output();
   private api = inject(Api);
   private readonly confirmDialog = inject(ConfirmDialog);
   private notices = inject(Notices);
@@ -312,6 +312,7 @@ export class ApiSpecs {
     { value: 'url', label: 'From a link' },
     { value: 'file', label: 'Upload a file' },
   ] as const;
+
   readonly file = signal<File | null>(null);
   url = '';
   name = '';
@@ -332,6 +333,7 @@ export class ApiSpecs {
     }
     return [...m].map(([tag, ops]) => ({ tag, ops }));
   });
+
   readonly schemas = computed(() => {
     const q = this.filter().trim().toLowerCase();
     return (this.detail()?.schemas ?? []).filter((n) => !q || n.toLowerCase().includes(q));
@@ -389,12 +391,13 @@ export class ApiSpecs {
   async add(): Promise<void> {
     this.busy.set(true);
     try {
+      const file = this.file();
       const body =
-        this.mode() === 'url'
+        this.mode() === 'url' || !file
           ? { url: this.url.trim(), name: this.name.trim() || undefined }
           : {
-              content: await this.readFile(this.file()!),
-              filename: this.file()!.name,
+              content: await this.readFile(file),
+              filename: file.name,
               name: this.name.trim() || undefined,
             };
       const s = await this.api.addApi(this.projectId(), body);
@@ -452,7 +455,9 @@ export class ApiSpecs {
       a.href = URL.createObjectURL(new Blob([raw], { type: 'application/json' }));
       a.download = (s.filename ?? `${s.name}.json`).replace(/\.ya?ml$/i, '.json');
       a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      setTimeout(() => {
+        URL.revokeObjectURL(a.href);
+      }, 1000);
     } catch (e) {
       this.notices.error(e);
     }

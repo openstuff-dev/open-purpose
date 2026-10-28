@@ -170,7 +170,7 @@ export class ThreadView {
   readonly showAnchor = input(false);
   /** The thread's lines as they read now, for the suggestion preview. */
   readonly currentLines = input<string | null>(null);
-  readonly changed = output<void>();
+  readonly changed = output();
   private api = inject(Api);
   private notices = inject(Notices);
   readonly replying = signal(false);
@@ -341,7 +341,7 @@ export class ReviewText {
   readonly canRevise = input(false);
   readonly me = input<string | null>(null);
   readonly author = input<string | null>(null);
-  readonly changed = output<void>();
+  readonly changed = output();
   private api = inject(Api);
   private notices = inject(Notices);
 
@@ -381,7 +381,7 @@ export class ReviewText {
     const s = new Set<number>();
     for (const t of this.threads()) {
       if (t.line_start === null || t.outdated || t.resolved_at) continue;
-      for (let i = t.line_start; i <= t.line_end!; i++) s.add(i);
+      for (let i = t.line_start; i <= (t.line_end ?? t.line_start); i++) s.add(i);
     }
     return s;
   });
@@ -412,13 +412,19 @@ export class ReviewText {
       this.selStart.set(line);
       this.selEnd.set(line);
     }
-    if (this.suggesting()) this.suggestion = this.linesText(this.selStart()!, this.selEnd()!);
+    if (this.suggesting()) this.suggestion = this.selectedText();
   }
 
   toggleSuggestion(): void {
     const on = !this.suggesting();
     this.suggesting.set(on);
-    if (on) this.suggestion = this.linesText(this.selStart()!, this.selEnd()!);
+    if (on) this.suggestion = this.selectedText();
+  }
+
+  private selectedText(): string {
+    const start = this.selStart();
+    const end = this.selEnd();
+    return start === null || end === null ? '' : this.linesText(start, end);
   }
 
   cancel(): void {

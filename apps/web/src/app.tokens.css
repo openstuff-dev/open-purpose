@@ -1,0 +1,84 @@
+/*
+ * The old names, kept so the rules below read the same. Every value comes from
+ * @openstuff-dev/tokens (tokens.css), generated from primaryColor #2d5bff in
+ * tokens.config.json, and is one light-dark() pair.
+ */
+:root {
+  --ground: var(--os-bg-default);
+  --surface: var(--os-bg-surface-100);
+  --sunken: var(--os-bg-surface-300);
+  --sidebar: var(--os-bg-alternative);
+  --hover: var(--os-bg-hover);
+  --line: var(--os-border-default);
+  --line-strong: var(--os-border-strong);
+  --ink: var(--os-fg-default);
+  --ink-2: var(--os-fg-light);
+  --muted: var(--os-fg-lighter);
+  --faint: var(--os-fg-muted);
+  --accent: var(--os-brand-default);
+  --accent-ink: var(--os-brand-ink);
+  --accent-soft: var(--os-brand-soft);
+  --accent-text: var(--os-brand-text);
+  --locked: var(--os-identity-1);
+  --locked-soft: var(--os-identity-1-soft);
+  --propose: var(--os-warning-text);
+  --propose-soft: var(--os-warning-soft);
+  --open: var(--os-success-text);
+  --open-soft: var(--os-success-soft);
+  --danger: var(--os-danger-text);
+  --danger-soft: var(--os-danger-soft);
+  --add: var(--os-success-soft);
+  --del: var(--os-danger-soft);
+  --agent: var(--os-identity-7);
+  --agent-soft: var(--os-identity-7-soft);
+  --node-term: var(--os-identity-4);
+  --edge: var(--os-border-strong);
+  --shadow-pop: var(--os-shadow-pop);
+  --sans: var(--os-font-sans);
+  --mono: var(--os-font-mono);
+  --fs-xs: var(--os-text-xs);
+  --fs-sm: var(--os-text-sm);
+  --fs-base: var(--os-text-base);
+  --fs-md: var(--os-text-md);
+  --fs-lg: var(--os-text-lg);
+  --fs-xl: var(--os-text-xl);
+  --fs-2xl: var(--os-text-2xl);
+  --r-sm: var(--os-radius-sm);
+  --r-md: var(--os-radius-md);
+  --r-lg: var(--os-radius-lg);
+  --rail: 248px;
+
+  /* Mixed from the colours above, so agent mode re-tints them too. */
+  --topbar-bg: color-mix(in srgb, var(--ground) 85%, transparent);
+  --danger-line: color-mix(in srgb, var(--danger) 30%, var(--line));
+  --danger-line-strong: color-mix(in srgb, var(--danger) 45%, var(--line));
+  --danger-strike: color-mix(in srgb, var(--danger) 50%, transparent);
+  --open-line: color-mix(in srgb, var(--open) 35%, var(--line));
+  --agent-line: color-mix(in srgb, var(--agent) 45%, var(--line));
+  --term-tint: color-mix(in srgb, var(--node-term) 14%, transparent);
+  --term-tint-light: color-mix(in srgb, var(--node-term) 13%, transparent);
+  --mark-bg: color-mix(in srgb, var(--propose) 22%, transparent);
+  --accent-tint: color-mix(in srgb, var(--accent) 10%, transparent);
+  --accent-ring: color-mix(in srgb, var(--accent) 22%, transparent);
+  --line-selected: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  --add-gutter: color-mix(in srgb, var(--add) 70%, var(--ground));
+  --del-gutter: color-mix(in srgb, var(--del) 70%, var(--ground));
+  --map-grid: color-mix(in srgb, var(--muted) 26%, transparent);
+  --drawer-backdrop: color-mix(in oklch, var(--os-backdrop), transparent 55%);
+
+  /* The activity grid: no activity, then three levels. */
+  --heat-outline: color-mix(in oklab, var(--line) 60%, transparent);
+  --heat-1: color-mix(in oklab, var(--accent) 28%, var(--sunken));
+  --heat-2: color-mix(in oklab, var(--accent) 50%, var(--sunken));
+  --heat-3: color-mix(in oklab, var(--accent) 74%, var(--sunken));
+  --spark-fill: color-mix(in oklab, var(--accent) 16%, transparent);
+
+  /* White on a coloured circle or the switch knob, in every theme. */
+  --on-tone: #fff;
+
+  /* The theme picker previews light and dark, whatever the current theme is. */
+  --swatch-light-bg: #f4f5f7;
+  --swatch-light-surface: #fff;
+  --swatch-dark-bg: #101317;
+  --swatch-dark-surface: #14171c;
+}

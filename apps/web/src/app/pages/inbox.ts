@@ -100,7 +100,7 @@ const EVENT: Record<ReviewEvent['kind'], { verb: string; icon: string }> = {
   commented: { verb: 'commented', icon: 'message' },
 };
 
-type TimelineItem = { at: string; event?: ReviewEvent; thread?: ReviewThread };
+interface TimelineItem { at: string; event?: ReviewEvent; thread?: ReviewThread }
 
 function isOpen(s: ProposalStatus): boolean {
   return s === 'pending' || s === 'changes_requested';
@@ -348,6 +348,7 @@ function ago(iso: string): string {
     }
 
     @if (current(); as p) {
+      <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- Escape closes the drawer from the keyboard -->
       <div class="drawer-backdrop" (click)="close()"></div>
       <!-- Not modal, like before: notices and the command palette stay usable on top. -->
       <dialog
@@ -871,21 +872,22 @@ export class InboxPage {
   private notices = inject(Notices);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
-  private drawer = viewChild('drawer', { read: ElementRef<HTMLElement> });
+  private readonly drawer = viewChild<unknown, ElementRef<HTMLElement>>('drawer', { read: ElementRef });
 
   readonly kind = KIND;
   readonly statusLabel = STATUS;
   readonly statusTone = STATUS_TONE;
   readonly modeLabel = MODE_LABEL;
   readonly ago = ago;
-  readonly tabs: Array<{ value: StatusTab; label: string }> = [
+  readonly tabs: { value: StatusTab; label: string }[] = [
     { value: 'pending', label: 'Needs review' },
     { value: 'changes_requested', label: 'Waiting on author' },
     { value: 'approved', label: 'Approved' },
     { value: 'rejected', label: 'Rejected' },
     { value: 'all', label: 'All' },
   ];
-  readonly columns: Array<{ key: SortKey; label: string }> = [
+
+  readonly columns: { key: SortKey; label: string }[] = [
     { key: 'change', label: 'Change' },
     { key: 'where', label: 'Where' },
     { key: 'from', label: 'From' },
@@ -902,7 +904,7 @@ export class InboxPage {
   readonly mine = signal(false);
   readonly sort = signal<SortKey>('when');
   readonly dir = signal<1 | -1>(-1);
-  readonly drafts = signal<Record<string, Draft>>({});
+  readonly drafts = signal<Partial<Record<string, Draft>>>({});
   /** Review threads, revisions and timeline, per opened proposal. */
   readonly reviewData = signal<Record<string, Review>>({});
   readonly view = signal<'review' | 'rendered' | 'before'>('review');
@@ -910,13 +912,14 @@ export class InboxPage {
     { value: 'review', label: 'Lines' },
     { value: 'rendered', label: 'Rendered' },
   ] as const;
+
   readonly editViews = [...this.views, { value: 'before', label: 'Before' }] as const;
   /** What the proposed text is compared with: 'section', 'none' or a revision number. */
   readonly compare = signal<string>('none');
   readonly eventInfo = EVENT;
   readonly isOpen = isOpen;
   /** A proposal opened by link that isn't in the current list. */
-  private extra = signal<Proposal | null>(null);
+  private readonly extra = signal<Proposal | null>(null);
   private scopeCache = new Map<string, Scope[]>();
 
   private readonly params = toSignal(this.route.queryParamMap);
@@ -948,7 +951,7 @@ export class InboxPage {
         case 'kind':
           return p.kind;
         case 'change':
-          return (p.heading || p.current_heading || '').toLowerCase();
+          return (p.heading || (p.current_heading ?? '')).toLowerCase();
         case 'where':
           return [p.organization_name ?? '', p.project_name ?? '', p.scope_name ?? '']
             .join('/')
@@ -967,6 +970,7 @@ export class InboxPage {
     if (!id) return null;
     return this.all().find((p) => p.id === id) ?? (this.extra()?.id === id ? this.extra() : null);
   });
+
   readonly index = computed(() => this.rows().findIndex((p) => p.id === this.openId()));
 
   constructor() {
@@ -993,7 +997,7 @@ export class InboxPage {
             await this.prepare(p);
             this.extra.set(p);
           })
-          .catch((e) => {
+          .catch((e: unknown) => {
             this.notices.error(e);
             this.close();
           });
@@ -1007,7 +1011,9 @@ export class InboxPage {
         this.view.set('review');
         this.compare.set(p.kind === 'edit_section' && isOpen(p.status) ? 'section' : 'none');
         void this.loadReview(p.id);
-        queueMicrotask(() => this.drawer()?.nativeElement.focus({ preventScroll: true }));
+        queueMicrotask(() => {
+          this.drawer()?.nativeElement.focus({ preventScroll: true });
+        });
       });
     });
   }
@@ -1067,7 +1073,8 @@ export class InboxPage {
   }
 
   step(delta: number): void {
-    const next = this.rows()[this.index() + delta];
+    const j = this.index() + delta;
+    const next = j >= 0 ? this.rows().at(j) : undefined;
     if (next) this.open(next.id);
   }
 
@@ -1129,8 +1136,8 @@ export class InboxPage {
     return rv.threads.filter((t) => !t.resolved_at).length;
   }
 
-  compareOptions(p: Proposal, rv: Review | null): Array<{ value: string; label: string }> {
-    const out: Array<{ value: string; label: string }> = [];
+  compareOptions(p: Proposal, rv: Review | null): { value: string; label: string }[] {
+    const out: { value: string; label: string }[] = [];
     if (p.kind === 'edit_section' && isOpen(p.status))
       out.push({ value: 'section', label: `The section as it is now (v${p.current_version})` });
     for (const r of rv?.revisions ?? []) {
@@ -1198,7 +1205,7 @@ export class InboxPage {
       else this.extra.set(fresh);
       void this.api
         .proposalCounts(this.level() === 'all' ? undefined : this.level())
-        .then((c) => this.counts.set(c));
+        .then((c) => { this.counts.set(c); });
     } catch (e) {
       this.notices.error(e);
     }
@@ -1238,7 +1245,7 @@ export class InboxPage {
 
   async saveRevision(p: Proposal): Promise<void> {
     const d = this.draft(p);
-    if (d.body === p.body && d.heading === (p.heading || p.current_heading || '')) {
+    if (d.body === p.body && d.heading === (p.heading || (p.current_heading ?? ''))) {
       this.stopEditing(p);
       return;
     }
@@ -1256,7 +1263,7 @@ export class InboxPage {
     Object.assign(d, {
       editing: false,
       body: p.body,
-      heading: p.heading || p.current_heading || '',
+      heading: p.heading || (p.current_heading ?? ''),
     });
     this.touch();
   }
@@ -1275,7 +1282,7 @@ export class InboxPage {
   private blank(p: Proposal): Draft {
     return {
       editing: false,
-      heading: p.heading || p.current_heading || '',
+      heading: p.heading || (p.current_heading ?? ''),
       body: p.body,
       note: '',
       comment: '',
@@ -1291,12 +1298,12 @@ export class InboxPage {
 
   private async scopesAt(orgId: string | null, projectId: string | null): Promise<Scope[]> {
     const key = `${orgId}|${projectId}`;
-    if (!this.scopeCache.has(key))
-      this.scopeCache.set(
-        key,
-        await this.api.scopes({ organization_id: orgId, project_id: projectId }),
-      );
-    return this.scopeCache.get(key)!;
+    let scopes = this.scopeCache.get(key);
+    if (!scopes) {
+      scopes = await this.api.scopes({ organization_id: orgId, project_id: projectId });
+      this.scopeCache.set(key, scopes);
+    }
+    return scopes;
   }
 
   private async prepare(p: Proposal): Promise<void> {
@@ -1394,7 +1401,7 @@ export class InboxPage {
   private async afterDecision(p: Proposal): Promise<void> {
     const rows = this.rows();
     const i = rows.findIndex((x) => x.id === p.id);
-    const next = rows[i + 1] ?? rows[i - 1];
+    const next = rows.at(i + 1) ?? (i > 0 ? rows.at(i - 1) : undefined);
     this.session.me.set(await this.api.me());
     await this.load();
     if (next && this.all().some((x) => x.id === next.id)) this.open(next.id);

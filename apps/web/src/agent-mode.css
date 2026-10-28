@@ -37,6 +37,7 @@ html:root.agent-mode {
   --edge: #3f5a4a;
   --node-term: #e6c86e;
   --shadow-pop: none;
+
   /* ANSI-ish organization colours. */
   --os-identity-0: #5ccfe3;
   --os-identity-1: #e391f7;
@@ -51,6 +52,7 @@ html:root.agent-mode {
   --r-md: 0;
   --r-lg: 0;
   --os-border-style: dashed;
+
   color-scheme: dark;
 }
 
@@ -59,20 +61,24 @@ html.agent-mode body {
   font-feature-settings: normal;
   letter-spacing: 0;
 }
+
 html.agent-mode *,
 html.agent-mode *::before,
 html.agent-mode *::after {
   border-radius: 0 !important;
 }
+
 html.agent-mode ::selection {
   background: var(--agent);
   color: var(--accent-ink);
 }
+
 html.agent-mode :focus-visible {
   outline: 1px dashed var(--agent);
   outline-offset: 2px;
   box-shadow: none;
 }
+
 html.agent-mode * {
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
@@ -85,11 +91,12 @@ html.agent-mode body::after {
   inset: 0;
   z-index: 1000;
   pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    rgb(255 255 255 / 0.022) 0 1px,
-    transparent 1px 3px
-  );
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgb(255 255 255 / 2.2%) 0 1px,
+      transparent 1px 3px
+    );
 }
 
 /* No soft shadows; everything is drawn with rules. */
@@ -104,11 +111,13 @@ html.agent-mode .os-toast,
 html.agent-mode .composer {
   box-shadow: none !important;
 }
+
 html.agent-mode .drawer {
   border-left-width: 1px;
 }
+
 html.agent-mode .drawer-backdrop {
-  background: rgb(0 0 0 / 0.55);
+  background: rgb(0 0 0 / 55%);
 }
 
 /* Headings read like prompts. */
@@ -118,25 +127,30 @@ html.agent-mode h3 {
   letter-spacing: 0;
   font-weight: 600;
 }
+
 html.agent-mode .os-page-title,
 html.agent-mode .drawer-title {
   text-shadow: 0 0 12px color-mix(in srgb, var(--agent) 35%, transparent);
 }
+
 html.agent-mode .os-page-title::before {
   content: '> ';
   color: var(--agent);
 }
+
 html.agent-mode .os-page-title::after {
   content: '_';
   color: var(--agent);
   margin-left: 0.1em;
   animation: agent-blink 1.1s steps(1) infinite;
 }
+
 html.agent-mode .panel-head h2::before,
 html.agent-mode .block h2::before {
   content: '## ';
   color: var(--faint);
 }
+
 html.agent-mode .drawer-section-head h3,
 html.agent-mode .two-col h3,
 html.agent-mode .os-menu-label,
@@ -147,11 +161,13 @@ html.agent-mode .os-data-table th {
   letter-spacing: 0.08em;
   font-size: 0.6875rem;
 }
+
 @keyframes agent-blink {
   50% {
     opacity: 0;
   }
 }
+
 @media (prefers-reduced-motion: reduce) {
   html.agent-mode .os-page-title::after {
     animation: none;
@@ -164,32 +180,39 @@ html.agent-mode .os-button {
   font-weight: 500;
   gap: 0.4rem;
 }
+
 html.agent-mode .os-button::before {
   content: '[';
   color: var(--faint);
 }
+
 html.agent-mode .os-button::after {
   content: ']';
   color: var(--faint);
 }
+
 html.agent-mode .os-button:hover:not(:disabled) {
   background: var(--ink);
   color: var(--ground);
   border-color: var(--ink);
 }
+
 html.agent-mode .os-button:hover:not(:disabled)::before,
 html.agent-mode .os-button:hover:not(:disabled)::after {
   color: inherit;
 }
+
 html.agent-mode .os-button[data-variant='primary'] {
   background: var(--agent);
   color: var(--accent-ink);
   border-color: var(--agent);
 }
+
 html.agent-mode .os-button[data-variant='primary']::before,
 html.agent-mode .os-button[data-variant='primary']::after {
   color: inherit;
 }
+
 html.agent-mode .os-button[data-icon-only]:hover {
   background: var(--hover);
 }
@@ -207,10 +230,12 @@ html.agent-mode .brand::after {
   font-weight: 400;
   font-size: var(--fs-sm);
 }
+
 html.agent-mode .badge,
 html.agent-mode .avatar {
   font-family: var(--mono);
 }
+
 html.agent-mode .agent-bar {
   border-bottom-style: dashed;
 }
@@ -219,9 +244,11 @@ html.agent-mode .agent-bar {
 html.agent-mode .call {
   background: transparent;
 }
+
 html.agent-mode .call-head {
   border-bottom-style: dashed;
 }
+
 html.agent-mode .call-next {
   border-top-style: dashed;
 }
@@ -231,22 +258,27 @@ html.agent-mode .page-tabs {
   background: var(--ground);
   border-bottom-style: dashed;
 }
+
 html.agent-mode .page-tabs .os-tab[aria-current='page'] {
   background: var(--ink);
   color: var(--ground);
   border-bottom-color: var(--ink);
 }
+
 html.agent-mode .page-tabs .os-tab[aria-current='page'] .icon,
 html.agent-mode .page-tabs .os-tab[aria-current='page'] .tab-count {
   color: var(--ground);
   background: transparent;
 }
+
 html.agent-mode .tab-count::before {
   content: '(';
 }
+
 html.agent-mode .tab-count::after {
   content: ')';
 }
+
 html.agent-mode .tab-count {
   display: inline;
   background: transparent;
@@ -254,14 +286,17 @@ html.agent-mode .tab-count {
   min-width: 0;
   height: auto;
 }
+
 html.agent-mode .os-tab[aria-selected='true'] {
   background: var(--ink);
   color: var(--ground);
 }
+
 html.agent-mode .os-segmented {
   background: transparent;
   border: 1px dashed var(--line-strong);
 }
+
 html.agent-mode .os-segmented > label:has(:checked) {
   background: var(--ink);
   color: var(--ground);
@@ -272,11 +307,13 @@ html.agent-mode .os-segmented > label:has(:checked) {
 html.agent-mode .layer-path a {
   background: transparent;
 }
+
 html.agent-mode .layer-path .current a {
   background: transparent;
   border-color: var(--agent);
   box-shadow: none;
 }
+
 html.agent-mode .layer-path li + li::before {
   content: '──';
   width: auto;
@@ -284,11 +321,13 @@ html.agent-mode .layer-path li + li::before {
   background: none;
   color: var(--line-strong);
 }
+
 html.agent-mode .os-chip,
 html.agent-mode .os-badge,
 html.agent-mode .os-status-dot {
   font-family: var(--mono);
 }
+
 html.agent-mode .os-status-dot::before {
   content: '●';
   width: auto;
@@ -297,19 +336,24 @@ html.agent-mode .os-status-dot::before {
   color: var(--os-tone-default);
   font-size: 0.6rem;
 }
+
 html.agent-mode .row-table tbody tr[tabindex]:hover,
 html.agent-mode .row-table tr[aria-current='true'] {
   background: var(--hover);
 }
+
 html.agent-mode .row-table tr[aria-current='true'] {
   box-shadow: inset 2px 0 0 var(--agent);
 }
+
 html.agent-mode code {
   color: var(--accent-text);
 }
+
 html.agent-mode pre {
   background: var(--sunken);
 }
+
 html.agent-mode .os-toast {
   border: 1px dashed var(--agent);
 }
@@ -324,73 +368,92 @@ html.agent-mode .badge:not(.group) {
 html.agent-mode .map-stage {
   background:
     linear-gradient(color-mix(in srgb, var(--line) 55%, transparent) 1px, transparent 1px) 0 0 /
-      32px 32px,
+    32px 32px,
     linear-gradient(90deg, color-mix(in srgb, var(--line) 55%, transparent) 1px, transparent 1px) 0
-      0 / 32px 32px,
+    0 / 32px 32px,
     var(--ground);
 }
+
 html.agent-mode .map-svg .edge {
   stroke: var(--line-strong);
   stroke-dasharray: 5 3;
 }
+
 html.agent-mode .map-svg .edge.defines {
   stroke-dasharray: 1 3;
 }
+
 html.agent-mode .map-svg .edge.hot {
   stroke: var(--agent);
   stroke-dasharray: none;
 }
+
 html.agent-mode .map-svg marker .arrow {
   fill: var(--line-strong);
 }
+
 html.agent-mode .map-svg marker .arrow-hot {
   fill: var(--agent);
 }
+
 html.agent-mode .map-svg .node rect.box {
   --c: var(--agent);
+
   fill: color-mix(in srgb, var(--c) 16%, var(--ground));
   stroke: var(--c);
   stroke-width: 1.5;
 }
+
 html.agent-mode .map-svg .node.group rect.box {
   --c: var(--ink);
+
   fill: var(--ink);
 }
+
 html.agent-mode .map-svg .node.organization rect.box {
   stroke-width: 3;
   paint-order: stroke;
 }
+
 html.agent-mode .map-svg .node.restricted rect.box,
 html.agent-mode .map-svg .node.missing rect.box {
   --c: var(--muted);
+
   fill: var(--ground);
   stroke-dasharray: 3 2;
 }
+
 html.agent-mode .map-svg .node.term rect {
   fill: var(--ground);
   stroke: var(--node-term);
   stroke-width: 1.5;
 }
+
 html.agent-mode .map-svg .node text {
   font-family: var(--mono);
   font-weight: 500;
   stroke-linejoin: miter;
 }
+
 html.agent-mode .map-svg .node.project text {
   font-weight: 600;
 }
+
 html.agent-mode .map-svg .node.term text {
   fill: var(--node-term);
 }
+
 html.agent-mode .map-svg .node.hot rect.box,
 html.agent-mode .map-svg .node:focus-visible rect.box {
   stroke: var(--agent);
   stroke-width: 2.5;
   fill: color-mix(in srgb, var(--agent) 28%, var(--ground));
 }
+
 html.agent-mode .map-svg .node.hot text {
   fill: var(--agent);
 }
+
 html.agent-mode .legend .dot {
   border-radius: 0;
 }

@@ -8,7 +8,7 @@ const ICONS: Record<EditMode, string> = { locked: 'lock', propose: 'pencil', ope
   selector: 'app-mode-icon',
   imports: [Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<app-icon [name]="icon()" [size]="13" />`,
+  template: '<app-icon [name]="icon()" [size]="13" />',
   host: { class: 'mode-icon' },
 })
 export class ModeIcon {
@@ -20,7 +20,7 @@ export class ModeIcon {
   selector: 'app-mode-badge',
   imports: [ModeIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<app-mode-icon [mode]="mode()" />{{ label[mode()] }}`,
+  template: '<app-mode-icon [mode]="mode()" />{{ label[mode()] }}',
   host: { class: 'os-badge', '[attr.data-mode]': 'mode()', '[attr.title]': 'help[mode()]' },
 })
 export class ModeBadge {
@@ -36,7 +36,8 @@ let nextPicker = 0;
   selector: 'app-mode-picker',
   imports: [ModeIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  // The toolkit's segmented control holds plain labels; this one needs an icon and a colour per mode.
+  // The toolkit's segmented control holds plain labels; this one needs an icon and a
+  // colour per mode.
   template: ` <div
     class="os-segmented mode-picker"
     data-size="sm"

@@ -217,7 +217,8 @@ export class ScopePage {
   }
 
   startEdit(): void {
-    const s = this.scope()!;
+    const s = this.scope();
+    if (!s) return;
     this.draft = {
       name: s.name,
       description: s.description,
@@ -230,13 +231,15 @@ export class ScopePage {
   }
 
   async save(): Promise<void> {
+    const s = this.scope();
+    if (!s) return;
     try {
       await this.api.updateScope(this.id(), {
         name: this.draft.name,
         description: this.draft.description,
         path_globs: splitList(this.draft.globs),
         stacks: splitList(this.draft.stacks),
-        ...(this.scope()!.project ? { repository_ids: this.repositoryIds() } : {}),
+        ...(s.project ? { repository_ids: this.repositoryIds() } : {}),
       });
       this.editing.set(false);
       this.notices.ok('Saved scope');
@@ -247,7 +250,8 @@ export class ScopePage {
   }
 
   async remove(): Promise<void> {
-    const s = this.scope()!;
+    const s = this.scope();
+    if (!s) return;
     const remove = await this.confirmDialog.confirm({
       title: `Delete the ${s.name} scope?`,
       message: 'Its documents and learnings are deleted too.',

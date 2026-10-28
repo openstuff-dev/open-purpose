@@ -12,10 +12,12 @@ import DOMPurify from 'dompurify';
 import { Marked, type TokenizerAndRendererExtension } from 'marked';
 
 function escapeHtml(s: string): string {
-  return s.replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-  );
+  return s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 /** [[target]], [[target|label]], [[project:x]], [[term:x]] → links handled by the /go route. */
@@ -26,11 +28,12 @@ const wikilink: TokenizerAndRendererExtension = {
   tokenizer(src: string) {
     const m = /^\[\[([^\[\]\n|]+?)(?:\|([^\[\]\n]+?))?\]\]/.exec(src);
     if (!m) return undefined;
-    return { type: 'wikilink', raw: m[0], target: m[1].trim(), label: (m[2] ?? '').trim() };
+    return { type: 'wikilink', raw: m[0], target: m[1].trim(), label: (m[2] || '').trim() };
   },
   renderer(token) {
     const target = String(token['target']);
-    const shown = String(token['label'] || target.replace(/^(project|term)\s*:\s*/i, ''));
+    const label = typeof token['label'] === 'string' ? token['label'] : '';
+    const shown = label || target.replace(/^(project|term)\s*:\s*/i, '');
     const kind = /^term\s*:/i.test(target)
       ? 'term'
       : /^project\s*:/i.test(target)
@@ -49,7 +52,7 @@ const marked = new Marked({
 });
 
 export function renderMarkdown(src: string): string {
-  const html = marked.parse(src ?? '', { async: false }) as string;
+  const html = marked.parse(src, { async: false });
   return DOMPurify.sanitize(html, { ADD_ATTR: ['data-wikilink'] });
 }
 
@@ -57,7 +60,7 @@ export function renderMarkdown(src: string): string {
   selector: 'app-md',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'prose', '(click)': 'onClick($event)' },
-  template: `<div [innerHTML]="html()"></div>`,
+  template: '<div [innerHTML]="html()"></div>',
 })
 export class MarkdownView {
   readonly text = input<string>('');
@@ -69,7 +72,7 @@ export class MarkdownView {
   readonly followLinks = input(true);
   private sanitizer = inject(DomSanitizer);
   private router = inject(Router);
-  private el = inject(ElementRef<HTMLElement>);
+  private el = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly html = computed(() =>
     // renderMarkdown sanitizes with DOMPurify; Angular's sanitizer would drop data-wikilink.
@@ -88,8 +91,10 @@ export class MarkdownView {
     if (target && !ev.metaKey && !ev.ctrlKey) {
       ev.preventDefault();
       const queryParams: Record<string, string> = {};
-      if (this.fromProject()) queryParams['from'] = this.fromProject()!;
-      if (this.fromOrganization()) queryParams['org'] = this.fromOrganization()!;
+      const from = this.fromProject();
+      const org = this.fromOrganization();
+      if (from) queryParams['from'] = from;
+      if (org) queryParams['org'] = org;
       void this.router.navigate(['/go', target], { queryParams });
       return;
     }

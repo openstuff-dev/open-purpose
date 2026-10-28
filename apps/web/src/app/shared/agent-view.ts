@@ -206,11 +206,13 @@ export class AgentView {
     { value: 'layers', label: 'Layers' },
     { value: 'raw', label: 'Exactly as sent' },
   ] as const;
+
   readonly parts = computed(() => [
     { value: 'root', label: 'Whole project' },
     ...this.scopes().map((s) => ({ value: s.id, label: s.name })),
     { value: 'custom', label: 'Other path…' },
   ]);
+
   readonly result = signal<ContextResult | null>(null);
   readonly loading = signal(false);
   readonly raw = signal(false);

@@ -1,7 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
+  type ElementRef,
   computed,
   effect,
   inject,
@@ -33,10 +33,12 @@ interface Item {
 const FIRST_HITS = 12;
 
 function escapeHtml(s: string): string {
-  return s.replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
-  );
+  return s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 /**
@@ -54,7 +56,7 @@ function escapeHtml(s: string): string {
       class="os-command-palette palette"
       aria-label="Go to or search"
       [open]="true"
-      (openChange)="$event || close.emit()"
+      (openChange)="$event || closed.emit()"
     >
       <div class="os-command-search palette-input">
         <app-icon name="search" [size]="18" />
@@ -64,6 +66,7 @@ function escapeHtml(s: string): string {
           placeholder="Go to a page or project, or search rules…"
           aria-label="Search"
           role="combobox"
+          aria-expanded="true"
           aria-controls="palette-list"
           [attr.aria-activedescendant]="'pi-' + active()"
           [value]="query()"
@@ -97,6 +100,7 @@ function escapeHtml(s: string): string {
             @if (i === 0 || items()[i - 1].group !== it.group) {
               <li class="os-command-group-label" role="presentation">{{ it.group }}</li>
             }
+            <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- the search box moves through options with the arrow keys and Enter -->
             <li
               class="os-command-item"
               role="option"
@@ -141,11 +145,11 @@ function escapeHtml(s: string): string {
   `,
 })
 export class Palette {
-  readonly close = output<void>();
+  readonly closed = output();
   private api = inject(Api);
   private router = inject(Router);
   private session = inject(Session);
-  private input = viewChild.required<ElementRef<HTMLInputElement>>('input');
+  private readonly input = viewChild.required<ElementRef<HTMLInputElement>>('input');
 
   readonly query = signal('');
   readonly active = signal(0);
@@ -153,10 +157,10 @@ export class Palette {
   /** Search only the project or organization on screen. */
   readonly narrow = signal(false);
   private readonly more = signal(false);
-  private projects = signal<Project[]>([]);
-  private hits = signal<SearchHit[]>([]);
+  private readonly projects = signal<Project[]>([]);
+  private readonly hits = signal<SearchHit[]>([]);
   /** The scopes and documents of the project on screen. */
-  private local = signal<ProjectDetail | null>(null);
+  private readonly local = signal<ProjectDetail | null>(null);
   private timer: ReturnType<typeof setTimeout> | undefined;
 
   /** The project on screen, else its (or the current) organization. */
@@ -184,12 +188,13 @@ export class Palette {
   private go(path: unknown[], extras: Record<string, unknown> = {}): () => void {
     return () => {
       void this.router.navigate(path, extras);
-      this.close.emit();
+      this.closed.emit();
     };
   }
 
   private readonly pages = computed<Item[]>(() => {
     const s = this.session;
+    const org = s.org();
     // A group with one organization is just that organization: no group page to go to.
     const pages: Item[] = [
       ...(s.groupShown()
@@ -203,12 +208,12 @@ export class Palette {
             },
           ]
         : []),
-      ...(s.org()
+      ...(org
         ? [
             {
               group: 'Pages',
               icon: 'layers',
-              label: s.org()!.name,
+              label: org.name,
               hint: 'Organization overview',
               run: this.go(['/organization']),
             },
@@ -303,7 +308,8 @@ export class Palette {
         : this.projects()
             .filter((p) => narrow?.kind !== 'organization' || p.organization_id === narrow.id)
             .filter((p) => p.id !== hereProject?.id && (match(p.name) || match(p.slug)))
-            // The organization on screen first; sort is stable, so the server's order stays within each.
+            // The organization on screen first; sort is stable, so the server's order stays
+            // within each.
             .sort((a, b) => +(b.organization_id === orgId) - +(a.organization_id === orgId))
             .slice(0, q ? 8 : 5)
             .map<Item>((p) => ({
@@ -315,11 +321,11 @@ export class Palette {
             }));
 
     const where = (h: SearchHit): string => {
-      if (hereProject && h.project_id === hereProject.id) return 'In ' + hereProject.name;
-      if (hereOrg && h.organization_id === hereOrg.id) return 'In ' + hereOrg.name;
+      if (h.project_id === hereProject?.id) return `In ${hereProject.name}`;
+      if (h.organization_id === hereOrg?.id) return `In ${hereOrg.name}`;
       return hereProject || hereOrg ? 'Elsewhere' : 'Rules and terms';
     };
-    const order = (g: string) => (g === 'Elsewhere' ? 2 : g === 'In ' + hereOrg?.name ? 1 : 0);
+    const order = (g: string) => (g === 'Elsewhere' ? 2 : hereOrg && g === `In ${hereOrg.name}` ? 1 : 0);
     const all = this.hits();
     const shown = this.more() ? all : all.slice(0, FIRST_HITS);
     const rules = shown
@@ -340,7 +346,7 @@ export class Palette {
         group: rules[rules.length - 1].group,
         icon: 'plus',
         label: `Show ${all.length - shown.length} more`,
-        run: () => this.more.set(true),
+        run: () => { this.more.set(true); },
       });
 
     return [
@@ -359,15 +365,23 @@ export class Palette {
   constructor() {
     void this.api
       .projects({})
-      .then((p) => this.projects.set(p))
-      .catch(() => {});
+      .then((p) => {
+        this.projects.set(p);
+      })
+      .catch(() => undefined);
     const project = untracked(this.here).project;
     if (project)
       void this.api
         .project(project.id)
-        .then((p) => this.local.set(p))
-        .catch(() => {});
-    effect(() => queueMicrotask(() => this.input().nativeElement.focus()));
+        .then((p) => {
+          this.local.set(p);
+        })
+        .catch(() => undefined);
+    effect(() => {
+      queueMicrotask(() => {
+        this.input().nativeElement.focus();
+      });
+    });
     const start = untracked(this.session.palette);
     if (start) this.onInput(start);
   }
@@ -420,7 +434,7 @@ export class Palette {
       this.active.set(n ? (this.active() - 1 + n) % n : 0);
     } else if (ev.key === 'Enter') {
       ev.preventDefault();
-      const it = this.items()[this.active()];
+      const it = this.items().at(this.active());
       if (it) this.pick(it);
     } else if (ev.key === 'Tab' && this.near()) {
       ev.preventDefault();

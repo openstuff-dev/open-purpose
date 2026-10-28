@@ -1,9 +1,9 @@
 import {
-  AfterViewInit,
+  type AfterViewInit,
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
-  OnDestroy,
+  type ElementRef,
+  type OnDestroy,
   computed,
   inject,
   signal,
@@ -24,9 +24,9 @@ import {
   type SimulationNodeDatum,
 } from 'd3-force';
 import { select, type Selection } from 'd3-selection';
-import { zoom, zoomIdentity, type ZoomBehavior } from 'd3-zoom';
+import { type D3ZoomEvent, zoom, zoomIdentity, type ZoomBehavior } from 'd3-zoom';
 import 'd3-transition';
-import { drag } from 'd3-drag';
+import { type D3DragEvent, drag } from 'd3-drag';
 import { Button, Check, Checkbox, Control } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Graph, GraphEdge, GraphNode, LinkRef, Project } from '../core/models';
@@ -209,7 +209,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
   private notices = inject(Notices);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
-  private svgRef = viewChild.required<ElementRef<SVGSVGElement>>('svg');
+  private readonly svgRef = viewChild.required<ElementRef<SVGSVGElement>>('svg');
   readonly session = inject(Session);
   private switcher = inject(ContextSwitch);
 
@@ -220,12 +220,14 @@ export class MapPage implements AfterViewInit, OnDestroy {
     for (const o of this.graph().organizations) m.set(o.id, this.session.orgColor(o.id));
     return m;
   });
+
   readonly legendOrgs = computed(() => {
     const present = new Set(this.graph().nodes.map((n) => n.organization_id));
     return this.graph()
       .organizations.filter((o) => o.readable && present.has(o.id))
-      .map((o) => ({ ...o, color: this.orgColor().get(o.id)! }));
+      .map((o) => ({ ...o, color: this.session.orgColor(o.id) }));
   });
+
   readonly focus = signal('');
   readonly depth = signal(1);
   readonly showTerms = signal(true);
@@ -236,14 +238,18 @@ export class MapPage implements AfterViewInit, OnDestroy {
   readonly selected = computed(
     () => this.graph().nodes.find((n) => n.id === this.selectedId()) ?? null,
   );
+
   private connections(dir: 'out' | 'in') {
     const id = this.selectedId();
     const nodes = new Map(this.graph().nodes.map((n) => [n.id, n]));
     return this.graph()
       .edges.filter((e) => e.kind === 'link' && (dir === 'out' ? e.source === id : e.target === id))
-      .map((e) => ({ node: nodes.get(dir === 'out' ? e.target : e.source)!, refs: e.refs }))
-      .filter((c) => c.node);
+      .flatMap((e) => {
+        const node = nodes.get(dir === 'out' ? e.target : e.source);
+        return node ? [{ node, refs: e.refs }] : [];
+      });
   }
+
   readonly outgoing = computed(() => this.connections('out'));
   readonly incoming = computed(() => this.connections('in'));
   readonly ariaLabel = computed(() => {
@@ -254,7 +260,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
   private sim: Simulation<SimNode, SimLink> | null = null;
   private fitted = false;
   private zoomer: ZoomBehavior<SVGSVGElement, unknown> | null = null;
-  private resize = () => this.draw();
+  private resize = () => { this.draw(); };
 
   ngAfterViewInit(): void {
     const q = this.route.snapshot.queryParamMap;
@@ -262,8 +268,10 @@ export class MapPage implements AfterViewInit, OnDestroy {
     this.depth.set(Number(q.get('depth') ?? 1) || 1);
     void this.api
       .projects({})
-      .then((p) => this.projects.set(p))
-      .catch((e) => this.notices.error(e));
+      .then((p) => { this.projects.set(p); })
+      .catch((e: unknown) => {
+        this.notices.error(e);
+      });
     window.addEventListener('resize', this.resize);
     void this.reload();
   }
@@ -330,9 +338,9 @@ export class MapPage implements AfterViewInit, OnDestroy {
   refText(refs: LinkRef[]): string {
     return refs.length
       ? `in ${refs
-          .map((r) => `“${r.heading}”`)
-          .slice(0, 2)
-          .join(', ')}`
+        .map((r) => `“${r.heading}”`)
+        .slice(0, 2)
+        .join(', ')}`
       : '';
   }
 
@@ -346,9 +354,11 @@ export class MapPage implements AfterViewInit, OnDestroy {
     const keep = (n: GraphNode) => this.showTerms() || n.type !== 'term';
     const nodes: SimNode[] = g.nodes.filter(keep).map((n) => ({ ...n, degree: 0 }));
     const byId = new Map(nodes.map((n) => [n.id, n]));
-    const links: SimLink[] = g.edges
-      .filter((e) => byId.has(e.source) && byId.has(e.target))
-      .map((e) => ({ source: byId.get(e.source)!, target: byId.get(e.target)!, edge: e }));
+    const links: SimLink[] = g.edges.flatMap((e) => {
+      const source = byId.get(e.source);
+      const target = byId.get(e.target);
+      return source && target ? [{ source, target, edge: e }] : [];
+    });
     for (const l of links) {
       (l.source as SimNode).degree++;
       (l.target as SimNode).degree++;
@@ -392,7 +402,9 @@ export class MapPage implements AfterViewInit, OnDestroy {
     const root = svg.append('g');
     this.zoomer = zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.2, 4])
-      .on('zoom', (ev) => root.attr('transform', ev.transform));
+      .on('zoom', (ev: D3ZoomEvent<SVGSVGElement, unknown>) => {
+        root.attr('transform', ev.transform.toString());
+      });
     svg.call(this.zoomer).on('dblclick.zoom', null);
     svg.on('click', (ev: MouseEvent) => {
       if (ev.target === svgEl) this.select(null);
@@ -496,7 +508,8 @@ export class MapPage implements AfterViewInit, OnDestroy {
         forceCollide<SimNode>().radius((d) => r(d) + Math.min(d.label.length * 3.2, 60)),
       )
       .force('center', forceCenter(width / 2, height / 2))
-      // Each organization gathers around its own point on a circle; group-wide things sit in the middle.
+      // Each organization gathers around its own point on a circle; group-wide things sit
+      // in the middle.
       .force(
         'x',
         forceX<SimNode>((d) => anchor(d).x).strength((d) => (d.organization_id ? 0.07 : 0.04)),
@@ -511,22 +524,24 @@ export class MapPage implements AfterViewInit, OnDestroy {
       link.each(function (d) {
         const s = d.source as SimNode;
         const t = d.target as SimNode;
-        const dx = t.x! - s.x!;
-        const dy = t.y! - s.y!;
+        const [sx, sy, tx, ty] = [s.x ?? 0, s.y ?? 0, t.x ?? 0, t.y ?? 0];
+        const dx = tx - sx;
+        const dy = ty - sy;
         const len = Math.hypot(dx, dy) || 1;
         const pad = r(t) + 3;
         select(this)
-          .attr('x1', s.x!)
-          .attr('y1', s.y!)
-          .attr('x2', t.x! - (dx / len) * pad)
-          .attr('y2', t.y! - (dy / len) * pad);
+          .attr('x1', sx)
+          .attr('y1', sy)
+          .attr('x2', tx - (dx / len) * pad)
+          .attr('y2', ty - (dy / len) * pad);
       });
       node.attr('transform', (d) => `translate(${d.x},${d.y})`);
     };
     const fit = () => {
-      if (!nodes.length || !this.zoomer) return;
-      const xs = nodes.map((n) => n.x!);
-      const ys = nodes.map((n) => n.y!);
+      const zoomer = this.zoomer;
+      if (!nodes.length || !zoomer) return;
+      const xs = nodes.map((n) => n.x ?? 0);
+      const ys = nodes.map((n) => n.y ?? 0);
       const [x0, x1, y0, y1] = [
         Math.min(...xs) - 40,
         Math.max(...xs) + 160,
@@ -541,7 +556,9 @@ export class MapPage implements AfterViewInit, OnDestroy {
       svg
         .transition()
         .duration(reduced ? 0 : 450)
-        .call(this.zoomer.transform, t);
+        .call((tr) => {
+          zoomer.transform(tr, t);
+        });
     };
     if (reduced) {
       sim.stop();
@@ -561,17 +578,17 @@ export class MapPage implements AfterViewInit, OnDestroy {
 
     node.call(
       drag<SVGGElement, SimNode>()
-        .on('start', (ev, d) => {
+        .on('start', (ev: D3DragEvent<SVGGElement, SimNode, SimNode>, d) => {
           if (!ev.active) sim.alphaTarget(0.2).restart();
           d.fx = d.x;
           d.fy = d.y;
         })
-        .on('drag', (ev, d) => {
+        .on('drag', (ev: D3DragEvent<SVGGElement, SimNode, SimNode>, d) => {
           d.fx = ev.x;
           d.fy = ev.y;
           if (reduced) tick();
         })
-        .on('end', (ev, d) => {
+        .on('end', (ev: D3DragEvent<SVGGElement, SimNode, SimNode>, d) => {
           if (!ev.active) sim.alphaTarget(0);
           d.fx = null;
           d.fy = null;
@@ -581,7 +598,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
     this.sim = sim;
     this.nodeSel = node;
     this.linkSel = link;
-    svg.call(this.zoomer.transform, zoomIdentity);
+    this.zoomer.transform(svg, zoomIdentity);
     this.highlight();
   }
 

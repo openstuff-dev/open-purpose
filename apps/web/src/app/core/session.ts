@@ -1,4 +1,4 @@
-import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { type HttpErrorResponse, type HttpInterceptorFn } from '@angular/common/http';
 import { DestroyRef, Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 import type { ConfirmDialog } from '@openstuff-dev/ui-angular';
@@ -68,6 +68,7 @@ export class Session {
     const ids = this.agentView()?.switchable_organization_ids ?? [];
     return this.orgs().filter((o) => ids.includes(o.id));
   });
+
   readonly org = computed<Organization | null>(
     () => this.orgs().find((o) => o.id === this.orgId()) ?? null,
   );
@@ -114,7 +115,7 @@ export class Session {
   /** Edit rights at a level (null = group-wide). Detail endpoints also return can_edit. */
   canEdit(orgId: string | null): boolean {
     const me = this.me();
-    if (!me || me.actor.kind !== 'human' || me.agent_view) return false;
+    if (me?.actor.kind !== 'human' || me.agent_view) return false;
     if (orgId === null) return me.group.can_edit;
     const role = me.organizations.find((o) => o.id === orgId)?.role;
     return role === 'admin' || role === 'editor';
@@ -122,7 +123,7 @@ export class Session {
 
   canAdmin(orgId: string | null): boolean {
     const me = this.me();
-    if (!me || me.actor.kind !== 'human' || me.agent_view) return false;
+    if (me?.actor.kind !== 'human' || me.agent_view) return false;
     if (orgId === null) return me.group.can_admin;
     return me.organizations.find((o) => o.id === orgId)?.role === 'admin';
   }
@@ -166,7 +167,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
 /** Set when a create or rename failed because the slug is still another one's old slug. */
 export function aliasConflict(err: unknown): { id: string; name: string; slug: string } | null {
-  const body = (err as HttpErrorResponse)?.error as
+  const body = (err as HttpErrorResponse | undefined)?.error as
     { error?: string; alias_of?: { id: string; name: string; slug: string } } | undefined;
   return body?.error === 'conflict' && body.alias_of ? body.alias_of : null;
 }
@@ -195,7 +196,7 @@ export async function claimingOldSlug<T>(
 
 /** Pull the server's message out of an HttpErrorResponse. */
 export function errorMessage(err: unknown): string {
-  const e = err as HttpErrorResponse;
+  const e = err as HttpErrorResponse | undefined;
   const body = e?.error as { message?: string } | undefined;
   if (body?.message) return body.message;
   if (e?.status === 0) return 'Cannot reach the OpenPurpose server.';

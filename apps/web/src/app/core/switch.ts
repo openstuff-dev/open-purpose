@@ -23,7 +23,7 @@ export class ContextSwitch {
     const before = this.session.orgChoice();
     this.session.setAgentMode(on);
     if (on && !this.session.orgId()) {
-      const first = this.session.readableOrgs()[0];
+      const first = this.session.readableOrgs().at(0);
       if (first) this.session.chooseOrg(first.id);
     }
     try {
