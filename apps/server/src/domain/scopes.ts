@@ -50,7 +50,12 @@ function globMatches(glob: string, path: string): boolean {
  */
 export function matchScopes<T extends ScopeRule>(
   scopes: T[],
-  input: { path?: string | null; stacks?: string[]; explicit?: string[]; repository?: { id: string; key: string } | null },
+  input: {
+    path?: string | null;
+    stacks?: string[];
+    explicit?: string[];
+    repository?: { id: string; key: string } | null;
+  },
 ): ScopeMatch<T>[] {
   const path = normalizePath(input.path);
   const stacks = new Set(normalizeTags(input.stacks ?? []));
@@ -63,7 +68,10 @@ export function matchScopes<T extends ScopeRule>(
     }
     const old = scope.aliases?.find((s) => explicit.has(s));
     if (old) {
-      out.push({ scope, reason: `requested explicitly by its old slug "${old}"; use "${scope.slug}"` });
+      out.push({
+        scope,
+        reason: `requested explicitly by its old slug "${old}"; use "${scope.slug}"`,
+      });
       continue;
     }
     const repos = scope.repository_ids ?? [];

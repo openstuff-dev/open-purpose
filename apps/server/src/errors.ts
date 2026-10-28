@@ -1,10 +1,5 @@
 export type ErrorCode =
-  | 'bad_request'
-  | 'unauthorized'
-  | 'forbidden'
-  | 'not_found'
-  | 'conflict'
-  | 'locked';
+  'bad_request' | 'unauthorized' | 'forbidden' | 'not_found' | 'conflict' | 'locked';
 
 const STATUS: Record<ErrorCode, number> = {
   bad_request: 400,
@@ -23,6 +18,7 @@ export class AppError extends Error {
   ) {
     super(message);
   }
+
   get status(): number {
     return STATUS[this.code];
   }
@@ -35,14 +31,16 @@ export const badRequest = (msg: string, details?: Record<string, unknown>) =>
 
 /** Translate Postgres unique-violation into a readable conflict. */
 export function mapPgError(err: unknown): unknown {
-  const e = err as { code?: string; constraint?: string; detail?: string };
-  if (e && e.code === '23505') {
-    return new AppError('conflict', `Already exists (${e.constraint ?? 'unique'})`, { detail: e.detail });
+  const e = err as { code?: string; constraint?: string; detail?: string } | null | undefined;
+  if (e?.code === '23505') {
+    return new AppError('conflict', `Already exists (${e.constraint ?? 'unique'})`, {
+      detail: e.detail,
+    });
   }
-  if (e && e.code === '23514') {
+  if (e?.code === '23514') {
     return new AppError('bad_request', `Invalid value (${e.constraint ?? 'check'})`);
   }
-  if (e && e.code === '22P02') {
+  if (e?.code === '22P02') {
     return new AppError('bad_request', 'Malformed identifier');
   }
   return err;

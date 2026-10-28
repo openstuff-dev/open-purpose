@@ -9,7 +9,7 @@ export interface Manifest {
   content: string;
 }
 
-const NPM_TAGS: Array<[pkg: string | RegExp, tags: string[]]> = [
+const NPM_TAGS: [pkg: string | RegExp, tags: string[]][] = [
   ['@angular/core', ['angular', 'frontend']],
   ['react', ['react', 'frontend']],
   ['next', ['nextjs', 'react', 'frontend']],
@@ -28,7 +28,7 @@ const NPM_TAGS: Array<[pkg: string | RegExp, tags: string[]]> = [
   ['@playwright/test', ['playwright']],
 ];
 
-const NUGET_TAGS: Array<[pkg: RegExp, tags: string[]]> = [
+const NUGET_TAGS: [pkg: RegExp, tags: string[]][] = [
   [/^Microsoft\.EntityFrameworkCore/i, ['efcore']],
   [/^Microsoft\.AspNetCore\.Components/i, ['blazor', 'frontend']],
   [/^MediatR$/i, ['mediatr']],
@@ -40,7 +40,11 @@ const NUGET_TAGS: Array<[pkg: RegExp, tags: string[]]> = [
 ];
 
 export function normalizeTag(tag: string): string {
-  return tag.trim().toLowerCase().replace(/[^a-z0-9+#.]+/g, '-').replace(/^-+|-+$/g, '');
+  return tag
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9+#.]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 export function normalizeTags(tags: Iterable<string>): string[] {
@@ -55,7 +59,7 @@ export function normalizeTags(tags: Iterable<string>): string[] {
 function fromPackageJson(content: string): string[] {
   let pkg: Record<string, unknown>;
   try {
-    pkg = JSON.parse(content);
+    pkg = JSON.parse(content) as Record<string, unknown>;
   } catch {
     return ['node'];
   }
@@ -67,7 +71,8 @@ function fromPackageJson(content: string): string[] {
   const names = Object.keys(deps);
   const tags = ['node'];
   for (const [match, add] of NPM_TAGS) {
-    if (names.some((n) => (typeof match === 'string' ? n === match : match.test(n)))) tags.push(...add);
+    if (names.some((n) => (typeof match === 'string' ? n === match : match.test(n))))
+      tags.push(...add);
   }
   return tags;
 }
@@ -94,10 +99,12 @@ export function detectStacks(manifests: Manifest[]): string[] {
     if (file === 'package.json') tags.push(...fromPackageJson(m.content));
     else if (file.endsWith('.csproj')) tags.push(...fromCsproj(m.content));
     else if (file.endsWith('.fsproj')) tags.push('dotnet', 'fsharp');
-    else if (file.endsWith('.sln') || file === 'directory.build.props' || file === 'global.json') tags.push('dotnet');
+    else if (file.endsWith('.sln') || file === 'directory.build.props' || file === 'global.json')
+      tags.push('dotnet');
     else if (file === 'go.mod') tags.push('go');
     else if (file === 'pyproject.toml' || file === 'requirements.txt') tags.push('python');
-    else if (file === 'pom.xml' || file === 'build.gradle' || file === 'build.gradle.kts') tags.push('java');
+    else if (file === 'pom.xml' || file === 'build.gradle' || file === 'build.gradle.kts')
+      tags.push('java');
     else if (file === 'cargo.toml') tags.push('rust');
     else if (file === 'angular.json') tags.push('angular', 'frontend');
     else if (file === 'dockerfile') tags.push('docker');

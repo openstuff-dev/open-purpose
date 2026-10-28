@@ -3,11 +3,13 @@
  * The file is the same as the one Settings › Export and import downloads.
  *
  *   node dist/export-cli.js --group acme-group --out backup.json
- *   node dist/export-cli.js --group acme-group --organization payments --people --no-history > payments.json
+ *   node dist/export-cli.js --group acme-group --organization payments --people \
+ *     --no-history > payments.json
  *
- * Options: --organization <slug>, --out <file>, --zip (Markdown files plus manifest.json, needs --out),
- * --people, --no-history, --no-proposals, --no-api-specs, --no-findings.
- * With npm, pass -s so npm's own output stays out of the file: npm run -s export -w server -- --group acme-group
+ * Options: --organization <slug>, --out <file>, --zip (Markdown files plus manifest.json, needs
+ * --out), --people, --no-history, --no-proposals, --no-api-specs, --no-findings.
+ * With npm, pass -s so npm's own output stays out of the file:
+ *   npm run -s export -w server -- --group acme-group
  */
 import fs from 'node:fs/promises';
 import { parseArgs } from 'node:util';
@@ -39,15 +41,28 @@ async function main() {
   if (!args.group) throw new Error('--group <slug> is required');
   if (args.zip && !args.out) throw new Error('--zip needs --out <file>');
   const { rows } = await pool.query<Actor>(
-    `SELECT id, name, kind, is_superadmin FROM actors WHERE is_superadmin AND disabled_at IS NULL ORDER BY created_at LIMIT 1`);
+    'SELECT id, name, kind, is_superadmin FROM actors WHERE is_superadmin AND disabled_at IS NULL ORDER BY created_at LIMIT 1',
+  );
   if (!rows[0]) throw new Error('No server admin found to export as.');
   const access = await resolveAccess(pool, rows[0], args.group, args.organization);
   const orgId = args.organization ? access.orgBySlug(args.organization)?.id : null;
-  if (orgId === undefined) throw new Error(`No organization "${args.organization}" in ${access.group.name}.`);
-  const file = await withScope(pool, { groupId: access.group.id }, (db) => exportContent(db, access, orgId, {
-    history: !args['no-history'], proposals: !args['no-proposals'], people: args.people, api_specs: !args['no-api-specs'],
-    findings: !args['no-findings'],
-  }, VERSION));
+  if (orgId === undefined)
+    throw new Error(`No organization "${args.organization}" in ${access.group.name}.`);
+  const file = await withScope(pool, { groupId: access.group.id }, (db) =>
+    exportContent(
+      db,
+      access,
+      orgId,
+      {
+        history: !args['no-history'],
+        proposals: !args['no-proposals'],
+        people: args.people,
+        api_specs: !args['no-api-specs'],
+        findings: !args['no-findings'],
+      },
+      VERSION,
+    ),
+  );
   const text = JSON.stringify(file, null, 2);
   if (args.out) {
     await fs.writeFile(args.out, args.zip ? exportZip(file) : text);
@@ -58,8 +73,8 @@ async function main() {
 }
 
 main()
-  .catch((err) => {
-    process.stderr.write(`${err instanceof Error ? err.message : err}\n`);
+  .catch((err: unknown) => {
+    process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
     process.exitCode = 1;
   })
   .finally(() => pool.end());

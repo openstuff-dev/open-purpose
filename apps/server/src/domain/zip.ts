@@ -64,12 +64,21 @@ export function writeZip(entries: ZipEntry[], when = new Date()): Buffer {
   return Buffer.concat([...locals, ...central, end]);
 }
 
-/** Read the files of a zip. `wanted` picks which names to unpack; `maxBytes` caps each one unpacked. */
-export function readZip(zip: Buffer, wanted: (name: string) => boolean, maxBytes: number): ZipEntry[] {
+/**
+ * Read the files of a zip. `wanted` picks which names to unpack; `maxBytes` caps each one unpacked.
+ */
+export function readZip(
+  zip: Buffer,
+  wanted: (name: string) => boolean,
+  maxBytes: number,
+): ZipEntry[] {
   const bad = () => new Error('not a readable zip file');
   let end = -1;
   for (let i = zip.length - 22; i >= Math.max(0, zip.length - 22 - 0xffff); i--) {
-    if (zip.readUInt32LE(i) === 0x06054b50) { end = i; break; }
+    if (zip.readUInt32LE(i) === 0x06054b50) {
+      end = i;
+      break;
+    }
   }
   if (end < 0) throw bad();
   const count = zip.readUInt16LE(end + 10);

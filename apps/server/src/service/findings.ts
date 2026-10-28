@@ -7,7 +7,13 @@ import type { Finding, FindingCounts, FindingStatus } from '@openpurpose/contrac
 
 export type { Finding, FindingCounts, FindingStatus } from '@openpurpose/contracts';
 
-export const FINDING_STATUSES: FindingStatus[] = ['new', 'todo', 'ask_later', 'dismissed', 'solved'];
+export const FINDING_STATUSES: FindingStatus[] = [
+  'new',
+  'todo',
+  'ask_later',
+  'dismissed',
+  'solved',
+];
 
 /** Still waiting for someone: what lists show unless asked for more. */
 export const OPEN_FINDING_STATUSES: FindingStatus[] = ['new', 'todo', 'ask_later'];
@@ -36,7 +42,10 @@ function present(a: Access, r: Row): Finding {
   };
 }
 
-/** People who edit the finding's organization sort it; agents of that organization may only mark it solved. */
+/**
+ * People who edit the finding's organization sort it; agents of that organization may only mark it
+ * solved.
+ */
 export function canTriage(a: Access, f: Pick<Finding, 'organization_id'>): boolean {
   return a.canEdit(f.organization_id) || a.canAgentWrite(f.organization_id);
 }
@@ -53,7 +62,11 @@ export interface FindingQuery {
   limit?: number;
 }
 
-export async function listFindings(db: Queryable, a: Access, opts: FindingQuery = {}): Promise<Finding[]> {
+export async function listFindings(
+  db: Queryable,
+  a: Access,
+  opts: FindingQuery = {},
+): Promise<Finding[]> {
   if (opts.id && !/^[0-9a-f-]{36}$/i.test(opts.id)) throw notFound('Finding');
   if (opts.organizationId) a.requireRead(opts.organizationId);
   const path = normalizePath(opts.path);
@@ -68,14 +81,22 @@ export async function listFindings(db: Queryable, a: Access, opts: FindingQuery 
         AND ($7 = '' OR f.search @@ websearch_to_tsquery('simple', $7) OR f.file ILIKE '%' || $7 || '%')
       ORDER BY f.updated_at DESC
       LIMIT $8`,
-    [a.readableOrgIds(), opts.id ?? null, opts.projectId ?? null, opts.organizationId ?? null,
-      opts.statuses?.length ? opts.statuses : OPEN_FINDING_STATUSES, path, opts.q?.trim() ?? '', Math.min(opts.limit ?? 300, 1000)],
+    [
+      a.readableOrgIds(),
+      opts.id ?? null,
+      opts.projectId ?? null,
+      opts.organizationId ?? null,
+      opts.statuses?.length ? opts.statuses : OPEN_FINDING_STATUSES,
+      path,
+      opts.q?.trim() ?? '',
+      Math.min(opts.limit ?? 300, 1000),
+    ],
   );
   return rows.map((r) => present(a, r));
 }
 
 export async function getFinding(db: Queryable, a: Access, id: string): Promise<Finding> {
-  const [f] = await listFindings(db, a, { id });
+  const f = (await listFindings(db, a, { id })).at(0);
   if (!f) throw notFound('Finding');
   return f;
 }
@@ -89,8 +110,9 @@ async function findId(db: Queryable, a: Access, ref: string): Promise<string> {
   if (/^[0-9a-f-]{36}$/.test(r)) return r;
   if (!/^[0-9a-f]{8}$/.test(r)) throw notFound('Finding');
   const { rows } = await db.query<{ id: string }>(
-    `SELECT id FROM findings WHERE id::text LIKE $1 || '%' AND organization_id = ANY($2::uuid[]) LIMIT 2`,
-    [r, a.readableOrgIds()]);
+    'SELECT id FROM findings WHERE id::text LIKE $1 || \'%\' AND organization_id = ANY($2::uuid[]) LIMIT 2',
+    [r, a.readableOrgIds()],
+  );
   if (rows.length !== 1) throw notFound('Finding');
   return rows[0].id;
 }
@@ -100,7 +122,11 @@ export async function getFindingByRef(db: Queryable, a: Access, ref: string): Pr
   return getFinding(db, a, await findId(db, a, ref));
 }
 
-export async function findingCounts(db: Queryable, a: Access, opts: { projectId?: string; organizationId?: string } = {}): Promise<FindingCounts> {
+export async function findingCounts(
+  db: Queryable,
+  a: Access,
+  opts: { projectId?: string; organizationId?: string } = {},
+): Promise<FindingCounts> {
   if (opts.organizationId) a.requireRead(opts.organizationId);
   const { rows } = await db.query<{ status: FindingStatus; n: number }>(
     `SELECT status, count(*)::int AS n FROM findings
@@ -120,7 +146,9 @@ export async function countToSort(db: Queryable, a: Access): Promise<number> {
   const editable = a.orgs.filter((o) => a.canEdit(o.id)).map((o) => o.id);
   if (!editable.length) return 0;
   const { rows } = await db.query<{ n: number }>(
-    `SELECT count(*)::int AS n FROM findings WHERE status = 'new' AND organization_id = ANY($1::uuid[])`, [editable]);
+    'SELECT count(*)::int AS n FROM findings WHERE status = \'new\' AND organization_id = ANY($1::uuid[])',
+    [editable],
+  );
   return rows[0].n;
 }
 
@@ -141,7 +169,13 @@ export interface FindingInput {
   context?: Record<string, unknown>;
 }
 
-const words = (t: string) => new Set(t.toLowerCase().split(/[^\p{L}\p{N}_]+/u).filter((w) => w.length >= 3));
+const words = (t: string) =>
+  new Set(
+    t
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}_]+/u)
+      .filter((w) => w.length >= 3),
+  );
 
 /** How alike two titles are: shared words over all words (0 to 1). */
 export function titleSimilarity(x: string, y: string): number {
@@ -153,13 +187,20 @@ export function titleSimilarity(x: string, y: string): number {
   return shared / (a.size + b.size - shared);
 }
 
-/** Open findings in the same project that may be the same problem: same file, or a similar title. */
+/**
+ * Open findings in the same project that may be the same problem: same file, or a similar title.
+ */
 export async function similarFindings(
-  db: Queryable, a: Access, input: Pick<FindingInput, 'project_id' | 'file' | 'title'>,
+  db: Queryable,
+  a: Access,
+  input: Pick<FindingInput, 'project_id' | 'file' | 'title'>,
 ): Promise<Finding[]> {
   const open = await listFindings(db, a, { projectId: input.project_id, limit: 1000 });
   return open
-    .map((f) => ({ f, score: (f.file === input.file ? 0.5 : 0) + titleSimilarity(f.title, input.title) }))
+    .map((f) => ({
+      f,
+      score: (f.file === input.file ? 0.5 : 0) + titleSimilarity(f.title, input.title),
+    }))
     .filter((x) => x.score >= 0.4)
     .sort((x, y) => y.score - x.score)
     .slice(0, 5)
@@ -171,14 +212,18 @@ export async function similarFindings(
  * filed unless `evenIfSimilar`: they come back instead, so the agent can check them first.
  */
 export async function reportFinding(
-  db: Queryable, a: Access, input: FindingInput, opts: { evenIfSimilar?: boolean } = {},
+  db: Queryable,
+  a: Access,
+  input: FindingInput,
+  opts: { evenIfSimilar?: boolean } = {},
 ): Promise<{ finding: Finding | null; similar: Finding[] }> {
   const file = normalizePath(input.file);
   if (!file) throw badRequest('file (the repo-relative path of the problem) is required');
-  if (!input.title?.trim()) throw badRequest('title (one line a person can scan) is required');
+  if (!input.title.trim()) throw badRequest('title (one line a person can scan) is required');
   const lineStart = input.line_start ?? null;
   const lineEnd = input.line_end ?? lineStart;
-  if (lineStart !== null && (lineStart < 1 || (lineEnd ?? lineStart) < lineStart)) throw badRequest('lines must be 1 or more, start before end');
+  if (lineStart !== null && (lineStart < 1 || (lineEnd ?? lineStart) < lineStart))
+    throw badRequest('lines must be 1 or more, start before end');
   a.requireContribute(input.organization_id);
   const similar = await similarFindings(db, a, { ...input, file });
   if (similar.length && !opts.evenIfSimilar) return { finding: null, similar };
@@ -186,9 +231,21 @@ export async function reportFinding(
     `INSERT INTO findings (organization_id, project_id, scope_id, file, line_start, line_end, title, problem, proposed_fix,
                            commit_sha, remote, context, created_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
-    [input.organization_id, input.project_id, input.scope_id, file, lineStart, lineEnd, input.title.trim(),
-      input.problem?.trim() ?? '', input.proposed_fix?.trim() ?? '', input.commit_sha?.trim() || null, input.remote ?? null,
-      JSON.stringify(input.context ?? {}), a.actor.id],
+    [
+      input.organization_id,
+      input.project_id,
+      input.scope_id,
+      file,
+      lineStart,
+      lineEnd,
+      input.title.trim(),
+      input.problem?.trim() ?? '',
+      input.proposed_fix?.trim() ?? '',
+      input.commit_sha?.trim() || null,
+      input.remote ?? null,
+      JSON.stringify(input.context ?? {}),
+      a.actor.id,
+    ],
   );
   return { finding: await getFinding(db, a, rows[0].id), similar };
 }
@@ -208,30 +265,53 @@ export interface FindingStatusChange {
  * People with edit rights move a finding to any status, including back from
  * solved or dismissed. Agents only mark one solved, and must say how.
  */
-export async function setFindingStatus(db: Queryable, a: Access, ref: string, change: FindingStatusChange): Promise<Finding> {
-  if (!FINDING_STATUSES.includes(change.status)) throw badRequest(`status must be one of ${FINDING_STATUSES.join(', ')}`);
+export async function setFindingStatus(
+  db: Queryable,
+  a: Access,
+  ref: string,
+  change: FindingStatusChange,
+): Promise<Finding> {
+  if (!FINDING_STATUSES.includes(change.status))
+    throw badRequest(`status must be one of ${FINDING_STATUSES.join(', ')}`);
   const id = await findId(db, a, ref);
   return tx(db, async (c) => {
-    const { rows: [current] } = await c.query<{ organization_id: string; status: FindingStatus }>(
-      'SELECT organization_id, status FROM findings WHERE id = $1 FOR UPDATE', [id]);
+    const current = (
+      await c.query<{ organization_id: string; status: FindingStatus }>(
+        'SELECT organization_id, status FROM findings WHERE id = $1 FOR UPDATE',
+        [id],
+      )
+    ).rows.at(0);
     if (!current) throw notFound('Finding');
     a.requireRead(current.organization_id, 'this finding');
     if (a.isAgent) {
-      if (change.status !== 'solved') throw forbidden('Agents can only mark a finding solved. A person decides what else happens to it.');
+      if (change.status !== 'solved')
+        throw forbidden(
+          'Agents can only mark a finding solved. A person decides what else happens to it.',
+        );
       a.requireContribute(current.organization_id);
-      if (!change.solved_ref?.trim()) throw badRequest('solved_ref (the commit or PR that fixed it) is required');
+      if (!change.solved_ref?.trim())
+        throw badRequest('solved_ref (the commit or PR that fixed it) is required');
     } else {
       a.requireEdit(current.organization_id);
     }
-    if (current.status === change.status && change.status === 'solved') throw new AppError('conflict', 'This finding is already solved');
+    if (current.status === change.status && change.status === 'solved')
+      throw new AppError('conflict', 'This finding is already solved');
     const remindAfter = change.status === 'ask_later' ? change.remind_after || null : null;
-    if (remindAfter && !/^\d{4}-\d{2}-\d{2}$/.test(remindAfter)) throw badRequest('remind_after must be a date, YYYY-MM-DD');
+    if (remindAfter && !/^\d{4}-\d{2}-\d{2}$/.test(remindAfter))
+      throw badRequest('remind_after must be a date, YYYY-MM-DD');
     await c.query(
       `UPDATE findings SET status = $2, status_note = $3, solved_ref = $4, remind_after = $5::date,
               status_by = $6, status_at = now(), updated_at = now()
         WHERE id = $1`,
-      [id, change.status, change.note?.trim() ?? '', change.status === 'solved' ? change.solved_ref?.trim() || null : null,
-        remindAfter, a.actor.id]);
+      [
+        id,
+        change.status,
+        change.note?.trim() ?? '',
+        change.status === 'solved' ? change.solved_ref?.trim() || null : null,
+        remindAfter,
+        a.actor.id,
+      ],
+    );
     return getFinding(c, a, id);
   });
 }
@@ -255,21 +335,43 @@ export interface FindingEdit {
  * Whoever reported a finding corrects it while it is still open: a wrong commit,
  * file or line, or a clearer title. Sorting it stays with people (setFindingStatus).
  */
-export async function updateFinding(db: Queryable, a: Access, ref: string, edit: FindingEdit): Promise<Finding> {
+export async function updateFinding(
+  db: Queryable,
+  a: Access,
+  ref: string,
+  edit: FindingEdit,
+): Promise<Finding> {
   const id = await findId(db, a, ref);
   return tx(db, async (c) => {
-    const { rows: [current] } = await c.query<{
-      organization_id: string; status: FindingStatus; created_by: string | null; file: string; scope_id: string | null;
-      line_start: number | null; line_end: number | null; title: string; problem: string; proposed_fix: string; commit_sha: string | null;
-    }>(
-      `SELECT organization_id, status, created_by, file, scope_id, line_start, line_end, title, problem, proposed_fix, commit_sha
-         FROM findings WHERE id = $1 FOR UPDATE`, [id]);
+    const current = (
+      await c.query<{
+        organization_id: string;
+        status: FindingStatus;
+        created_by: string | null;
+        file: string;
+        scope_id: string | null;
+        line_start: number | null;
+        line_end: number | null;
+        title: string;
+        problem: string;
+        proposed_fix: string;
+        commit_sha: string | null;
+      }>(
+        `SELECT organization_id, status, created_by, file, scope_id, line_start, line_end, title, problem, proposed_fix, commit_sha
+           FROM findings WHERE id = $1 FOR UPDATE`,
+        [id],
+      )
+    ).rows.at(0);
     if (!current) throw notFound('Finding');
     a.requireRead(current.organization_id, 'this finding');
-    if (current.created_by !== a.actor.id) throw forbidden('Only whoever reported a finding can correct it.');
+    if (current.created_by !== a.actor.id)
+      throw forbidden('Only whoever reported a finding can correct it.');
     a.requireContribute(current.organization_id);
     if (!OPEN_FINDING_STATUSES.includes(current.status)) {
-      throw new AppError('conflict', `This finding is ${current.status === 'ask_later' ? 'waiting' : current.status}; it can't be changed any more.`);
+      throw new AppError(
+        'conflict',
+        `This finding is ${current.status === 'ask_later' ? 'waiting' : current.status}; it can't be changed any more.`,
+      );
     }
 
     const file = edit.file === undefined ? current.file : normalizePath(edit.file);
@@ -278,18 +380,31 @@ export async function updateFinding(db: Queryable, a: Access, ref: string, edit:
     if (!title) throw badRequest('title (one line a person can scan) is required');
     // A new start line without an end means one line, as when reporting.
     const lineStart = edit.line_start === undefined ? current.line_start : edit.line_start;
-    const lineEnd = edit.line_end !== undefined ? edit.line_end ?? lineStart
-      : edit.line_start !== undefined ? lineStart : current.line_end;
-    if (lineStart !== null && (lineStart < 1 || (lineEnd ?? lineStart) < lineStart)) throw badRequest('lines must be 1 or more, start before end');
+    const lineEnd =
+      edit.line_end !== undefined
+        ? (edit.line_end ?? lineStart)
+        : edit.line_start !== undefined
+          ? lineStart
+          : current.line_end;
+    if (lineStart !== null && (lineStart < 1 || (lineEnd ?? lineStart) < lineStart))
+      throw badRequest('lines must be 1 or more, start before end');
 
     await c.query(
       `UPDATE findings SET file = $2, scope_id = $3, line_start = $4, line_end = $5, title = $6, problem = $7,
               proposed_fix = $8, commit_sha = $9, updated_at = now()
         WHERE id = $1`,
-      [id, file, edit.file === undefined ? current.scope_id : edit.scope_id ?? null, lineStart, lineEnd, title,
+      [
+        id,
+        file,
+        edit.file === undefined ? current.scope_id : (edit.scope_id ?? null),
+        lineStart,
+        lineEnd,
+        title,
         edit.problem === undefined ? current.problem : edit.problem.trim(),
         edit.proposed_fix === undefined ? current.proposed_fix : edit.proposed_fix.trim(),
-        edit.commit_sha === undefined ? current.commit_sha : edit.commit_sha?.trim() || null]);
+        edit.commit_sha === undefined ? current.commit_sha : edit.commit_sha?.trim() || null,
+      ],
+    );
     return getFinding(c, a, id);
   });
 }
@@ -319,7 +434,11 @@ export function folderOf(path: string | null | undefined): string {
  * nobody has looked at them yet.
  */
 export async function findingsNear(
-  db: Queryable, a: Access, projectId: string, path: string | null | undefined, remote: string | null | undefined,
+  db: Queryable,
+  a: Access,
+  projectId: string,
+  path: string | null | undefined,
+  remote: string | null | undefined,
 ): Promise<NearbyFindings> {
   const folder = folderOf(path);
   const { rows } = await db.query<Row & { total: number }>(

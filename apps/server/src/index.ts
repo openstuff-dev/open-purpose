@@ -22,7 +22,11 @@ async function main() {
   const applied = await migrate(config.databaseUrl, config.migrationsDir);
   if (applied.length) console.log(`Applied migrations: ${applied.join(', ')}`);
 
-  const boot = await bootstrap(db, { groupName: config.groupName, orgName: config.orgName, token: config.bootstrapToken });
+  const boot = await bootstrap(db, {
+    groupName: config.groupName,
+    orgName: config.orgName,
+    token: config.bootstrapToken,
+  });
   if (boot.createdAdmin) {
     console.log('────────────────────────────────────────────────────────────');
     console.log('Created the first admin.');
@@ -42,11 +46,11 @@ async function main() {
     await db.end();
     process.exit(0);
   };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', () => void shutdown());
+  process.on('SIGTERM', () => void shutdown());
 }
 
-main().catch((err) => {
+main().catch((err: unknown) => {
   console.error(err);
   process.exit(1);
 });

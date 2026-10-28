@@ -18,17 +18,27 @@ export interface Namespace {
   project_id?: string | null;
 }
 
-const COLUMN: Record<SlugKind, string> = { organization: 'organization_id', project: 'project_id', scope: 'scope_id' };
+const COLUMN: Record<SlugKind, string> = {
+  organization: 'organization_id',
+  project: 'project_id',
+  scope: 'scope_id',
+};
 
 export async function listAliases(db: Queryable, kind: SlugKind, id: string): Promise<SlugAlias[]> {
   const { rows } = await db.query<SlugAlias>(
-    `SELECT id, old_slug, created_at FROM slug_aliases WHERE ${COLUMN[kind]} = $1 ORDER BY created_at DESC`, [id]);
+    `SELECT id, old_slug, created_at FROM slug_aliases WHERE ${COLUMN[kind]} = $1 ORDER BY created_at DESC`,
+    [id],
+  );
   return rows;
 }
 
 /** Another organization, project or scope in the namespace that used to be called `slug`. */
 export async function aliasOwner(
-  db: Queryable, kind: SlugKind, ns: Namespace, slug: string, exceptId: string | null,
+  db: Queryable,
+  kind: SlugKind,
+  ns: Namespace,
+  slug: string,
+  exceptId: string | null,
 ): Promise<{ alias_id: string; id: string; name: string; slug: string } | null> {
   const sql = {
     organization: `SELECT x.id AS alias_id, o.id, o.name, o.slug FROM slug_aliases x JOIN organizations o ON o.id = x.organization_id
@@ -42,7 +52,10 @@ export async function aliasOwner(
   const params: unknown[] = [slug, exceptId];
   if (kind !== 'organization') params.push(ns.organization_id ?? null);
   if (kind === 'scope') params.push(ns.project_id ?? null);
-  const { rows } = await db.query<{ alias_id: string; id: string; name: string; slug: string }>(sql, params);
+  const { rows } = await db.query<{ alias_id: string; id: string; name: string; slug: string }>(
+    sql,
+    params,
+  );
   return rows[0] ?? null;
 }
 
@@ -52,38 +65,60 @@ export async function aliasOwner(
  * it, and then remove the alias so the old owner stops answering to it.
  */
 export async function claimSlug(
-  db: Queryable, kind: SlugKind, ns: Namespace, slug: string, exceptId: string | null, take: boolean | undefined,
+  db: Queryable,
+  kind: SlugKind,
+  ns: Namespace,
+  slug: string,
+  exceptId: string | null,
+  take: boolean | undefined,
 ): Promise<void> {
   const owner = await aliasOwner(db, kind, ns, slug, exceptId);
   if (!owner) return;
   if (!take) {
-    throw new AppError('conflict',
+    throw new AppError(
+      'conflict',
       `"${slug}" is the old slug of ${owner.name} (now "${owner.slug}"). Repositories, agents and [[links]] that still use "${slug}" reach ${owner.name}. ` +
       'Taking the slug points them here instead.',
-      { alias_of: { id: owner.id, name: owner.name, slug: owner.slug }, slug });
+      { alias_of: { id: owner.id, name: owner.name, slug: owner.slug }, slug },
+    );
   }
   await db.query('DELETE FROM slug_aliases WHERE id = $1', [owner.alias_id]);
 }
 
-/** After a slug changed from `from` to `to`: remember `from`, and forget `to` if it was an old name. */
+/**
+ * After a slug changed from `from` to `to`: remember `from`, and forget `to` if it was an old name.
+ */
 export async function recordRename(
-  db: Queryable, kind: SlugKind, id: string, from: string, to: string, actorId: string | null,
+  db: Queryable,
+  kind: SlugKind,
+  id: string,
+  from: string,
+  to: string,
+  actorId: string | null,
 ): Promise<void> {
   if (from === to) return;
   const col = COLUMN[kind];
   await db.query(`DELETE FROM slug_aliases WHERE ${col} = $1 AND old_slug = $2`, [id, to]);
   await db.query(
     `INSERT INTO slug_aliases (${col}, old_slug, created_by) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-    [id, from, actorId]);
+    [id, from, actorId],
+  );
 }
 
 /** Retire an old slug. Same rights as renaming its owner. */
 export async function deleteAlias(db: Queryable, a: Access, id: string): Promise<void> {
-  const { rows } = await db.query<{ organization_id: string | null; project_org: string | null; scope_org: string | null; is_org: boolean }>(
+  const { rows } = await db.query<{
+    organization_id: string | null;
+    project_org: string | null;
+    scope_org: string | null;
+    is_org: boolean;
+  }>(
     `SELECT x.organization_id, p.organization_id AS project_org, s.organization_id AS scope_org, x.organization_id IS NOT NULL AS is_org
        FROM slug_aliases x LEFT JOIN projects p ON p.id = x.project_id LEFT JOIN scopes s ON s.id = x.scope_id
-      WHERE x.id = $1`, [id]);
-  const r = rows[0];
+      WHERE x.id = $1`,
+    [id],
+  );
+  const r = rows.at(0);
   if (!r) throw notFound('Old slug');
   if (r.is_org) a.requireAdmin(null);
   else a.requireEdit(r.project_org ?? r.scope_org);

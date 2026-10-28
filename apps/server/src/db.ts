@@ -24,7 +24,11 @@ export function createPool(databaseUrl: string): Pool {
   // Every client, however it is checked out (pool.connect or pool.query), drops privileges
   // once before its first use.
   const connect = pool.connect.bind(pool) as () => Promise<pg.PoolClient>;
-  type Cb = (err: Error | undefined, client?: pg.PoolClient, done?: (release?: boolean | Error) => void) => void;
+  type Cb = (
+    err: Error | undefined,
+    client?: pg.PoolClient,
+    done?: (release?: boolean | Error) => void,
+  ) => void;
   const wrapped = (cb?: Cb) => {
     const p = connect().then(async (c) => {
       if (!ready.has(c)) {
@@ -39,7 +43,12 @@ export function createPool(databaseUrl: string): Pool {
       return c;
     });
     if (!cb) return p;
-    p.then((c) => cb(undefined, c, c.release.bind(c)), (e) => cb(e as Error));
+    p.then(
+      (c) => { cb(undefined, c, c.release.bind(c)); },
+      (e: unknown) => {
+        cb(e as Error);
+      },
+    );
     return undefined;
   };
   (pool as unknown as { connect: typeof wrapped }).connect = wrapped;
@@ -94,7 +103,7 @@ export async function beginScope(pool: Pool, scope: Scope): Promise<pg.PoolClien
   try {
     await client.query('BEGIN');
     await client.query(
-      `SELECT set_config('openpurpose.group_id', $1, true), set_config('openpurpose.bypass', $2, true)`,
+      'SELECT set_config(\'openpurpose.group_id\', $1, true), set_config(\'openpurpose.bypass\', $2, true)',
       [scope.groupId ?? '', scope.bypass ? 'on' : ''],
     );
     return client;
@@ -112,7 +121,11 @@ export async function endScope(client: pg.PoolClient, ok: boolean): Promise<void
   }
 }
 
-export async function withScope<T>(pool: Pool, scope: Scope, fn: (db: pg.PoolClient) => Promise<T>): Promise<T> {
+export async function withScope<T>(
+  pool: Pool,
+  scope: Scope,
+  fn: (db: pg.PoolClient) => Promise<T>,
+): Promise<T> {
   const client = await beginScope(pool, scope);
   let ok = false;
   try {
@@ -120,7 +133,8 @@ export async function withScope<T>(pool: Pool, scope: Scope, fn: (db: pg.PoolCli
     ok = true;
     return result;
   } finally {
-    await endScope(client, ok).catch(() => {});
+    // The transaction already ended or the connection broke; the client is released anyway.
+    await endScope(client, ok).catch(() => undefined);
   }
 }
 
@@ -142,7 +156,7 @@ export async function migrate(databaseUrl: string, dir: string): Promise<string[
       try {
         // Serialise concurrent boots of several replicas.
         await client.query('SELECT pg_advisory_xact_lock(4242)');
-        await client.query(`SELECT set_config('openpurpose.bypass', 'on', true)`);
+        await client.query('SELECT set_config(\'openpurpose.bypass\', \'on\', true)');
         const done = await client.query('SELECT 1 FROM schema_migrations WHERE name = $1', [file]);
         if (!done.rowCount) {
           await client.query(sql);
@@ -156,13 +170,18 @@ export async function migrate(databaseUrl: string, dir: string): Promise<string[
       }
     }
     // Keep the unprivileged role's grants in step with the schema.
-    const role = await client.query(`SELECT 1 FROM pg_roles WHERE rolname = 'openpurpose_app'`);
+    const role = await client.query('SELECT 1 FROM pg_roles WHERE rolname = \'openpurpose_app\'');
     if (role.rowCount) {
-      await client.query(`
+      await client
+        .query(
+          `
         GRANT USAGE ON SCHEMA public TO openpurpose_app;
         GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO openpurpose_app;
         GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO openpurpose_app;
-        GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO openpurpose_app;`).catch(() => {});
+        GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO openpurpose_app;`,
+        )
+        // Grants fail on databases where the role doesn't exist; that setup doesn't need them.
+        .catch(() => undefined);
     }
   } finally {
     await client.end();

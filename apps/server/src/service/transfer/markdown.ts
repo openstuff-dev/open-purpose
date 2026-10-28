@@ -29,11 +29,13 @@ function markdownFiles(file: ExportFile): Map<string, string> {
   const scope = new Map(file.scopes.map((s) => [s.key, s]));
   const out = new Map<string, string>();
   for (const d of file.documents) {
-    const parts = [d.organization ? org.get(d.organization)! : 'group'];
-    if (d.project) parts.push(project.get(d.project)!);
-    if (d.scope) {
-      if (!scope.get(d.scope)!.project) parts.push('scopes');
-      parts.push(scope.get(d.scope)!.slug);
+    // Documents point at keys that format.ts has checked are in the file.
+    const parts = [d.organization ? (org.get(d.organization) ?? d.organization) : 'group'];
+    if (d.project) parts.push(project.get(d.project) ?? d.project);
+    const s = d.scope ? scope.get(d.scope) : undefined;
+    if (s) {
+      if (!s.project) parts.push('scopes');
+      parts.push(s.slug);
     }
     let path = `${parts.join('/')}/${d.slug}.md`;
     for (let i = 2; out.has(path); i++) path = `${parts.join('/')}/${d.slug}-${i}.md`;
@@ -52,7 +54,10 @@ export function exportZip(file: ExportFile): Buffer {
 }
 
 /** The manifest of an exported zip, and whether its Markdown files were edited after the export. */
-export function readExportZip(zip: Buffer, maxBytes: number): { file: unknown; markdownEdited: boolean } {
+export function readExportZip(
+  zip: Buffer,
+  maxBytes: number,
+): { file: unknown; markdownEdited: boolean } {
   let entries;
   try {
     entries = readZip(zip, (name) => name === MANIFEST || name.endsWith('.md'), maxBytes);
@@ -60,18 +65,24 @@ export function readExportZip(zip: Buffer, maxBytes: number): { file: unknown; m
     throw new AppError('bad_request', `This file can't be imported: ${(err as Error).message}.`);
   }
   const manifest = entries.find((e) => e.name === MANIFEST);
-  if (!manifest) throw new AppError('bad_request', 'This file can\'t be imported: the zip has no manifest.json.');
+  if (!manifest)
+    throw new AppError('bad_request', "This file can't be imported: the zip has no manifest.json.");
   let file: unknown;
   try {
     file = JSON.parse(manifest.data.toString('utf8'));
   } catch {
-    throw new AppError('bad_request', 'This file can\'t be imported: manifest.json isn\'t valid JSON.');
+    throw new AppError(
+      'bad_request',
+      "This file can't be imported: manifest.json isn't valid JSON.",
+    );
   }
   let markdownEdited = false;
   try {
     const expected = markdownFiles(file as ExportFile);
     const markdown = entries.filter((e) => e.name !== MANIFEST && e.name !== 'README.md');
-    markdownEdited = markdown.length !== expected.size || markdown.some((e) => expected.get(e.name) !== e.data.toString('utf8'));
+    markdownEdited =
+      markdown.length !== expected.size ||
+      markdown.some((e) => expected.get(e.name) !== e.data.toString('utf8'));
   } catch {
     // A malformed manifest is reported by the import itself.
   }

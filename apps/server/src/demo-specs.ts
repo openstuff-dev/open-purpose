@@ -2,49 +2,113 @@
 
 export const ORDER_API = {
   openapi: '3.0.3',
-  info: { title: 'Order Service API', version: '1.4.0', description: 'Orders and shipments. Amounts are integer øre.' },
+  info: {
+    title: 'Order Service API',
+    version: '1.4.0',
+    description: 'Orders and shipments. Amounts are integer øre.',
+  },
   servers: [{ url: 'https://orders.acme.internal' }],
   security: [{ bearer: [] }],
   paths: {
     '/orders': {
       get: {
-        tags: ['Orders'], operationId: 'listOrders', summary: 'List orders for a customer',
+        tags: ['Orders'],
+        operationId: 'listOrders',
+        summary: 'List orders for a customer',
         parameters: [
-          { name: 'customerId', in: 'query', required: true, schema: { type: 'string', format: 'uuid' } },
+          {
+            name: 'customerId',
+            in: 'query',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
           { name: 'status', in: 'query', schema: { $ref: '#/components/schemas/OrderStatus' } },
           { $ref: '#/components/parameters/Page' },
         ],
-        responses: { 200: { description: 'OK', content: { 'application/json': { schema: { $ref: '#/components/schemas/OrderPage' } } } } },
+        responses: {
+          200: {
+            description: 'OK',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/OrderPage' } } },
+          },
+        },
       },
       post: {
-        tags: ['Orders'], operationId: 'createOrder', summary: 'Create an order',
-        parameters: [{ name: 'Idempotency-Key', in: 'header', required: true, description: 'Retries with the same key create one order', schema: { type: 'string' } }],
-        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/CreateOrderRequest' } } } },
+        tags: ['Orders'],
+        operationId: 'createOrder',
+        summary: 'Create an order',
+        parameters: [
+          {
+            name: 'Idempotency-Key',
+            in: 'header',
+            required: true,
+            description: 'Retries with the same key create one order',
+            schema: { type: 'string' },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/CreateOrderRequest' } },
+          },
+        },
         responses: {
-          201: { description: 'Created', content: { 'application/json': { schema: { $ref: '#/components/schemas/OrderDto' } } } },
+          201: {
+            description: 'Created',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/OrderDto' } } },
+          },
           400: { $ref: '#/components/responses/Problem' },
         },
       },
     },
     '/orders/{orderId}': {
-      parameters: [{ name: 'orderId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+      parameters: [
+        { name: 'orderId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } },
+      ],
       get: {
-        tags: ['Orders'], operationId: 'getOrder', summary: 'Get an order',
+        tags: ['Orders'],
+        operationId: 'getOrder',
+        summary: 'Get an order',
         responses: {
-          200: { description: 'OK', content: { 'application/json': { schema: { $ref: '#/components/schemas/OrderDto' } } } },
+          200: {
+            description: 'OK',
+            content: { 'application/json': { schema: { $ref: '#/components/schemas/OrderDto' } } },
+          },
           404: { $ref: '#/components/responses/Problem' },
         },
       },
       delete: {
-        tags: ['Orders'], operationId: 'cancelOrder', summary: 'Cancel an order that is not shipped yet',
-        responses: { 204: { description: 'Cancelled' }, 409: { $ref: '#/components/responses/Problem' } },
+        tags: ['Orders'],
+        operationId: 'cancelOrder',
+        summary: 'Cancel an order that is not shipped yet',
+        responses: {
+          204: { description: 'Cancelled' },
+          409: { $ref: '#/components/responses/Problem' },
+        },
       },
     },
     '/orders/{orderId}/shipments': {
       get: {
-        tags: ['Shipments'], operationId: 'listShipments', summary: 'Shipments of an order',
-        parameters: [{ name: 'orderId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
-        responses: { 200: { description: 'OK', content: { 'application/json': { schema: { type: 'array', items: { $ref: '#/components/schemas/ShipmentDto' } } } } } },
+        tags: ['Shipments'],
+        operationId: 'listShipments',
+        summary: 'Shipments of an order',
+        parameters: [
+          {
+            name: 'orderId',
+            in: 'path',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+          },
+        ],
+        responses: {
+          200: {
+            description: 'OK',
+            content: {
+              'application/json': {
+                schema: { type: 'array', items: { $ref: '#/components/schemas/ShipmentDto' } },
+              },
+            },
+          },
+        },
       },
     },
   },
@@ -54,16 +118,30 @@ export const ORDER_API = {
       Page: { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
     },
     responses: {
-      Problem: { description: 'Problem', content: { 'application/problem+json': { schema: { $ref: '#/components/schemas/ProblemDetails' } } } },
+      Problem: {
+        description: 'Problem',
+        content: {
+          'application/problem+json': { schema: { $ref: '#/components/schemas/ProblemDetails' } },
+        },
+      },
     },
     schemas: {
-      OrderStatus: { type: 'string', enum: ['Draft', 'Placed', 'Shipped', 'Delivered', 'Cancelled'] },
+      OrderStatus: {
+        type: 'string',
+        enum: ['Draft', 'Placed', 'Shipped', 'Delivered', 'Cancelled'],
+      },
       Money: {
-        type: 'object', description: 'An amount in øre. Never use floats for money.', required: ['amountOre', 'currency'],
-        properties: { amountOre: { type: 'integer', format: 'int64' }, currency: { type: 'string', default: 'DKK', maxLength: 3 } },
+        type: 'object',
+        description: 'An amount in øre. Never use floats for money.',
+        required: ['amountOre', 'currency'],
+        properties: {
+          amountOre: { type: 'integer', format: 'int64' },
+          currency: { type: 'string', default: 'DKK', maxLength: 3 },
+        },
       },
       OrderLineDto: {
-        type: 'object', required: ['sku', 'quantity', 'unitPrice'],
+        type: 'object',
+        required: ['sku', 'quantity', 'unitPrice'],
         properties: {
           sku: { type: 'string', description: 'Article number from the product catalogue' },
           quantity: { type: 'integer', minimum: 1 },
@@ -71,7 +149,8 @@ export const ORDER_API = {
         },
       },
       OrderDto: {
-        type: 'object', required: ['id', 'customerId', 'status', 'lines', 'total'],
+        type: 'object',
+        required: ['id', 'customerId', 'status', 'lines', 'total'],
         properties: {
           id: { type: 'string', format: 'uuid', readOnly: true },
           customerId: { type: 'string', format: 'uuid' },
@@ -83,22 +162,38 @@ export const ORDER_API = {
         },
       },
       CreateOrderRequest: {
-        type: 'object', required: ['customerId', 'lines'],
+        type: 'object',
+        required: ['customerId', 'lines'],
         properties: {
           customerId: { type: 'string', format: 'uuid' },
-          lines: { type: 'array', minItems: 1, items: { $ref: '#/components/schemas/OrderLineDto' } },
+          lines: {
+            type: 'array',
+            minItems: 1,
+            items: { $ref: '#/components/schemas/OrderLineDto' },
+          },
           note: { type: 'string', maxLength: 500 },
         },
       },
       OrderPage: {
         allOf: [
           { $ref: '#/components/schemas/PageInfo' },
-          { type: 'object', required: ['items'], properties: { items: { type: 'array', items: { $ref: '#/components/schemas/OrderDto' } } } },
+          {
+            type: 'object',
+            required: ['items'],
+            properties: {
+              items: { type: 'array', items: { $ref: '#/components/schemas/OrderDto' } },
+            },
+          },
         ],
       },
-      PageInfo: { type: 'object', required: ['page', 'total'], properties: { page: { type: 'integer' }, total: { type: 'integer' } } },
+      PageInfo: {
+        type: 'object',
+        required: ['page', 'total'],
+        properties: { page: { type: 'integer' }, total: { type: 'integer' } },
+      },
       ShipmentDto: {
-        type: 'object', required: ['id', 'carrier'],
+        type: 'object',
+        required: ['id', 'carrier'],
         properties: {
           id: { type: 'string' },
           carrier: { type: 'string', enum: ['PostNord', 'GLS', 'DAO'] },
@@ -106,8 +201,14 @@ export const ORDER_API = {
         },
       },
       ProblemDetails: {
-        type: 'object', description: 'RFC 9457 problem details',
-        properties: { type: { type: 'string' }, title: { type: 'string' }, status: { type: 'integer' }, detail: { type: 'string' } },
+        type: 'object',
+        description: 'RFC 9457 problem details',
+        properties: {
+          type: { type: 'string' },
+          title: { type: 'string' },
+          status: { type: 'integer' },
+          detail: { type: 'string' },
+        },
         additionalProperties: true,
       },
     },
