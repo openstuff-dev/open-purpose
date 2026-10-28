@@ -403,7 +403,7 @@ function lines(f: Finding): string {
               <label class="os-field remind"
                 ><span class="os-label">Remind after</span
                 ><input
-                  class="os-input"
+                  os-input
                   type="date"
                   [(ngModel)]="remindAfter"
                   name="remind"

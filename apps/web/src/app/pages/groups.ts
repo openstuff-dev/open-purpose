@@ -28,8 +28,7 @@ import { initials } from '../core/theme';
     </section>
 
     @if (created(); as c) {
-      <os-callout tone="success" role="alert">
-        <h2>{{ c.name }} is ready</h2>
+      <os-callout tone="success" role="alert" title="{{ c.name }} is ready" level="2">
         @if (c.token) {
           <p>Give this token to {{ c.admin }}, the group's first admin. It is not shown again.</p>
           <pre><code>{{ c.token }}</code></pre>

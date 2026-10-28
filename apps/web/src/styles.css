@@ -89,15 +89,6 @@ p:not(
   margin: 0.5rem 0;
 }
 
-/* A callout's text starts and ends flush with its icon and actions. */
-.os-callout > div > div > :first-child {
-  margin-block-start: 0;
-}
-
-.os-callout > div > div > :last-child {
-  margin-block-end: 0;
-}
-
 ::selection {
   background: var(--accent-soft);
 }
@@ -113,11 +104,6 @@ p:not(
 
 .quiet {
   color: var(--muted);
-}
-
-/* os-empty-state renders its text paragraph even when there is none. */
-.os-empty-state > p:empty {
-  display: none;
 }
 
 .icon {
@@ -166,10 +152,6 @@ label:not(:where(.os-field, .os-check, .os-button, .os-segmented > label)) {
 .os-badge[data-mode='open'] {
   --os-tone-soft: var(--open-soft);
   --os-tone-text: var(--open);
-}
-
-.os-button[data-variant='link'].danger {
-  --os-button-fg: var(--danger);
 }
 
 kbd {
@@ -588,11 +570,6 @@ kbd {
 /* ─── Page structure ─── */
 .os-page-header {
   margin-bottom: 2rem;
-}
-
-/* A header with more under the title (a callout, a mode picker) keeps its buttons at the top. */
-.os-page-header:is(.project-head, .doc-head) {
-  align-items: start;
 }
 
 .os-page-description {
@@ -1172,7 +1149,7 @@ pre {
   color: var(--ink);
 }
 
-.section-actions .os-button[data-variant='link'].danger:hover {
+.section-actions .os-button[data-variant='link'][data-tone='danger']:hover {
   color: var(--danger);
 }
 
@@ -3913,16 +3890,6 @@ mark {
   z-index: 5;
   background: var(--ground);
   scrollbar-width: none;
-}
-
-/* Link tabs: @openstuff-dev/ui styles button tabs (aria-selected) only. */
-a.os-tab {
-  text-decoration: none;
-}
-
-.os-tab[aria-current='page'] {
-  color: var(--os-fg-default);
-  box-shadow: inset 0 -2px var(--os-fg-default);
 }
 
 .os-tab[aria-current='page'] .tab-count {
