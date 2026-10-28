@@ -104,9 +104,9 @@ async function readUpload(file: File): Promise<ImportUpload> {
         Download everything in {{ session.group()?.name }} or one organization, to keep as a backup
         or to import into another OpenPurpose server. A group export is a complete backup.
       </p>
-      <div class="setting-card">
-        <div class="setting-row">
-          <div>
+      <div class="os-setting-card">
+        <div class="os-setting-row" data-inline>
+          <div class="os-setting-text">
             <h3>What to export</h3>
           </div>
           <select os-select name="what" [(ngModel)]="what" aria-label="What to export">
@@ -122,8 +122,8 @@ async function readUpload(file: File): Promise<ImportUpload> {
             }
           </select>
         </div>
-        <div class="setting-row">
-          <div>
+        <div class="os-setting-row" data-inline>
+          <div class="os-setting-text">
             <h3>Format</h3>
             <p>
               {{
@@ -135,8 +135,8 @@ async function readUpload(file: File): Promise<ImportUpload> {
           </div>
           <os-segmented-control label="Format" size="sm" [options]="formats" [(value)]="format" />
         </div>
-        <div class="setting-row stack">
-          <div>
+        <div class="os-setting-row stack">
+          <div class="os-setting-text">
             <h3>Include</h3>
           </div>
           <div class="transfer-includes">
@@ -168,7 +168,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
             >
           </div>
         </div>
-        <div class="setting-row">
+        <div class="os-setting-row" data-inline>
           <p>
             For scheduled backups, run
             <code
@@ -219,9 +219,9 @@ async function readUpload(file: File): Promise<ImportUpload> {
         </os-callout>
       }
 
-      <div class="setting-card">
-        <div class="setting-row">
-          <div>
+      <div class="os-setting-card">
+        <div class="os-setting-row" data-inline>
+          <div class="os-setting-text">
             <h3>File</h3>
             <p>{{ fileName() || 'An OpenPurpose export, .json or .zip' }}</p>
           </div>
@@ -236,8 +236,8 @@ async function readUpload(file: File): Promise<ImportUpload> {
           </label>
         </div>
         @if (session.isSuperadmin && upload()) {
-          <div class="setting-row">
-            <div>
+          <div class="os-setting-row" data-inline>
+            <div class="os-setting-text">
               <h3>Import into</h3>
               <p>
                 {{
@@ -266,7 +266,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
         </p>
 
         @if (asGroup() && r.group) {
-          <form class="inline-form panel" (ngSubmit)="refresh()">
+          <form class="inline-form os-panel os-panel-body" (ngSubmit)="refresh()">
             <os-field label="Group name" class="grow"
               ><input os-input name="gname" [(ngModel)]="groupName" (change)="refresh()"
             /></os-field>
@@ -345,9 +345,9 @@ async function readUpload(file: File): Promise<ImportUpload> {
           </ul>
 
           @if (merging()) {
-            <div class="setting-card">
-              <div class="setting-row stack">
-                <div>
+            <div class="os-setting-card">
+              <div class="os-setting-row stack">
+                <div class="os-setting-text">
                   <h3>When a section here differs from the file</h3>
                 </div>
                 <div
@@ -373,7 +373,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
                   }
                 </div>
               </div>
-              <div class="setting-row stack">
+              <div class="os-setting-row stack">
                 <label os-check
                   ><input
                     os-checkbox

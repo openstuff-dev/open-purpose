@@ -124,7 +124,7 @@ h3 {
   font-weight: 600;
 }
 /* Not the toolkit's own paragraphs: its components space them. */
-p:not(:where(.os-callout-title, .os-toast-message, .os-empty-state > p, .os-page-description)) {
+p:not(:where(.os-callout-title, .os-toast-message, .os-empty-state > p, .os-page-description, .os-setting-text > p)) {
   margin: 0.5rem 0;
 }
 /* A callout's text starts and ends flush with its icon and actions. */
@@ -227,12 +227,6 @@ kbd {
   gap: 0.5rem;
   flex-wrap: wrap;
   align-items: center;
-}
-.panel {
-  background: var(--surface);
-  border: 1px var(--os-border-style) var(--line);
-  border-radius: var(--r-lg);
-  padding: 1.1rem 1.25rem;
 }
 .title-form {
   display: flex;
@@ -1742,40 +1736,19 @@ mark {
   font-size: var(--fs-sm);
   max-width: 64ch;
 }
-.setting-card {
-  background: var(--surface);
-  border: 1px var(--os-border-style) var(--line);
-  border-radius: var(--r-lg);
+.os-setting-card {
   margin-top: 1rem;
 }
-.setting-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.5rem 1.5rem;
-  align-items: center;
-  padding: 1rem 1.25rem;
+/* A row whose control needs the full width, such as the theme picker. */
+.os-setting-row.stack {
+  grid-template-columns: minmax(0, 1fr);
 }
-.setting-row + .setting-row {
-  border-top: 1px var(--os-border-style) var(--line);
-}
-.setting-row h3 {
-  font-size: var(--fs-base);
-  font-weight: 600;
-}
-.setting-row p {
-  margin: 0.15rem 0 0;
-  font-size: var(--fs-sm);
-  color: var(--muted);
-}
-.setting-row.stack {
-  grid-template-columns: 1fr;
-}
-.setting-row form {
+.os-setting-row form {
   display: flex;
   gap: 0.5rem;
   align-items: center;
 }
-.setting-row form input {
+.os-setting-row form input {
   width: 16rem;
 }
 .theme-options {
@@ -1921,10 +1894,7 @@ mark {
   .settings-nav a {
     white-space: nowrap;
   }
-  .setting-row {
-    grid-template-columns: 1fr;
-  }
-  .setting-row form input {
+  .os-setting-row form input {
     width: 100%;
   }
   .theme-options {
@@ -2293,18 +2263,18 @@ mark {
   margin-top: 0.25rem;
   font-size: var(--fs-sm);
 }
-.settings-body .panel {
+.settings-body .os-panel {
   margin-top: 0.5rem;
 }
-.setting-row > .os-button {
+.os-setting-row > .os-button {
   justify-self: start;
 }
-.setting-row h3 code,
-.setting-row h3 .os-badge {
+.os-setting-row h3 code,
+.os-setting-row h3 .os-badge {
   margin-left: 0.35rem;
   font-weight: 400;
 }
-.setting-row h3 .icon {
+.os-setting-row h3 .icon {
   vertical-align: -2px;
   color: var(--muted);
 }
@@ -4125,15 +4095,15 @@ a.os-tab {
   gap: 0.5rem;
 }
 .transfer-policies .os-check,
-.setting-row .os-check {
+.os-setting-row .os-check {
   align-items: flex-start;
 }
 .transfer-policies .os-check input,
-.setting-row .os-check input[type='checkbox'] {
+.os-setting-row .os-check input[type='checkbox'] {
   margin-top: 0.3rem;
 }
 .transfer-policies .quiet,
-.setting-row .os-check .quiet {
+.os-setting-row .os-check .quiet {
   display: block;
   font-size: var(--fs-sm);
 }
@@ -4226,30 +4196,6 @@ a.os-tab {
   gap: 0.5rem;
   flex-wrap: wrap;
 }
-.stat-tiles {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(13.5rem, 1fr));
-  gap: 0.75rem;
-}
-.stat-tile {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  min-width: 0;
-  background: var(--surface);
-  border: 1px var(--os-border-style) var(--line);
-  border-radius: var(--r-lg);
-  padding: 0.85rem 1rem;
-}
-.stat-tile.warn {
-  border-color: color-mix(in oklab, var(--propose) 35%, var(--line));
-  background: color-mix(in oklab, var(--propose-soft) 45%, var(--surface));
-}
-.stat-label {
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  color: var(--muted);
-}
 .stat-name {
   font-weight: 600;
   color: var(--ink);
@@ -4288,7 +4234,7 @@ ul.stat-rest {
 .stat-rest .quiet {
   margin-left: 0.3rem;
 }
-.stat-tile > .quiet {
+.os-stat-tile > .quiet {
   font-size: var(--fs-xs);
 }
 

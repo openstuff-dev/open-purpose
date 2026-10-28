@@ -100,7 +100,7 @@ function followUps(call: {
       description="Ask like an agent would. Each answer below is the MCP tool's output, word for word. Write tools aren't available here."
     ></header>
 
-    <form class="inline-form panel console-form" (ngSubmit)="getContext()">
+    <form class="inline-form os-panel os-panel-body console-form" (ngSubmit)="getContext()">
       <os-field label="Project"
         ><select os-select name="project" [(ngModel)]="project">
           <option value="">Find it from the git remote</option>

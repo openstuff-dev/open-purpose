@@ -137,9 +137,9 @@ organization, the project and the part of the code you are in (a repository or a
           @case ('account') {
             <section>
               <h2>Account</h2>
-              <div class="setting-card">
-                <div class="setting-row">
-                  <div>
+              <div class="os-setting-card">
+                <div class="os-setting-row" data-inline>
+                  <div class="os-setting-text">
                     <h3>Name</h3>
                     <p>Shown in history, the inbox and on proposals your agents make.</p>
                   </div>
@@ -160,8 +160,8 @@ organization, the project and the part of the code you are in (a repository or a
                     </button>
                   </form>
                 </div>
-                <div class="setting-row">
-                  <div>
+                <div class="os-setting-row" data-inline>
+                  <div class="os-setting-text">
                     <h3>Your access</h3>
                     <p>{{ accessLine() }}</p>
                   </div>
@@ -199,10 +199,10 @@ organization, the project and the part of the code you are in (a repository or a
                   </button>
                 </os-callout>
               }
-              <div class="setting-card">
+              <div class="os-setting-card">
                 @for (t of tokens(); track t.id) {
-                  <div class="setting-row" [style.opacity]="t.revoked_at ? 0.55 : 1">
-                    <div>
+                  <div class="os-setting-row" data-inline [style.opacity]="t.revoked_at ? 0.55 : 1">
+                    <div class="os-setting-text">
                       <h3>
                         <app-icon name="key" [size]="14" /> {{ t.label }}
                         <code class="quiet">{{ t.prefix }}…</code>
@@ -234,7 +234,7 @@ organization, the project and the part of the code you are in (a repository or a
                     }
                   </div>
                 }
-                <div class="setting-row">
+                <div class="os-setting-row" data-inline>
                   <form (ngSubmit)="newToken()">
                     <input
                       os-input
@@ -254,9 +254,9 @@ organization, the project and the part of the code you are in (a repository or a
             <section>
               <h2>Appearance</h2>
               <p class="quiet">Stored in this browser only.</p>
-              <div class="setting-card">
-                <div class="setting-row stack">
-                  <div><h3>Theme</h3></div>
+              <div class="os-setting-card">
+                <div class="os-setting-row stack">
+                  <div class="os-setting-text"><h3>Theme</h3></div>
                   <div class="theme-options" role="radiogroup" aria-label="Theme">
                     @for (o of themes; track o.value) {
                       <button
@@ -360,9 +360,9 @@ organization, the project and the part of the code you are in (a repository or a
             @if (session.canAdmin(null) && session.groupShown()) {
               <section>
                 <h2>Group</h2>
-                <div class="setting-card">
-                  <div class="setting-row">
-                    <div>
+                <div class="os-setting-card">
+                  <div class="os-setting-row" data-inline>
+                    <div class="os-setting-text">
                       <h3>Group name</h3>
                       <p>
                         Shown to everyone in {{ session.group()?.name }}, and to agents as the top
@@ -386,8 +386,8 @@ organization, the project and the part of the code you are in (a repository or a
                       </button>
                     </form>
                   </div>
-                  <div class="setting-row">
-                    <div>
+                  <div class="os-setting-row" data-inline>
+                    <div class="os-setting-text">
                       <h3>Context budget</h3>
                       <p>
                         Largest context an agent gets from <code>get_context</code>, in every
@@ -436,9 +436,9 @@ organization, the project and the part of the code you are in (a repository or a
                   </p>
                 </div>
               </div>
-              <div class="setting-card">
+              <div class="os-setting-card">
                 @for (o of manageableOrgs(); track o.id) {
-                  <div class="setting-row" [style.opacity]="o.archived_at ? 0.6 : 1">
+                  <div class="os-setting-row" data-inline [style.opacity]="o.archived_at ? 0.6 : 1">
                     @if (editingOrg() === o.id) {
                       <form
                         class="inline-form"
@@ -498,7 +498,7 @@ organization, the project and the part of the code you are in (a repository or a
                         <span class="badge" [style.background]="session.orgColor(o.id)">{{
                           initials(o.name)
                         }}</span>
-                        <div style="min-width:0">
+                        <div class="os-setting-text" style="min-width:0">
                           <h3>
                             {{ o.name }} <code class="quiet">{{ o.slug }}</code>
                             @if (o.archived_at) {
@@ -539,7 +539,7 @@ organization, the project and the part of the code you are in (a repository or a
                   </div>
                 }
                 @if (session.canAdmin(null)) {
-                  <div class="setting-row">
+                  <div class="os-setting-row" data-inline>
                     @if (addingOrg()) {
                       <form
                         class="inline-form"
@@ -623,7 +623,7 @@ organization, the project and the part of the code you are in (a repository or a
                   at the top. Reading only: agents never write outside their own organization.
                   People with a role in the group read everything.
                 </p>
-                <div class="setting-card" style="overflow-x:auto">
+                <div class="os-setting-card" style="overflow-x:auto">
                   <table class="matrix">
                     <thead>
                       <tr>

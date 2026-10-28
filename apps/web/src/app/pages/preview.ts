@@ -23,7 +23,7 @@ import { splitList } from '../shared/scope-list';
       </p>
     </section>
 
-    <form class="inline-form panel" (ngSubmit)="run()">
+    <form class="inline-form os-panel os-panel-body" (ngSubmit)="run()">
       <os-field label="Project"
         ><select os-select name="project" [(ngModel)]="project">
           <option value="">Find it from the git remote</option>

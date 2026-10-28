@@ -111,9 +111,9 @@ function readPeriod(): ActivityPeriod {
               Counts start when an agent calls <code>get_context</code>.
             </os-empty-state>
           } @else {
-            <div class="stat-tiles">
-              <div class="stat-tile">
-                <span class="stat-label">Read requests</span>
+            <div class="os-stat-grid">
+              <div class="os-stat-tile">
+                <span class="os-stat-label">Read requests</span>
                 <app-activity-figure
                   [count]="a.reads.count"
                   [previous]="a.reads.previous"
@@ -123,8 +123,8 @@ function readPeriod(): ActivityPeriod {
                   unit="reads"
                 />
               </div>
-              <div class="stat-tile">
-                <span class="stat-label">Write requests</span>
+              <div class="os-stat-tile">
+                <span class="os-stat-label">Write requests</span>
                 <app-activity-figure
                   [count]="a.writes.count"
                   [previous]="a.writes.previous"
@@ -135,8 +135,8 @@ function readPeriod(): ActivityPeriod {
                 />
               </div>
               @for (t of tops(a); track t.label) {
-                <div class="stat-tile">
-                  <span class="stat-label">{{ t.label }}</span>
+                <div class="os-stat-tile">
+                  <span class="os-stat-label">{{ t.label }}</span>
                   @if (t.items[0]; as top) {
                     <a class="stat-name" [routerLink]="top.link">{{ top.name }}</a>
                     @if (top.where) {
@@ -173,8 +173,8 @@ function readPeriod(): ActivityPeriod {
                   }
                 </div>
               }
-              <div class="stat-tile" [class.warn]="a.stale_documents.length">
-                <span class="stat-label"
+              <div class="os-stat-tile" [class.warn]="a.stale_documents.length">
+                <span class="os-stat-label"
                   >Not requested in the last {{ period() === '7d' ? 'week' : 'month' }}</span
                 >
                 @if (a.stale_documents.length) {
