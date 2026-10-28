@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Button, Check, Checkbox } from '@openstuff-dev/ui-angular';
+import { Button, Check, Checkbox, Chip } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { SlugAlias, SlugKind, SlugRename, SlugRenameRef } from '../core/models';
 import { aliasConflict, errorMessage } from '../core/session';
@@ -24,7 +24,7 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
  */
 @Component({
   selector: 'app-slug-rename',
-  imports: [FormsModule, RouterLink, Button, Check, Checkbox],
+  imports: [FormsModule, RouterLink, Button, Check, Checkbox, Chip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="slug-field">
@@ -181,19 +181,9 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
         <div class="alias-list">
           <span class="quiet">Also answers to</span>
           @for (a of aliases(); track a.id) {
-            <span class="chip"
-              ><code>{{ a.old_slug }}</code>
-              @if (canEdit()) {
-                <button
-                  type="button"
-                  class="chip-x"
-                  (click)="removeAlias(a)"
-                  [attr.aria-label]="'Remove old slug ' + a.old_slug"
-                >
-                  ×
-                </button>
-              }
-            </span>
+            <span os-chip [removable]="canEdit()" (removed)="removeAlias(a)"
+              ><code>{{ a.old_slug }}</code></span
+            >
           }
         </div>
       }

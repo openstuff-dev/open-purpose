@@ -13,7 +13,7 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { Button, Control, IconButton } from '@openstuff-dev/ui-angular';
+import { Button, Control, IconButton, StatusDot, type Tone } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Finding, FindingCounts, FindingStatus } from '../core/models';
 import { Session } from '../core/session';
@@ -25,6 +25,14 @@ const STATUSES: FindingStatus[] = ['new', 'todo', 'ask_later', 'solved', 'dismis
 
 /** Shown unless someone turns on solved or dismissed. */
 const DEFAULT_SHOWN: FindingStatus[] = ['new', 'todo', 'ask_later'];
+
+const TONE: Record<FindingStatus, Tone> = {
+  new: 'brand',
+  todo: 'success',
+  ask_later: 'warning',
+  solved: 'neutral',
+  dismissed: 'neutral',
+};
 
 const STATUS: Record<FindingStatus, string> = {
   new: 'New',
@@ -63,7 +71,17 @@ function lines(f: Finding): string {
 
 @Component({
   selector: 'app-findings',
-  imports: [FormsModule, RouterLink, DatePipe, MarkdownView, Icon, Button, IconButton, Control],
+  imports: [
+    FormsModule,
+    RouterLink,
+    DatePipe,
+    MarkdownView,
+    Icon,
+    Button,
+    IconButton,
+    Control,
+    StatusDot,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)', class: 'wide-page' },
   template: `
@@ -174,7 +192,7 @@ function lines(f: Finding): string {
                 >
               </td>
               <td class="col-status">
-                <span class="status" [attr.data-finding]="f.status">{{ label[f.status] }}</span>
+                <span os-status-dot [tone]="tone[f.status]">{{ label[f.status] }}</span>
                 @if (f.status === 'ask_later' && f.remind_after) {
                   <span class="awaiting">From {{ f.remind_after | date: 'd MMM y' }}</span>
                 }
@@ -218,7 +236,7 @@ function lines(f: Finding): string {
       >
         <header class="drawer-top">
           <span class="kind-tag"><app-icon name="bug" [size]="13" />Finding</span>
-          <span class="status" [attr.data-finding]="f.status">{{ label[f.status] }}</span>
+          <span os-status-dot [tone]="tone[f.status]">{{ label[f.status] }}</span>
           <span class="drawer-nav">
             <button
               os-icon-button
@@ -411,6 +429,7 @@ export class FindingsPage {
 
   readonly statuses = STATUSES;
   readonly label = STATUS;
+  readonly tone = TONE;
   readonly hint = STATUS_HINT;
   readonly lines = lines;
   readonly ago = ago;

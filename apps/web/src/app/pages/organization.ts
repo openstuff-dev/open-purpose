@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Badge, Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type {
   ActivityFigure as Figure,
@@ -36,7 +36,7 @@ function readPeriod(): ActivityPeriod {
 
 @Component({
   selector: 'app-organization',
-  imports: [DocList, ScopeList, RouterLink, Icon, ActivityFigure, StatStyleSwitch, Button],
+  imports: [DocList, ScopeList, RouterLink, Icon, ActivityFigure, StatStyleSwitch, Button, Badge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (session.org(); as org) {
@@ -214,7 +214,7 @@ function readPeriod(): ActivityPeriod {
                     <span class="project-name"
                       >{{ p.name }}
                       @if (!p.reviewed) {
-                        <span class="flag">Needs review</span>
+                        <span os-badge tone="warning">Needs review</span>
                       }
                     </span>
                     <code class="project-slug">{{ p.slug }}</code>

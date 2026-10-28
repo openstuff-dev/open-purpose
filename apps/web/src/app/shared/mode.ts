@@ -21,7 +21,7 @@ export class ModeIcon {
   imports: [ModeIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<app-mode-icon [mode]="mode()" />{{ label[mode()] }}`,
-  host: { class: 'mode-badge', '[attr.data-mode]': 'mode()', '[attr.title]': 'help[mode()]' },
+  host: { class: 'os-badge', '[attr.data-mode]': 'mode()', '[attr.title]': 'help[mode()]' },
 })
 export class ModeBadge {
   readonly mode = input.required<EditMode>();

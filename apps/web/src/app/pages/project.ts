@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Button, Control, Field } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Chip, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Graph, GraphNode, LinkRef, ProjectDetail } from '../core/models';
 import { Session, provideHere } from '../core/session';
@@ -52,6 +52,8 @@ const TABS: Tab[] = [
     Button,
     Field,
     Control,
+    Badge,
+    Chip,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -69,7 +71,7 @@ const TABS: Tab[] = [
         <div class="title-row">
           <h1>{{ p.name }}</h1>
           @if (p.archived_at) {
-            <span class="flag muted">Archived</span>
+            <span os-badge>Archived</span>
           }
           <a os-button [routerLink]="['/map']" [queryParams]="{ focus: p.id }"
             ><app-icon name="map" />Map</a
@@ -236,13 +238,13 @@ const TABS: Tab[] = [
                       <a [routerLink]="linkFor(c.node)">{{ c.node.label }}</a>
                     }
                     @if (c.node.type === 'term') {
-                      <span class="chip">Term</span>
+                      <span os-chip>Term</span>
                     }
                     @if (c.node.organization_id && c.node.organization_id !== p.organization_id) {
-                      <span class="chip">{{ session.orgName(c.node.organization_id) }}</span>
+                      <span os-chip>{{ session.orgName(c.node.organization_id) }}</span>
                     }
                     @if (c.node.restricted) {
-                      <span class="flag muted">No access</span>
+                      <span os-badge>No access</span>
                     }
                     <span class="quiet">in {{ refsText(c.refs) }}</span>
                   </p>
@@ -260,7 +262,7 @@ const TABS: Tab[] = [
                   <p class="conn">
                     <a [routerLink]="linkFor(c.node)">{{ c.node.label }}</a>
                     @if (c.node.organization_id && c.node.organization_id !== p.organization_id) {
-                      <span class="chip">{{ session.orgName(c.node.organization_id) }}</span>
+                      <span os-chip>{{ session.orgName(c.node.organization_id) }}</span>
                     }
                     <span class="quiet">in {{ refsText(c.refs) }}</span>
                   </p>

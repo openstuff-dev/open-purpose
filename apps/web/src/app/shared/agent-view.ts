@@ -9,7 +9,7 @@ import {
   untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Button, Control } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Chip, Control } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ContextResult, Scope } from '../core/models';
 import { Session } from '../core/session';
@@ -43,7 +43,7 @@ function samplePath(glob: string): string {
  */
 @Component({
   selector: 'app-agent-view',
-  imports: [FormsModule, Icon, MarkdownView, ModeBadge, Button, Control],
+  imports: [FormsModule, Icon, MarkdownView, ModeBadge, Button, Control, Badge, Chip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="agent-view">
@@ -107,7 +107,7 @@ function samplePath(glob: string): string {
             <span
               ><span class="quiet">Stacks</span>
               @for (t of r.stacks; track t) {
-                <span class="chip stack">{{ t }}</span>
+                <span os-chip>{{ t }}</span>
               }
             </span>
           }
@@ -164,7 +164,7 @@ function samplePath(glob: string): string {
                           ><app-mode-badge [mode]="s.mode" />
                           @if (s.shortened) {
                             <span
-                              class="flag muted"
+                              os-badge
                               title="Agents get the first sentence only, to stay within the context budget"
                               >Shortened</span
                             >

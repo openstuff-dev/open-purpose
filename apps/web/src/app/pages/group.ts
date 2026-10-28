@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Chip } from '@openstuff-dev/ui-angular';
 import { ROLE_LABEL, type Organization } from '../core/models';
 import { Session } from '../core/session';
 import { ContextSwitch } from '../core/switch';
@@ -11,7 +11,7 @@ import { ScopeList } from '../shared/scope-list';
 
 @Component({
   selector: 'app-group',
-  imports: [DocList, ScopeList, RouterLink, Icon, Button],
+  imports: [DocList, ScopeList, RouterLink, Icon, Button, Badge, Chip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (session.group(); as g) {
@@ -63,10 +63,10 @@ import { ScopeList } from '../shared/scope-list';
                   </button>
                 } @else {
                   <span class="org-name">{{ o.name }}</span
-                  ><span class="flag muted"><app-icon name="lock" [size]="11" />No access</span>
+                  ><span os-badge><app-icon name="lock" [size]="11" />No access</span>
                 }
                 @if (o.role) {
-                  <span class="chip">{{ roleLabel[o.role] }}</span>
+                  <span os-chip>{{ roleLabel[o.role] }}</span>
                 }
                 <span class="quiet org-count">
                   @if (o.projects !== null) {

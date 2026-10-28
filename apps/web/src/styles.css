@@ -169,6 +169,22 @@ label:not(:where(.os-field, .os-check, .os-button)) {
 }
 
 /* A destructive link (Revoke, Delete). @openstuff-dev/ui has no danger link yet. */
+/* Edit modes on the toolkit badge: violet, amber and green say what agents may do. */
+.os-badge[data-mode] {
+  --os-tone-border: transparent;
+}
+.os-badge[data-mode='locked'] {
+  --os-tone-soft: var(--locked-soft);
+  --os-tone-text: var(--locked);
+}
+.os-badge[data-mode='propose'] {
+  --os-tone-soft: var(--propose-soft);
+  --os-tone-text: var(--propose);
+}
+.os-badge[data-mode='open'] {
+  --os-tone-soft: var(--open-soft);
+  --os-tone-text: var(--open);
+}
 .os-button[data-variant='link'].danger {
   --os-button-fg: var(--danger);
 }
@@ -825,68 +841,6 @@ kbd {
   gap: 0.4rem;
   font-size: var(--fs-sm);
 }
-.chip-x {
-  border: 0;
-  background: none;
-  padding: 0 0.1rem;
-  color: var(--muted);
-  cursor: pointer;
-  font: inherit;
-  line-height: 1;
-}
-.chip-x:hover,
-.chip-x:focus-visible {
-  color: var(--danger);
-}
-.flag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  color: var(--propose);
-  background: var(--propose-soft);
-  border-radius: 999px;
-  padding: 0.1rem 0.5rem;
-  line-height: 1.5;
-}
-.flag.muted {
-  color: var(--muted);
-  background: var(--sunken);
-}
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  background: var(--sunken);
-  color: var(--ink-2);
-  margin: 0 0.25rem 0.25rem 0;
-  line-height: 1.5;
-  white-space: nowrap;
-}
-.chip.path {
-  font-family: var(--mono);
-  font-weight: 400;
-  background: var(--accent-soft);
-  color: var(--accent-text);
-  border-radius: 4px;
-}
-.chip.stack {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--line-strong);
-}
-.chip.repo {
-  font-family: var(--mono);
-  font-weight: 400;
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--accent-soft);
-  color: var(--accent-text);
-  border-radius: 4px;
-}
 .repo-picker {
   flex: 1 1 100%;
   min-width: 0;
@@ -921,7 +875,11 @@ kbd {
   min-width: 0;
   margin: 0;
 }
-.chip .dot {
+/* Chips in a list of values, which the old .chip spaced with a margin. */
+:is(.facts dd, .scope-match) > .os-chip {
+  margin: 0 0.25rem 0.25rem 0;
+}
+.os-chip .dot {
   width: 6px;
   height: 6px;
 }
@@ -939,7 +897,7 @@ kbd {
   margin: 0;
 }
 .facts dd > a + .quiet,
-.facts dd > .chip + .quiet {
+.facts dd > .os-chip + .quiet {
   margin-left: 0.4rem;
 }
 .tabs {
@@ -1171,28 +1129,6 @@ pre {
 }
 
 /* ─── Edit modes ─── */
-.mode-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  white-space: nowrap;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-}
-.mode-badge[data-mode='locked'] {
-  color: var(--locked);
-  background: var(--locked-soft);
-}
-.mode-badge[data-mode='propose'] {
-  color: var(--propose);
-  background: var(--propose-soft);
-}
-.mode-badge[data-mode='open'] {
-  color: var(--open);
-  background: var(--open-soft);
-}
 .mode-picker {
   display: inline-flex;
   padding: 2px;
@@ -1671,7 +1607,7 @@ a.wikilink:hover {
 .context-line code {
   color: var(--ink-2);
 }
-.context-line .chip {
+.context-line .os-chip {
   margin: 0;
 }
 .proposal-body {
@@ -2673,7 +2609,7 @@ mark {
   justify-self: start;
 }
 .setting-row h3 code,
-.setting-row h3 .flag {
+.setting-row h3 .os-badge {
   margin-left: 0.35rem;
   font-weight: 400;
 }
@@ -2949,45 +2885,6 @@ mark {
 }
 .kind-tag[data-kind='new_section'] {
   color: var(--open);
-}
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  white-space: nowrap;
-}
-.status::before {
-  content: '';
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--faint);
-}
-.status[data-status='pending'] {
-  color: var(--accent-text);
-}
-.status[data-status='pending']::before {
-  background: var(--accent);
-}
-.status[data-status='approved'] {
-  color: var(--open);
-}
-.status[data-status='approved']::before {
-  background: var(--open);
-}
-.status[data-status='rejected'] {
-  color: var(--danger);
-}
-.status[data-status='rejected']::before {
-  background: var(--danger);
-}
-.status[data-status='changes_requested'] {
-  color: var(--propose);
-}
-.status[data-status='changes_requested']::before {
-  background: var(--propose);
 }
 .awaiting {
   display: block;
@@ -3272,7 +3169,7 @@ mark {
   gap: 0.35rem;
   flex-wrap: wrap;
 }
-.av-summary .chip {
+.av-summary .os-chip {
   margin: 0;
 }
 .av-actions {
@@ -3727,7 +3624,7 @@ mark {
   gap: 0.4rem;
   font-size: var(--fs-sm);
 }
-.comment-head .chip {
+.comment-head .os-chip {
   margin: 0;
 }
 .comment-head .quiet {
@@ -3893,7 +3790,7 @@ mark {
 .tl-event p {
   margin: 0.2rem 0 0;
 }
-.tl-event .chip {
+.tl-event .os-chip {
   margin: 0 0.15rem;
 }
 .tl-icon {
@@ -4457,7 +4354,7 @@ mark {
   font-size: var(--fs-sm);
   color: var(--muted);
 }
-.api-sub .chip {
+.api-sub .os-chip {
   margin: 0;
 }
 .api-error {
@@ -5066,10 +4963,6 @@ ul.stat-rest {
   flex-wrap: wrap;
   gap: 0.3rem;
 }
-.flag.quiet-flag,
-.flag.stale {
-  font-weight: 500;
-}
 .doc-notice {
   display: flex;
   align-items: center;
@@ -5123,28 +5016,6 @@ ul.stat-rest {
 }
 .segmented button[aria-pressed='true'] .seg-count {
   color: var(--accent-text);
-}
-.status[data-finding='new'] {
-  color: var(--accent-text);
-}
-.status[data-finding='new']::before {
-  background: var(--accent);
-}
-.status[data-finding='todo'] {
-  color: var(--open);
-}
-.status[data-finding='todo']::before {
-  background: var(--open);
-}
-.status[data-finding='ask_later'] {
-  color: var(--propose);
-}
-.status[data-finding='ask_later']::before {
-  background: var(--propose);
-}
-.status[data-finding='solved'],
-.status[data-finding='dismissed'] {
-  color: var(--muted);
 }
 .finding-gist {
   display: -webkit-box;

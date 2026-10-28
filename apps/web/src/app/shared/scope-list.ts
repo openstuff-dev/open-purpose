@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Button, Control, Field } from '@openstuff-dev/ui-angular';
+import { Button, Chip, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Repository, Scope } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -29,7 +29,7 @@ export const repoName = (key: string) => key.split('/').pop() || key;
 /** Scopes at the org level (projectId null) or inside a project. */
 @Component({
   selector: 'app-scope-list',
-  imports: [RouterLink, FormsModule, Icon, RepoPicker, Button, Field, Control],
+  imports: [RouterLink, FormsModule, Icon, RepoPicker, Button, Field, Control, Chip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (scopes().length) {
@@ -39,15 +39,15 @@ export const repoName = (key: string) => key.split('/').pop() || key;
             <a [routerLink]="['/scopes', s.id]" class="scope-name">{{ s.name }}</a>
             <span class="scope-match">
               @for (id of s.repository_ids; track id) {
-                <span class="chip repo" [title]="repoKey(id)"
+                <span os-chip tone="brand" class="mono" [title]="repoKey(id)"
                   ><app-icon name="branch" [size]="11" />{{ repoLabel(id) }}</span
                 >
               }
               @for (g of s.path_globs; track g) {
-                <code class="chip path">{{ g }}</code>
+                <code os-chip tone="brand">{{ g }}</code>
               }
               @for (t of s.stacks; track t) {
-                <span class="chip stack">{{ t }}</span>
+                <span os-chip>{{ t }}</span>
               }
               @if (!s.repository_ids.length && !s.path_globs.length && !s.stacks.length) {
                 <span class="quiet">Matches nothing automatically</span>

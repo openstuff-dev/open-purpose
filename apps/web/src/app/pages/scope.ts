@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Button, Control, Field } from '@openstuff-dev/ui-angular';
+import { Button, Chip, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Repository, ScopeDetail } from '../core/models';
 import { Session, provideHere } from '../core/session';
@@ -24,6 +24,7 @@ import { SlugRenameField } from '../shared/slug-rename';
     Button,
     Field,
     Control,
+    Chip,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -98,7 +99,7 @@ import { SlugRenameField } from '../shared/slug-rename';
               <dt>Repositories</dt>
               <dd>
                 @for (r of boundRepos(s); track r.id) {
-                  <span class="chip repo" [title]="r.remote_key"
+                  <span os-chip tone="brand" class="mono" [title]="r.remote_key"
                     ><app-icon name="branch" [size]="11" />{{ repoName(r.remote_key) }}</span
                   >
                 } @empty {
@@ -109,7 +110,7 @@ import { SlugRenameField } from '../shared/slug-rename';
             <dt>Paths</dt>
             <dd>
               @for (g of s.path_globs; track g) {
-                <code class="chip path">{{ g }}</code>
+                <code os-chip tone="brand">{{ g }}</code>
               } @empty {
                 <span class="quiet">Any path</span>
               }
@@ -117,7 +118,7 @@ import { SlugRenameField } from '../shared/slug-rename';
             <dt>Stacks</dt>
             <dd>
               @for (t of s.stacks; track t) {
-                <span class="chip stack">{{ t }}</span>
+                <span os-chip>{{ t }}</span>
               } @empty {
                 <span class="quiet">Any stack</span>
               }

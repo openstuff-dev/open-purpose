@@ -10,7 +10,7 @@ import {
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Button, Control, Field } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Chip, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import {
   KIND_LABEL,
@@ -54,6 +54,8 @@ interface Draft {
     Button,
     Field,
     Control,
+    Chip,
+    Badge,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -109,7 +111,7 @@ interface Draft {
           </div>
         }
         <p class="meta">
-          <span class="chip">{{ kindLabel[d.kind] }}</span>
+          <span os-chip>{{ kindLabel[d.kind] }}</span>
           <span>{{ where() }}</span>
           <span
             >{{ d.sections.length }} {{ d.sections.length === 1 ? 'section' : 'sections' }}</span
@@ -250,7 +252,7 @@ interface Draft {
                     {{ s.activity.reads === 1 ? 'time' : 'times' }} by agents, last
                     <time [attr.datetime]="last" [title]="dateTime(last)">{{ since(last) }}</time>
                     @if (quietFor30Days(last)) {
-                      <span class="flag quiet-flag">Not requested in the last month</span>
+                      <span os-badge tone="warning">Not requested in the last month</span>
                     }
                   } @else {
                     <span class="quiet">Not requested by agents yet</span>

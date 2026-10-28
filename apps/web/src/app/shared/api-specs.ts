@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Button, Control, Field } from '@openstuff-dev/ui-angular';
+import { Button, Chip, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ApiSpec, ApiSpecDetail } from '../core/models';
 import { Icon } from './icon';
@@ -35,7 +35,7 @@ function ago(iso: string | null): string {
  */
 @Component({
   selector: 'app-api-specs',
-  imports: [FormsModule, DatePipe, Icon, MarkdownView, Button, Field, Control],
+  imports: [FormsModule, DatePipe, Icon, MarkdownView, Button, Field, Control, Chip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (specs().length) {
@@ -57,7 +57,7 @@ function ago(iso: string | null): string {
                   }
                 </span>
                 <span class="api-sub">
-                  <span class="chip">{{ s.spec_version }}</span>
+                  <span os-chip>{{ s.spec_version }}</span>
                   {{ s.endpoint_count }} endpoints · {{ s.schema_count }} schemas ·
                   @if (s.source_url) {
                     <span [title]="s.source_url">from link, fetched {{ ago(s.fetched_at) }}</span>
