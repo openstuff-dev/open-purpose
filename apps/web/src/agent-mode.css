@@ -98,7 +98,8 @@ html.agent-mode input,
 html.agent-mode select,
 html.agent-mode textarea,
 html.agent-mode .drawer,
-html.agent-mode .menu,
+html.agent-mode .os-menu,
+html.agent-mode .os-tooltip,
 html.agent-mode .notice,
 html.agent-mode .composer {
   box-shadow: none !important;
@@ -138,7 +139,7 @@ html.agent-mode .block h2::before {
 }
 html.agent-mode .drawer-section-head h3,
 html.agent-mode .two-col h3,
-html.agent-mode .menu-label,
+html.agent-mode .os-menu-label,
 html.agent-mode .nav-label,
 html.agent-mode .lp-kind,
 html.agent-mode .os-data-table th {
