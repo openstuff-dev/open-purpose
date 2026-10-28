@@ -1,6 +1,6 @@
 /*
  * Agent mode looks like a terminal: one monospace font, a phosphor palette,
- * square corners, dashed rules (see agent-mode.generated.css), bracketed
+ * square corners, dashed rules (--os-border-style), bracketed
  * buttons and prompt-style headings. It is a costume over the normal UI: the
  * same markup, switched by the agent-mode class on <html>.
  */
@@ -38,18 +38,19 @@ html:root.agent-mode {
   --node-term: #e6c86e;
   --shadow-pop: none;
   /* ANSI-ish organization colours. */
-  --org-0: #5ccfe3;
-  --org-1: #e391f7;
-  --org-2: #6fe8a1;
-  --org-3: #f2b55e;
-  --org-4: #ff7d8d;
-  --org-5: #7fa8ff;
-  --org-6: #b9a0ff;
-  --org-7: #c8e36c;
+  --os-identity-0: #5ccfe3;
+  --os-identity-1: #e391f7;
+  --os-identity-2: #6fe8a1;
+  --os-identity-3: #f2b55e;
+  --os-identity-4: #ff7d8d;
+  --os-identity-5: #7fa8ff;
+  --os-identity-6: #b9a0ff;
+  --os-identity-7: #c8e36c;
   --sans: var(--mono);
   --r-sm: 0;
   --r-md: 0;
   --r-lg: 0;
+  --os-border-style: dashed;
   color-scheme: dark;
 }
 

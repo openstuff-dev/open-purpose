@@ -4,138 +4,62 @@
  *   each organization has its own identity colour.
  */
 
+/*
+ * The old names, kept so the rules below read the same. Every value comes from
+ * @openstuff-dev/tokens (tokens.css), generated from primaryColor #2d5bff in
+ * tokens.config.json, and is one light-dark() pair.
+ */
 :root {
-  --ground: #fbfbfc;
-  --surface: #ffffff;
-  --sunken: #f3f4f6;
-  --sidebar: #f4f5f7;
-  --hover: #eceef1;
-  --line: #e6e8eb;
-  --line-strong: #d5d9de;
-  --ink: #16181d;
-  --ink-2: #3c414b;
-  --muted: #6b7280;
-  --faint: #9aa1ab;
+  --ground: var(--os-bg-default);
+  --surface: var(--os-bg-surface-100);
+  --sunken: var(--os-bg-surface-300);
+  --sidebar: var(--os-bg-alternative);
+  --hover: var(--os-bg-hover);
+  --line: var(--os-border-default);
+  --line-strong: var(--os-border-strong);
+  --ink: var(--os-fg-default);
+  --ink-2: var(--os-fg-light);
+  --muted: var(--os-fg-lighter);
+  --faint: var(--os-fg-muted);
 
-  --accent: #2d5bff;
-  --accent-ink: #ffffff;
-  --accent-soft: #e8eeff;
-  --accent-text: #2448d8;
+  --accent: var(--os-brand-default);
+  --accent-ink: var(--os-brand-ink);
+  --accent-soft: var(--os-brand-soft);
+  --accent-text: var(--os-brand-text);
 
-  --locked: #7c3aed;
-  --locked-soft: #f1eafe;
-  --propose: #b45309;
-  --propose-soft: #fdf1e3;
-  --open: #15803d;
-  --open-soft: #e5f5ea;
+  --locked: var(--os-identity-1);
+  --locked-soft: var(--os-identity-1-soft);
+  --propose: var(--os-warning-text);
+  --propose-soft: var(--os-warning-soft);
+  --open: var(--os-success-text);
+  --open-soft: var(--os-success-soft);
 
-  --danger: #d0263c;
-  --danger-soft: #fdecee;
-  --add: #e7f6ec;
-  --del: #fdecee;
-  --agent: #0e7490;
-  --org-0: #2d5bff;
-  --org-1: #a03fb5;
-  --org-2: #0f8a6a;
-  --org-3: #c26a12;
-  --org-4: #d23f57;
-  --org-5: #1d8fb3;
-  --org-6: #6a55e0;
-  --org-7: #5f7a14;
-  --agent-soft: #e2f4f8;
+  --danger: var(--os-danger-text);
+  --danger-soft: var(--os-danger-soft);
+  --add: var(--os-success-soft);
+  --del: var(--os-danger-soft);
+  --agent: var(--os-identity-7);
+  --agent-soft: var(--os-identity-7-soft);
 
-  --node-term: #8a6d1d;
-  --edge: #b6bdc6;
-  --shadow-pop: 0 1px 2px rgb(16 24 40 / 0.06), 0 12px 32px -8px rgb(16 24 40 / 0.18);
+  --node-term: var(--os-identity-4);
+  --edge: var(--os-border-strong);
+  --shadow-pop: var(--os-shadow-pop);
 
-  --sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace;
+  --sans: var(--os-font-sans);
+  --mono: var(--os-font-mono);
 
-  --fs-xs: 0.75rem;
-  --fs-sm: 0.8125rem;
-  --fs-base: 0.875rem;
-  --fs-md: 1rem;
-  --fs-lg: 1.25rem;
-  --fs-xl: 1.75rem;
-  --fs-2xl: 2.125rem;
+  --fs-xs: var(--os-text-xs);
+  --fs-sm: var(--os-text-sm);
+  --fs-base: var(--os-text-base);
+  --fs-md: var(--os-text-md);
+  --fs-lg: var(--os-text-lg);
+  --fs-xl: var(--os-text-xl);
+  --fs-2xl: var(--os-text-2xl);
 
-  --r-sm: 6px;
-  --r-md: 8px;
-  --r-lg: 12px;
+  --r-sm: var(--os-radius-sm);
+  --r-md: var(--os-radius-md);
+  --r-lg: var(--os-radius-lg);
   --rail: 248px;
-  color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --ground: #0d0f13;
-    --surface: #14171c;
-    --sunken: #1a1e24;
-    --sidebar: #101317;
-    --hover: #1f242b;
-    --line: #262b33;
-    --line-strong: #343a44;
-    --ink: #eceef2;
-    --ink-2: #c4c9d2;
-    --muted: #8d95a1;
-    --faint: #616975;
-    --accent: #5a7dff;
-    --accent-ink: #ffffff;
-    --accent-soft: #1a2448;
-    --accent-text: #8ea6ff;
-    --locked: #b794f6;
-    --locked-soft: #2a1f42;
-    --propose: #f0a64b;
-    --propose-soft: #36270f;
-    --open: #5fd38a;
-    --open-soft: #13301f;
-    --danger: #ff6b7d;
-    --danger-soft: #3a1720;
-    --agent: #5ccfe3;
-    --agent-soft: #10292f;
-    --agent: #5ccfe3;
-    --agent-soft: #10292f;
-    --add: #13301f;
-    --del: #3a1720;
-    --node-term: #d9bb62;
-    --edge: #4a525d;
-    --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.4), 0 16px 40px -8px rgb(0 0 0 / 0.6);
-    color-scheme: dark;
-  }
-}
-
-:root[data-theme='dark'] {
-  --ground: #0d0f13;
-  --surface: #14171c;
-  --sunken: #1a1e24;
-  --sidebar: #101317;
-  --hover: #1f242b;
-  --line: #262b33;
-  --line-strong: #343a44;
-  --ink: #eceef2;
-  --ink-2: #c4c9d2;
-  --muted: #8d95a1;
-  --faint: #616975;
-  --accent: #5a7dff;
-  --accent-ink: #ffffff;
-  --accent-soft: #1a2448;
-  --accent-text: #8ea6ff;
-  --locked: #b794f6;
-  --locked-soft: #2a1f42;
-  --propose: #f0a64b;
-  --propose-soft: #36270f;
-  --open: #5fd38a;
-  --open-soft: #13301f;
-  --danger: #ff6b7d;
-  --danger-soft: #3a1720;
-  --agent: #5ccfe3;
-  --agent-soft: #10292f;
-  --add: #13301f;
-  --del: #3a1720;
-  --node-term: #d9bb62;
-  --edge: #4a525d;
-  --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.4), 0 16px 40px -8px rgb(0 0 0 / 0.6);
-  color-scheme: dark;
 }
 
 /* ─── Base ─── */
@@ -235,7 +159,7 @@ textarea {
   font: inherit;
   color: var(--ink);
   background: var(--surface);
-  border: 1px solid var(--line-strong);
+  border: 1px var(--os-border-style) var(--line-strong);
   border-radius: var(--r-sm);
   padding: 0.5rem 0.65rem;
   width: 100%;
@@ -315,7 +239,7 @@ label.check input {
   padding: 0 0.85rem;
   font: 500 var(--fs-sm)/1 var(--sans);
   border-radius: var(--r-sm);
-  border: 1px solid var(--line-strong);
+  border: 1px var(--os-border-style) var(--line-strong);
   background: var(--surface);
   color: var(--ink);
   cursor: pointer;
@@ -401,7 +325,7 @@ kbd {
   font: 500 0.6875rem/1 var(--sans);
   color: var(--muted);
   background: var(--surface);
-  border: 1px solid var(--line-strong);
+  border: 1px var(--os-border-style) var(--line-strong);
   border-bottom-width: 2px;
   border-radius: 4px;
   padding: 0.15rem 0.35rem;
@@ -435,7 +359,7 @@ kbd {
 }
 .panel {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   padding: 1.1rem 1.25rem;
 }
@@ -469,7 +393,7 @@ kbd {
   display: grid;
   gap: 0.85rem;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   padding: 2rem;
   box-shadow: var(--shadow-pop);
@@ -506,7 +430,7 @@ kbd {
   gap: 0.25rem;
   padding: 0.75rem 0.65rem;
   background: var(--sidebar);
-  border-right: 1px solid var(--line);
+  border-right: 1px var(--os-border-style) var(--line);
 }
 .brand {
   display: flex;
@@ -536,7 +460,7 @@ kbd {
   gap: 0.6rem;
   padding: 0.45rem 0.5rem;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   font: inherit;
   color: var(--ink);
@@ -576,7 +500,8 @@ kbd {
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 7px;
-  color: #fff;
+  /* Identity colours are lighter in dark mode, so the text flips with them. */
+  color: var(--ground);
   font: 600 0.6875rem/1 var(--sans);
   letter-spacing: 0.02em;
 }
@@ -597,7 +522,7 @@ kbd {
   right: 0;
   top: calc(100% + 4px);
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-pop);
   padding: 0.3rem;
@@ -708,7 +633,7 @@ kbd {
   align-items: center;
   gap: 0.55rem;
   padding: 0.5rem 0.55rem;
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
   margin-top: 0.4rem;
 }
 .me-row .avatar {
@@ -753,7 +678,7 @@ kbd {
   padding: 0 clamp(1rem, 3vw, 2.25rem);
   background: color-mix(in srgb, var(--ground) 85%, transparent);
   backdrop-filter: saturate(1.4) blur(10px);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
 }
 .topbar .menu-btn {
   display: none;
@@ -771,7 +696,7 @@ kbd {
   padding: 0 0.6rem;
   margin-left: auto;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-sm);
   color: var(--faint);
   font: inherit;
@@ -812,7 +737,7 @@ kbd {
   }
   .rail-open .rail {
     transform: none;
-    box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.35);
+    box-shadow: 0 0 0 100vmax var(--os-backdrop);
   }
   .topbar .menu-btn {
     display: inline-grid;
@@ -931,7 +856,7 @@ kbd {
 }
 .two-col > div {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   padding: 0.9rem 1.1rem;
 }
@@ -966,7 +891,7 @@ kbd {
   flex: 1 1 20rem;
 }
 .callout {
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   background: var(--surface);
   padding: 0.9rem 1.1rem;
   border-radius: var(--r-lg);
@@ -985,7 +910,7 @@ kbd {
   border-color: transparent;
 }
 .danger-zone {
-  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--line));
+  border: 1px var(--os-border-style) color-mix(in srgb, var(--danger) 30%, var(--line));
   border-radius: var(--r-lg);
   padding: 1.1rem 1.25rem;
 }
@@ -1118,7 +1043,7 @@ kbd {
 .repo-picker {
   flex: 1 1 100%;
   min-width: 0;
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   padding: 0.6rem 0.9rem 0.5rem;
   margin: 0;
@@ -1174,14 +1099,14 @@ kbd {
   display: flex;
   gap: 0.15rem;
   align-items: center;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
   margin: 1rem 0;
   overflow-x: auto;
 }
 .tabs [role='tab'] {
   background: none;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-bottom: 2px var(--os-border-style) transparent;
   padding: 0.55rem 0.7rem;
   font: 500 var(--fs-sm) var(--sans);
   color: var(--muted);
@@ -1216,7 +1141,7 @@ pre {
   white-space: pre;
   font-size: 0.8125rem;
   line-height: 1.6;
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   margin: 0.5rem 0;
 }
 
@@ -1232,14 +1157,14 @@ pre {
   margin: 0 0 1rem;
   padding: 0;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   overflow: hidden;
 }
 :is(.doc-list, .scope-list, .project-list, .repo-list, .hits, .actor-list, .org-list, .group-list)
   > li
   + li {
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
 }
 
 .doc-list li a {
@@ -1445,7 +1370,7 @@ pre {
 }
 .mode-picker button[aria-checked='true'] {
   background: var(--surface);
-  box-shadow: 0 1px 2px rgb(16 24 40 / 0.08);
+  box-shadow: var(--os-shadow-xs);
 }
 .mode-picker button[aria-checked='true'][data-mode='locked'] {
   color: var(--locked);
@@ -1489,7 +1414,7 @@ pre {
 .section {
   position: relative;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   padding: 1.15rem 1.4rem 0.85rem 1.55rem;
   scroll-margin-top: 5rem;
@@ -1536,7 +1461,7 @@ pre {
   align-items: center;
   color: var(--faint);
   font-size: var(--fs-xs);
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
   margin-top: 0.9rem;
   padding-top: 0.7rem;
 }
@@ -1578,7 +1503,7 @@ pre {
   padding: 0;
   list-style: none;
   font-size: var(--fs-sm);
-  border-left: 1px solid var(--line);
+  border-left: 1px var(--os-border-style) var(--line);
 }
 .history li {
   margin: 0;
@@ -1652,7 +1577,7 @@ pre {
 .prose blockquote {
   margin: 0.8em 0;
   padding-left: 1em;
-  border-left: 2px solid var(--line-strong);
+  border-left: 2px var(--os-border-style) var(--line-strong);
   color: var(--muted);
 }
 .prose table {
@@ -1661,13 +1586,13 @@ pre {
 }
 .prose th,
 .prose td {
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   padding: 0.4rem 0.65rem;
   text-align: left;
 }
 .prose hr {
   border: 0;
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
   margin: 1.5rem 0;
 }
 .prose > div > :first-child {
@@ -1694,7 +1619,7 @@ a.wikilink:hover {
 
 /* ─── Editor ─── */
 .editor {
-  border: 1px solid var(--line-strong);
+  border: 1px var(--os-border-style) var(--line-strong);
   border-radius: var(--r-md);
   background: var(--surface);
   overflow: hidden;
@@ -1707,7 +1632,7 @@ a.wikilink:hover {
   display: flex;
   gap: 0.15rem;
   align-items: center;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
   padding: 0 0.4rem;
   flex-wrap: wrap;
   background: var(--ground);
@@ -1715,7 +1640,7 @@ a.wikilink:hover {
 .editor-tabs button {
   background: none;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-bottom: 2px var(--os-border-style) transparent;
   padding: 0.5rem 0.55rem;
   font: 500 var(--fs-xs) var(--sans);
   color: var(--muted);
@@ -1738,7 +1663,7 @@ a.wikilink:hover {
   gap: 0.05rem;
 }
 .editor-tool-group + .editor-tool-group {
-  border-left: 1px solid var(--line);
+  border-left: 1px var(--os-border-style) var(--line);
   margin-left: 0.3rem;
   padding-left: 0.3rem;
 }
@@ -1763,7 +1688,7 @@ a.wikilink:hover {
 }
 .editor-hint {
   margin: 0;
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
   padding: 0.3rem 0.85rem;
   color: var(--faint);
   font-size: var(--fs-xs);
@@ -1797,7 +1722,7 @@ a.wikilink:hover {
   margin: 0;
   padding: 0.3rem;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-pop);
   max-height: 14rem;
@@ -1834,7 +1759,7 @@ a.wikilink:hover {
 /* ─── Inbox ─── */
 .proposal {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   padding: 1.15rem 1.35rem;
   display: grid;
@@ -1872,7 +1797,7 @@ a.wikilink:hover {
   padding: 0.7rem 0.95rem;
   background: var(--ground);
   border-radius: var(--r-md);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   color: var(--ink-2);
 }
 .rationale .quiet {
@@ -1896,7 +1821,7 @@ a.wikilink:hover {
   margin: 0;
 }
 .proposal-body {
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   padding: 0.85rem 1.1rem;
 }
@@ -1905,7 +1830,7 @@ a.wikilink:hover {
   flex-wrap: wrap;
   gap: 0.85rem 1.25rem;
   align-items: end;
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
   padding-top: 0.95rem;
 }
 .review > label {
@@ -1935,7 +1860,7 @@ a.wikilink:hover {
 .diff {
   font-family: var(--mono);
   font-size: 0.78rem;
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   overflow-x: auto;
 }
@@ -1997,7 +1922,7 @@ mark {
 }
 .preview-render {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   padding: 1.25rem 1.5rem;
   max-width: none;
@@ -2074,7 +1999,7 @@ mark {
   align-items: center;
   gap: 0.35rem;
   font-size: var(--fs-xs);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: 999px;
   padding: 0.15rem 0.3rem 0.15rem 0.35rem;
   background: var(--ground);
@@ -2134,7 +2059,7 @@ mark {
   align-items: center;
 }
 .share {
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   padding: 0.75rem 1rem 0.6rem;
   margin: 0.75rem 0 0 2.35rem;
@@ -2223,7 +2148,7 @@ mark {
 }
 .setting-card {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   margin-top: 1rem;
 }
@@ -2235,7 +2160,7 @@ mark {
   padding: 1rem 1.25rem;
 }
 .setting-row + .setting-row {
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
 }
 .setting-row h3 {
   font-size: var(--fs-base);
@@ -2266,7 +2191,7 @@ mark {
   display: grid;
   gap: 0.55rem;
   padding: 0.55rem;
-  border: 1px solid var(--line-strong);
+  border: 1px var(--os-border-style) var(--line-strong);
   border-radius: var(--r-md);
   background: var(--surface);
   cursor: pointer;
@@ -2288,7 +2213,7 @@ mark {
 .theme-swatch {
   height: 4.25rem;
   border-radius: 6px;
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   display: grid;
   grid-template-columns: 30% 1fr;
   overflow: hidden;
@@ -2364,7 +2289,7 @@ mark {
 .matrix th,
 .matrix td {
   padding: 0.6rem 0.85rem;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
   text-align: center;
 }
 .matrix th:first-child,
@@ -2416,7 +2341,7 @@ mark {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgb(10 12 16 / 0.35);
+  background: var(--os-backdrop);
   display: grid;
   justify-items: center;
   align-items: start;
@@ -2425,7 +2350,7 @@ mark {
 .palette {
   width: min(38rem, 100%);
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-pop);
   overflow: hidden;
@@ -2435,7 +2360,7 @@ mark {
   align-items: center;
   gap: 0.6rem;
   padding: 0 1rem;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
 }
 .palette-input .icon {
   color: var(--muted);
@@ -2508,7 +2433,7 @@ mark {
   flex: none;
   max-width: 40%;
   padding: 0.2rem 0.6rem;
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: 999px;
   background: var(--ground);
   color: var(--muted);
@@ -2542,7 +2467,7 @@ mark {
   display: flex;
   gap: 1rem;
   padding: 0.55rem 1rem;
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
   font-size: var(--fs-xs);
   color: var(--faint);
   background: var(--ground);
@@ -2601,7 +2526,7 @@ mark {
   gap: 0.75rem 1rem;
   align-items: center;
   padding: 0.85rem clamp(1rem, 3vw, 2.25rem);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
   background: var(--ground);
 }
 .map-bar h1 {
@@ -2782,7 +2707,7 @@ mark {
   max-height: calc(100% - 2rem);
   overflow: auto;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   padding: 1rem 1.15rem;
   box-shadow: var(--shadow-pop);
@@ -2837,7 +2762,7 @@ mark {
 .map-empty p {
   max-width: 36ch;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   padding: 0.85rem 1.1rem;
 }
@@ -3005,7 +2930,7 @@ mark {
 .segmented button[aria-selected='true'] {
   background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 1px 2px rgb(16 24 40 / 0.08);
+  box-shadow: var(--os-shadow-xs);
 }
 .segmented.sm button {
   font-size: var(--fs-xs);
@@ -3022,7 +2947,7 @@ mark {
 
 .table-wrap {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   overflow-x: auto;
 }
@@ -3038,7 +2963,7 @@ mark {
   color: var(--muted);
   padding: 0 0.85rem;
   height: 2.4rem;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
   background: var(--ground);
   white-space: nowrap;
   position: sticky;
@@ -3059,7 +2984,7 @@ mark {
 }
 .data-table td {
   padding: 0.65rem 0.85rem;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
   vertical-align: middle;
 }
 .data-table tbody tr:last-child td {
@@ -3244,7 +3169,7 @@ mark {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgb(10 12 16 / 0.18);
+  background: color-mix(in oklch, var(--os-backdrop), transparent 55%);
 }
 .drawer {
   position: fixed;
@@ -3256,7 +3181,7 @@ mark {
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border-left: 1px solid var(--line);
+  border-left: 1px var(--os-border-style) var(--line);
   box-shadow: var(--shadow-pop);
   outline: none;
   animation: drawer-in 0.18s ease-out;
@@ -3272,7 +3197,7 @@ mark {
   align-items: center;
   gap: 0.75rem;
   padding: 0.6rem 0.75rem 0.6rem 1.5rem;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
 }
 .drawer-nav {
   margin-left: auto;
@@ -3312,7 +3237,7 @@ mark {
   grid-template-columns: 7.5rem minmax(0, 1fr);
   gap: 0;
   margin: 0;
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   overflow: hidden;
   font-size: var(--fs-sm);
@@ -3321,12 +3246,12 @@ mark {
   color: var(--muted);
   padding: 0.55rem 0.85rem;
   background: var(--ground);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
 }
 .detail-grid dd {
   margin: 0;
   padding: 0.55rem 0.85rem;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem 0.5rem;
@@ -3391,7 +3316,7 @@ mark {
 .decision-box {
   padding: 0.85rem 1rem;
   border-radius: var(--r-md);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   background: var(--ground);
   gap: 0.3rem;
   justify-items: start;
@@ -3413,7 +3338,7 @@ mark {
   color: var(--ink-2);
 }
 .drawer-foot {
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
   padding: 0.9rem 1.5rem 1rem;
   display: grid;
   gap: 0.7rem;
@@ -3536,7 +3461,7 @@ mark {
   height: 0.75rem;
   border-radius: 999px;
   background: var(--surface);
-  border: 2px solid var(--line-strong);
+  border: 2px var(--os-border-style) var(--line-strong);
 }
 .layer[data-level='project']::after,
 .layer[data-level='project-scope']::after {
@@ -3566,7 +3491,7 @@ mark {
   font-size: var(--fs-xs);
 }
 .layer-doc {
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   background: var(--surface);
   margin-bottom: 0.4rem;
@@ -3578,13 +3503,13 @@ mark {
   font-weight: 500;
 }
 .layer-doc[open] summary {
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
 }
 .layer-section {
   padding: 0.65rem 0.9rem;
 }
 .layer-section + .layer-section {
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
 }
 .layer-section-head {
   display: flex;
@@ -3746,7 +3671,7 @@ mark {
 .rt {
   font-family: var(--mono);
   font-size: 0.78rem;
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   overflow: hidden;
   background: var(--surface);
@@ -3763,7 +3688,7 @@ mark {
   color: var(--faint);
   user-select: none;
   background: var(--ground);
-  border-right: 1px solid var(--line);
+  border-right: 1px var(--os-border-style) var(--line);
   font-variant-numeric: tabular-nums;
 }
 .rt-gutter {
@@ -3861,7 +3786,7 @@ mark {
 .rt-inline {
   padding: 0.5rem 0.75rem 0.6rem 2.5rem;
   background: var(--ground);
-  border-block: 1px solid var(--line);
+  border-block: 1px var(--os-border-style) var(--line);
   font-family: var(--sans);
   font-size: var(--fs-sm);
 }
@@ -3871,7 +3796,7 @@ mark {
 }
 
 .thread {
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   background: var(--surface);
   overflow: hidden;
@@ -3900,7 +3825,7 @@ mark {
   background: var(--hover);
 }
 .thread-anchor {
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
   background: var(--ground);
 }
 .thread-anchor > span {
@@ -3924,7 +3849,7 @@ mark {
   padding: 0.7rem 0.75rem;
 }
 .comment + .comment {
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
 }
 .comment-avatar {
   display: grid;
@@ -3967,7 +3892,7 @@ mark {
   margin-bottom: 0;
 }
 .suggestion {
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-sm);
   overflow: hidden;
 }
@@ -3979,7 +3904,7 @@ mark {
   gap: 0.5rem;
   padding: 0.35rem 0.5rem 0.35rem 0.65rem;
   background: var(--ground);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
   font-size: var(--fs-xs);
   color: var(--muted);
 }
@@ -4001,7 +3926,7 @@ mark {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
   background: var(--ground);
 }
 .thread-foot .btn {
@@ -4016,7 +3941,7 @@ mark {
   flex: 1;
   text-align: left;
   padding: 0.4rem 0.6rem;
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-sm);
   background: var(--surface);
   color: var(--faint);
@@ -4035,7 +3960,7 @@ mark {
   display: grid;
   gap: 0.5rem;
   padding: 0.65rem 0.75rem;
-  border: 1px solid var(--accent);
+  border: 1px var(--os-border-style) var(--accent);
   border-radius: var(--r-md);
   background: var(--surface);
   box-shadow: 0 0 0 3px var(--accent-soft);
@@ -4127,7 +4052,7 @@ mark {
   height: 1.6rem;
   border-radius: 50%;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   color: var(--muted);
 }
 .tl-event[data-kind='approved'] .tl-icon {
@@ -4149,7 +4074,7 @@ mark {
   display: block;
   margin-top: 0.35rem;
   padding: 0.5rem 0.7rem;
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   background: var(--surface);
 }
@@ -4215,7 +4140,7 @@ mark {
   display: grid;
   gap: 0.05rem;
   padding: 0.4rem 0.75rem;
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   background: var(--surface);
   color: var(--ink);
@@ -4267,7 +4192,7 @@ mark {
   display: flex;
   gap: 0.15rem;
   margin: 1.75rem 0 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
   overflow-x: auto;
   position: sticky;
   top: 3.25rem;
@@ -4281,7 +4206,7 @@ mark {
   gap: 0.45rem;
   padding: 0.65rem 0.8rem;
   margin-bottom: -1px;
-  border-bottom: 2px solid transparent;
+  border-bottom: 2px var(--os-border-style) transparent;
   color: var(--muted);
   font-size: var(--fs-sm);
   font-weight: 500;
@@ -4322,7 +4247,7 @@ mark {
   margin-top: 1.25rem;
   padding: 1.4rem 1.5rem 1.6rem;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   animation: panel-in 0.14s ease-out;
 }
@@ -4335,7 +4260,7 @@ mark {
 .panel-head {
   margin-bottom: 1.1rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
 }
 .panel-head h2 {
   font-size: var(--fs-lg);
@@ -4365,12 +4290,12 @@ mark {
 .tab-panel .slug-section {
   margin-top: 1.5rem;
   padding-top: 1.25rem;
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
 }
 .tab-panel .danger-zone {
   margin-top: 2rem;
   padding-top: 1.25rem;
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
 }
 .tab-panel .danger-zone h2 {
   font-size: var(--fs-md);
@@ -4412,7 +4337,7 @@ mark {
   gap: 0.45rem;
   height: 2rem;
   padding: 0 0.55rem 0 0.6rem;
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-sm);
   background: var(--surface);
   color: var(--muted);
@@ -4444,7 +4369,7 @@ mark {
   height: calc(1rem - 4px);
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  box-shadow: var(--os-shadow-sm);
   transition: transform 0.15s;
 }
 .agent-switch[aria-checked='true'] {
@@ -4517,7 +4442,7 @@ mark {
   min-height: 3.25rem;
   padding: 0.4rem clamp(1rem, 3vw, 2.25rem);
   background: var(--ground);
-  border-bottom: 1px solid color-mix(in srgb, var(--agent) 45%, var(--line));
+  border-bottom: 1px var(--os-border-style) color-mix(in srgb, var(--agent) 45%, var(--line));
 }
 .agent-bar .brand {
   padding: 0;
@@ -4570,7 +4495,7 @@ mark {
   gap: 1rem;
 }
 .call {
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   background: var(--surface);
   min-width: 0;
@@ -4580,7 +4505,7 @@ mark {
 }
 .call-head {
   padding: 0.5rem 0.85rem;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px var(--os-border-style) var(--line);
   overflow-wrap: anywhere;
 }
 .call-sig {
@@ -4604,7 +4529,7 @@ mark {
   align-items: center;
   gap: 0.4rem;
   padding: 0.6rem 0.85rem;
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
   font-size: var(--fs-sm);
 }
 .transcript > .link-btn {
@@ -4630,7 +4555,7 @@ mark {
   gap: 0.6rem;
 }
 .api-card {
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   background: var(--surface);
   overflow: hidden;
@@ -4698,7 +4623,7 @@ mark {
   transform: rotate(180deg);
 }
 .api-body {
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
   padding: 0.75rem 0.9rem 0.9rem;
   display: grid;
   gap: 0.75rem;
@@ -4739,14 +4664,14 @@ mark {
 .api-browser {
   display: grid;
   grid-template-columns: minmax(14rem, 19rem) minmax(0, 1fr);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-md);
   min-height: 22rem;
   max-height: 70vh;
   overflow: hidden;
 }
 .api-nav {
-  border-right: 1px solid var(--line);
+  border-right: 1px var(--os-border-style) var(--line);
   background: var(--ground);
   overflow-y: auto;
   padding: 0.5rem;
@@ -4875,7 +4800,7 @@ mark {
   max-height: none;
 }
 .api-add {
-  border-top: 1px solid var(--line);
+  border-top: 1px var(--os-border-style) var(--line);
   padding-top: 1.1rem;
 }
 .api-add-head {
@@ -4901,7 +4826,7 @@ mark {
   }
   .api-nav {
     border-right: 0;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px var(--os-border-style) var(--line);
     max-height: 16rem;
   }
 }
@@ -4967,7 +4892,7 @@ mark {
   gap: 0.5rem 1rem;
   padding: 0.75rem 1rem;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
 }
 .transfer-orgs li > div {
@@ -4997,7 +4922,7 @@ mark {
   font-size: var(--fs-sm);
 }
 .transfer-changes li {
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   background: var(--surface);
 }
@@ -5034,7 +4959,7 @@ mark {
 .segmented button[aria-pressed='true'] {
   background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 1px 2px rgb(16 24 40 / 0.08);
+  box-shadow: var(--os-shadow-xs);
 }
 .activity-controls {
   display: flex;
@@ -5057,7 +4982,7 @@ mark {
   gap: 0.35rem;
   min-width: 0;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   padding: 0.85rem 1rem;
 }
@@ -5266,7 +5191,7 @@ ul.stat-rest {
 .stat-switch button[aria-pressed='true'] {
   background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 1px 2px rgb(16 24 40 / 0.08);
+  box-shadow: var(--os-shadow-xs);
 }
 .stat-switch button:focus-visible {
   outline: 2px solid var(--accent);
@@ -5301,7 +5226,7 @@ ul.stat-rest {
   padding: 0.7rem 0.9rem;
   border-radius: var(--r-md);
   font-size: var(--fs-sm);
-  border: 1px solid var(--line);
+  border: 1px var(--os-border-style) var(--line);
 }
 .doc-notice p {
   margin: 0;
@@ -5342,7 +5267,7 @@ ul.stat-rest {
 .segmented button[aria-pressed='true'] {
   background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 1px 2px rgb(16 24 40 / 0.08);
+  box-shadow: var(--os-shadow-xs);
 }
 .segmented button[aria-pressed='true'] .seg-count {
   color: var(--accent-text);

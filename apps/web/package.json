@@ -1,0 +1,95 @@
+{
+  "name": "web",
+  "version": "0.2.0",
+  "scripts": {
+    "ng": "ng",
+    "tokens": "os-tokens",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "stylelint": "stylelint \"src/**/*.css\""
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/common": "^22.2.3",
+    "@angular/compiler": "^22.2.3",
+    "@angular/core": "^22.2.3",
+    "@angular/forms": "^22.2.3",
+    "@angular/platform-browser": "^22.2.3",
+    "@angular/router": "^22.2.3",
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "@openstuff-dev/tokens": "file:../../vendor/openstuff-dev-tokens-0.0.1.tgz",
+    "d3-drag": "^3.0.0",
+    "d3-force": "^3.0.0",
+    "d3-selection": "^3.0.0",
+    "d3-transition": "^3.0.1",
+    "d3-zoom": "^3.0.0",
+    "dompurify": "^3.4.17",
+    "lucide": "^1.61.0",
+    "marked": "^18.1.1",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.2.4",
+    "@angular/cli": "^22.2.4",
+    "@angular/compiler-cli": "^22.2.3",
+    "@openpurpose/contracts": "*",
+    "@types/d3-drag": "^3.0.7",
+    "@types/d3-force": "^3.0.10",
+    "@types/d3-selection": "^3.0.12",
+    "@types/d3-transition": "^3.0.9",
+    "@types/d3-zoom": "^3.0.9",
+    "typescript": "~6.0.3"
+  },
+  "nx": {
+    "name": "web",
+    "tags": [
+      "type:app"
+    ],
+    "targets": {
+      "tokens": {
+        "cache": true,
+        "inputs": [
+          "{projectRoot}/tokens.config.json",
+          {
+            "externalDependencies": [
+              "@openstuff-dev/tokens"
+            ]
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/src/tokens"
+        ]
+      },
+      "build": {
+        "dependsOn": [
+          "tokens"
+        ],
+        "outputs": [
+          "{projectRoot}/dist"
+        ]
+      },
+      "start": {
+        "dependsOn": [
+          "tokens"
+        ],
+        "continuous": true
+      },
+      "watch": {
+        "dependsOn": [
+          "tokens"
+        ],
+        "continuous": true
+      },
+      "typecheck": {
+        "cache": true,
+        "dependsOn": [
+          "tokens"
+        ]
+      }
+    }
+  }
+}

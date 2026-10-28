@@ -3,7 +3,10 @@ import { Injectable, signal } from '@angular/core';
 export type ThemeChoice = 'system' | 'light' | 'dark';
 const KEY = 'openpurpose.theme';
 
-/** Light, dark or follow the system. Stored per browser. */
+/**
+ * Light, dark or follow the system. Stored per browser. data-theme on <html> only sets
+ * color-scheme (see tokens.css), which picks a side of every light-dark() token.
+ */
 @Injectable({ providedIn: 'root' })
 export class Theme {
   readonly choice = signal<ThemeChoice>(this.read());
@@ -40,24 +43,15 @@ export class Theme {
 }
 
 /**
- * Each organization's identity colour, picked from a fixed palette by its
- * position in the group, so it is the same on every page and on the map.
+ * Each organization's identity colour, picked by its position in the group, so it
+ * is the same on every page and on the map. The colours are --os-identity-0 … 7
+ * from @openstuff-dev/tokens.
  */
-/** Defaults; the values live in styles.css as --org-0 … --org-7. */
-export const ORG_COLORS = [
-  '#2d5bff',
-  '#a03fb5',
-  '#0f8a6a',
-  '#c26a12',
-  '#d23f57',
-  '#1d8fb3',
-  '#6a55e0',
-  '#5f7a14',
-];
+const IDENTITY_COLORS = 8;
 
-/** An organization's colour as a CSS variable (--org-0 … --org-7), so agent mode can re-tint it. */
+/** An organization's colour as a CSS variable, so agent mode can re-tint it. */
 export function orgColor(index: number): string {
-  return `var(--org-${((index % ORG_COLORS.length) + ORG_COLORS.length) % ORG_COLORS.length})`;
+  return `var(--os-identity-${((index % IDENTITY_COLORS) + IDENTITY_COLORS) % IDENTITY_COLORS})`;
 }
 
 export function initials(name: string): string {

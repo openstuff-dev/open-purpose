@@ -32,5 +32,24 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "nx": {
+    "name": "server",
+    "tags": [
+      "type:app"
+    ],
+    "targets": {
+      "build": {
+        "outputs": [
+          "{projectRoot}/dist"
+        ]
+      },
+      "dev": {
+        "continuous": true
+      },
+      "typecheck": {
+        "cache": true
+      }
+    }
   }
 }

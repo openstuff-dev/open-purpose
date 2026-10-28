@@ -4,15 +4,25 @@
   "private": true,
   "packageManager": "npm@10.9.4",
   "workspaces": [
-    "packages/contracts",
-    "server",
-    "web"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w web && npm run build -w server",
-    "typecheck": "npm run typecheck -w packages/contracts && npm run typecheck -w server && npx -w web tsc -p tsconfig.app.json --noEmit",
-    "test": "npm test -w server",
-    "dev:server": "npm run dev -w server",
-    "dev:web": "npm start -w web"
-  }
+    "build": "nx run-many -t build",
+    "typecheck": "nx run-many -t typecheck",
+    "test": "nx run-many -t test",
+    "lint": "nx run-many -t lint stylelint",
+    "dev:server": "nx run server:dev",
+    "dev:web": "nx run web:start"
+  },
+  "devDependencies": {
+    "@nx/eslint": "^24.0.2",
+    "@openstuff-dev/lint": "file:vendor/openstuff-dev-lint-0.0.1.tgz",
+    "eslint": "^10.13.0",
+    "nx": "24.0.2",
+    "prettier": "^3.9.10",
+    "stylelint": "^17.16.0",
+    "typescript": "~6.0.3"
+  },
+  "prettier": "@openstuff-dev/lint/prettier"
 }

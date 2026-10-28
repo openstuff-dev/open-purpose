@@ -1,0 +1,8 @@
+# Prettier only formats Angular templates: inline ones through the ESLint rule
+# @openstuff-dev/format-inline-templates, and .html files. ESLint Stylistic formats
+# code and Stylelint formats CSS.
+*
+!*/
+!*.html
+
+.angular
