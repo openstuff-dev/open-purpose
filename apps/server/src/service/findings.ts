@@ -95,6 +95,11 @@ async function findId(db: Queryable, a: Access, ref: string): Promise<string> {
   return rows[0].id;
 }
 
+/** One finding by its id or the first 8 characters of it. */
+export async function getFindingByRef(db: Queryable, a: Access, ref: string): Promise<Finding> {
+  return getFinding(db, a, await findId(db, a, ref));
+}
+
 export async function findingCounts(db: Queryable, a: Access, opts: { projectId?: string; organizationId?: string } = {}): Promise<FindingCounts> {
   if (opts.organizationId) a.requireRead(opts.organizationId);
   const { rows } = await db.query<{ status: FindingStatus; n: number }>(
@@ -227,6 +232,64 @@ export async function setFindingStatus(db: Queryable, a: Access, ref: string, ch
         WHERE id = $1`,
       [id, change.status, change.note?.trim() ?? '', change.status === 'solved' ? change.solved_ref?.trim() || null : null,
         remindAfter, a.actor.id]);
+    return getFinding(c, a, id);
+  });
+}
+
+// ───────────────────────────── correcting ─────────────────────────────
+
+/** What the reporter may correct. Fields left out keep their value. */
+export interface FindingEdit {
+  file?: string;
+  /** The scope of the new file; required with `file`. */
+  scope_id?: string | null;
+  line_start?: number | null;
+  line_end?: number | null;
+  title?: string;
+  problem?: string;
+  proposed_fix?: string;
+  commit_sha?: string | null;
+}
+
+/**
+ * Whoever reported a finding corrects it while it is still open: a wrong commit,
+ * file or line, or a clearer title. Sorting it stays with people (setFindingStatus).
+ */
+export async function updateFinding(db: Queryable, a: Access, ref: string, edit: FindingEdit): Promise<Finding> {
+  const id = await findId(db, a, ref);
+  return tx(db, async (c) => {
+    const { rows: [current] } = await c.query<{
+      organization_id: string; status: FindingStatus; created_by: string | null; file: string; scope_id: string | null;
+      line_start: number | null; line_end: number | null; title: string; problem: string; proposed_fix: string; commit_sha: string | null;
+    }>(
+      `SELECT organization_id, status, created_by, file, scope_id, line_start, line_end, title, problem, proposed_fix, commit_sha
+         FROM findings WHERE id = $1 FOR UPDATE`, [id]);
+    if (!current) throw notFound('Finding');
+    a.requireRead(current.organization_id, 'this finding');
+    if (current.created_by !== a.actor.id) throw forbidden('Only whoever reported a finding can correct it.');
+    a.requireContribute(current.organization_id);
+    if (!OPEN_FINDING_STATUSES.includes(current.status)) {
+      throw new AppError('conflict', `This finding is ${current.status === 'ask_later' ? 'waiting' : current.status}; it can't be changed any more.`);
+    }
+
+    const file = edit.file === undefined ? current.file : normalizePath(edit.file);
+    if (!file) throw badRequest('file (the repo-relative path of the problem) is required');
+    const title = edit.title === undefined ? current.title : edit.title.trim();
+    if (!title) throw badRequest('title (one line a person can scan) is required');
+    // A new start line without an end means one line, as when reporting.
+    const lineStart = edit.line_start === undefined ? current.line_start : edit.line_start;
+    const lineEnd = edit.line_end !== undefined ? edit.line_end ?? lineStart
+      : edit.line_start !== undefined ? lineStart : current.line_end;
+    if (lineStart !== null && (lineStart < 1 || (lineEnd ?? lineStart) < lineStart)) throw badRequest('lines must be 1 or more, start before end');
+
+    await c.query(
+      `UPDATE findings SET file = $2, scope_id = $3, line_start = $4, line_end = $5, title = $6, problem = $7,
+              proposed_fix = $8, commit_sha = $9, updated_at = now()
+        WHERE id = $1`,
+      [id, file, edit.file === undefined ? current.scope_id : edit.scope_id ?? null, lineStart, lineEnd, title,
+        edit.problem === undefined ? current.problem : edit.problem.trim(),
+        edit.proposed_fix === undefined ? current.proposed_fix : edit.proposed_fix.trim(),
+        edit.commit_sha === undefined ? current.commit_sha : edit.commit_sha?.trim() || null]);
     return getFinding(c, a, id);
   });
 }
