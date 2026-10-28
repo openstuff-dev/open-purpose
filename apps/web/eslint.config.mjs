@@ -43,6 +43,10 @@ const replaced = [
     message: 'Use <header os-page-header> (or .os-page-header with .os-page-title and .os-page-description) and <nav os-breadcrumbs> from @openstuff-dev/ui-angular instead of .page-head, .lede or .crumbs.',
   },
   {
+    pattern: String.raw`class="([^"]*\s)?(panel|stat-tiles|stat-tile|stat-label|setting-card|setting-row)[\s"]`,
+    message: 'Use os-panel, os-stat-tile (or .os-stat-grid, .os-stat-tile and .os-stat-label) and os-setting-card with os-setting-row (or .os-setting-card, .os-setting-row and .os-setting-text) from @openstuff-dev/ui-angular instead of .panel, .stat-tile or .setting-row.',
+  },
+  {
     pattern: String.raw`role="dialog"`,
     message: 'Use <dialog os-dialog> or <dialog os-drawer> from @openstuff-dev/ui-angular instead of an element with role="dialog".',
   },

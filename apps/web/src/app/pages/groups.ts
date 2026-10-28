@@ -71,7 +71,7 @@ import { initials } from '../core/theme';
 
     <section>
       <h3 class="list-label">New group</h3>
-      <form class="inline-form panel" (ngSubmit)="create()">
+      <form class="inline-form os-panel os-panel-body" (ngSubmit)="create()">
         <os-field label="Company or client" class="grow"
           ><input os-input name="name" [(ngModel)]="draft.name" required placeholder="Contoso"
         /></os-field>

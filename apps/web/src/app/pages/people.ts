@@ -82,7 +82,7 @@ const GROUP = 'group';
     }
 
     <section>
-      <form class="inline-form panel" (ngSubmit)="create()">
+      <form class="inline-form os-panel os-panel-body" (ngSubmit)="create()">
         <os-field label="Name" class="grow"
           ><input
             os-input

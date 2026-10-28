@@ -92,7 +92,7 @@ import { Icon } from '../shared/icon';
     </div>
 
     @if (adding()) {
-      <form class="inline-form panel" (ngSubmit)="create()">
+      <form class="inline-form os-panel os-panel-body" (ngSubmit)="create()">
         <p class="full" style="margin:0">
           <strong>New project in {{ session.org()?.name }}</strong>
         </p>
