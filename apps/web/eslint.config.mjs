@@ -31,6 +31,10 @@ const replaced = [
     message: 'Use .os-data-table (or <os-data-table>) with .os-cell-sub and .os-data-table-empty from @openstuff-dev/ui instead of .data-table, .cell-sub or .empty-row.',
   },
   {
+    pattern: String.raw`class="([^"]*\s)?(menu|menu-item|menu-label|menu-sep|tip|tip-wrap)[\s"]`,
+    message: 'Use os-menu with os-popover-trigger, os-menu-item, os-menu-label and os-menu-separator, or os-tooltip, from @openstuff-dev/ui-angular instead of .menu or .tip.',
+  },
+  {
     pattern: String.raw`role="dialog"`,
     message: 'Use <dialog os-dialog> or <dialog os-drawer> from @openstuff-dev/ui-angular instead of an element with role="dialog".',
   },

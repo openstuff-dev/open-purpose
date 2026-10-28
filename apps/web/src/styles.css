@@ -85,11 +85,11 @@ body {
   text-rendering: optimizeLegibility;
 }
 /* Not on buttons: unlayered rules win over @openstuff-dev/ui's layers. */
-a:not(:where(.os-button, .os-tab)) {
+a:not(:where(.os-button, .os-tab, .os-menu-item)) {
   color: var(--accent-text);
   text-decoration: none;
 }
-a:not(:where(.os-button, .os-tab)):hover {
+a:not(:where(.os-button, .os-tab, .os-menu-item)):hover {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -373,59 +373,13 @@ kbd {
   background: var(--ink);
   color: var(--surface);
 }
-.menu {
-  position: absolute;
-  z-index: 40;
-  left: 0;
-  right: 0;
-  top: calc(100% + 4px);
-  background: var(--surface);
-  border: 1px var(--os-border-style) var(--line);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-pop);
-  padding: 0.3rem;
-  max-height: 70vh;
-  overflow: auto;
+/* The switcher menu is at least as wide as its button. */
+.ws-menu {
+  min-inline-size: anchor-size(inline);
 }
-.menu-label {
-  font-size: var(--fs-xs);
-  color: var(--muted);
-  padding: 0.45rem 0.55rem 0.25rem;
-  font-weight: 500;
-}
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  width: 100%;
-  padding: 0.4rem 0.55rem;
-  border: 0;
-  background: none;
-  border-radius: var(--r-sm);
-  font: inherit;
-  font-size: var(--fs-sm);
-  color: var(--ink);
-  cursor: pointer;
-  text-align: left;
-}
-.menu-item:hover,
-.menu-item:focus-visible {
-  background: var(--hover);
-  outline: none;
-  text-decoration: none;
-}
-.menu-item .icon:last-child {
-  margin-left: auto;
+.os-menu-item[aria-checked='true'] > .icon:last-child {
+  margin-inline-start: auto;
   color: var(--accent);
-}
-.menu-item.disabled {
-  color: var(--faint);
-  cursor: default;
-}
-.menu-sep {
-  height: 1px;
-  background: var(--line);
-  margin: 0.3rem 0;
 }
 
 .nav-label {
@@ -3776,11 +3730,6 @@ a.os-tab {
 }
 
 /* ---------- Agent mode ---------- */
-.tip-wrap {
-  position: relative;
-  display: inline-flex;
-  flex: none;
-}
 .agent-switch {
   display: inline-flex;
   align-items: center;
@@ -3833,50 +3782,14 @@ a.os-tab {
 .agent-switch[aria-checked='true'] .thumb {
   transform: translateX(0.75rem);
 }
-.tip {
-  position: absolute;
-  z-index: 40;
-  top: calc(100% + 8px);
-  right: 0;
-  width: 20rem;
-  padding: 0.7rem 0.85rem;
-  background: var(--ink);
-  color: var(--ground);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-pop);
-  font-size: var(--fs-sm);
-  line-height: 1.45;
-  font-weight: 400;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-3px);
-  transition:
-    opacity 0.12s,
-    transform 0.12s,
-    visibility 0s 0.12s;
-  pointer-events: none;
+/* Below the switch, lined up with its end edge: the switch sits at the end of the top bar. */
+.agent-switch {
+  anchor-name: --agent-switch;
 }
-.tip strong {
-  display: block;
-  margin-bottom: 0.2rem;
-}
-.tip::before {
-  content: '';
-  position: absolute;
-  top: -5px;
-  right: 1.4rem;
-  width: 10px;
-  height: 10px;
-  background: inherit;
-  transform: rotate(45deg);
-  border-radius: 2px;
-}
-.tip-wrap:hover .tip,
-.tip-wrap:focus-within .tip {
-  opacity: 1;
-  visibility: visible;
-  transform: none;
-  transition-delay: 0.25s, 0.25s, 0s;
+.agent-tip {
+  position-anchor: --agent-switch;
+  position-area: block-end span-inline-start;
+  margin: var(--os-space-1) 0 0;
 }
 .agent-shell {
   min-height: 100%;
@@ -3916,9 +3829,6 @@ a.os-tab {
 @media (max-width: 860px) {
   .agent-switch-label {
     display: none;
-  }
-  .tip {
-    width: min(18rem, calc(100vw - 2rem));
   }
 }
 

@@ -2,15 +2,28 @@ import {
   ChangeDetectionStrategy,
   Component,
   effect,
+  ElementRef,
   inject,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
-import { Button, Control, Field, IconButton } from '@openstuff-dev/ui-angular';
+import {
+  Button,
+  Control,
+  Field,
+  IconButton,
+  Menu,
+  MenuItem,
+  MenuLabel,
+  MenuSeparator,
+  PopoverTrigger,
+} from '@openstuff-dev/ui-angular';
+import { positionAnchors } from '@openstuff-dev/ui';
 import { Api } from './core/api';
 import { ROLE_LABEL } from './core/models';
 import { Session, errorMessage } from './core/session';
@@ -33,9 +46,14 @@ import { Palette } from './shared/palette';
     IconButton,
     Field,
     Control,
+    Menu,
+    MenuItem,
+    MenuLabel,
+    MenuSeparator,
+    PopoverTrigger,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { '(document:keydown)': 'onKey($event)', '(document:click)': 'wsOpen.set(false)' },
+  host: { '(document:keydown)': 'onKey($event)' },
   template: `
     @if (!session.token()) {
       <main class="signin">
@@ -123,14 +141,8 @@ import { Palette } from './shared/palette';
               OpenPurpose
             </a>
 
-            <div class="ws" (click)="$event.stopPropagation()">
-              <button
-                type="button"
-                class="ws-button"
-                (click)="wsOpen.set(!wsOpen())"
-                [attr.aria-expanded]="wsOpen()"
-                aria-haspopup="menu"
-              >
+            <div class="ws">
+              <button type="button" class="ws-button" [os-popover-trigger]="wsMenu">
                 @if (session.org(); as org) {
                   <span class="badge" [style.background]="session.orgColor(org.id)">{{
                     initials(org.name)
@@ -150,57 +162,55 @@ import { Palette } from './shared/palette';
                 }
                 <app-icon name="chevrons-up-down" />
               </button>
-              @if (wsOpen()) {
-                <div class="menu" role="menu">
-                  @if (session.groupShown() && session.readableOrgs().length) {
-                    <div class="menu-label">Organizations in {{ me.group.name }}</div>
-                    @for (o of session.readableOrgs(); track o.id) {
-                      <button
-                        type="button"
-                        class="menu-item"
-                        role="menuitemradio"
-                        [attr.aria-checked]="o.id === session.orgId()"
-                        (click)="pickOrg(o.id)"
-                      >
-                        <span class="badge sm" [style.background]="session.orgColor(o.id)">{{
-                          initials(o.name)
-                        }}</span>
-                        {{ o.name }}
-                        @if (o.id === session.orgId()) {
-                          <app-icon name="check" />
-                        }
-                      </button>
-                    }
-                  }
-                  @if (me.groups.length > 1) {
-                    <div class="menu-sep"></div>
-                    <div class="menu-label">Groups</div>
-                    @for (g of me.groups; track g.id) {
-                      <button
-                        type="button"
-                        class="menu-item"
-                        role="menuitemradio"
-                        [attr.aria-checked]="g.id === me.group.id"
-                        (click)="pickGroup(g.id)"
-                      >
-                        <span class="badge sm group">{{ initials(g.name) }}</span>
-                        {{ g.name }}
-                        @if (g.id === me.group.id) {
-                          <app-icon name="check" />
-                        }
-                      </button>
-                    }
-                  }
-                  @if (session.canAdmin(null)) {
-                    <div class="menu-sep"></div>
-                    <a class="menu-item" routerLink="/settings/group" (click)="wsOpen.set(false)"
-                      ><app-icon name="settings" />{{
-                        session.groupShown() ? 'Manage organizations' : 'Add an organization'
-                      }}</a
+            <div os-menu #wsMenu="osPopover" class="ws-menu" aria-label="Switch organization">
+                @if (session.groupShown() && session.readableOrgs().length) {
+                  <div os-menu-label>Organizations in {{ me.group.name }}</div>
+                  @for (o of session.readableOrgs(); track o.id) {
+                    <button
+                      type="button"
+                      os-menu-item
+                      role="menuitemradio"
+                      [attr.aria-checked]="o.id === session.orgId()"
+                      (click)="pickOrg(o.id)"
                     >
+                      <span class="badge sm" [style.background]="session.orgColor(o.id)">{{
+                        initials(o.name)
+                      }}</span>
+                      {{ o.name }}
+                      @if (o.id === session.orgId()) {
+                        <app-icon name="check" />
+                      }
+                    </button>
                   }
-                </div>
-              }
+                }
+                @if (me.groups.length > 1) {
+                  <hr os-menu-separator />
+                  <div os-menu-label>Groups</div>
+                  @for (g of me.groups; track g.id) {
+                    <button
+                      type="button"
+                      os-menu-item
+                      role="menuitemradio"
+                      [attr.aria-checked]="g.id === me.group.id"
+                      (click)="pickGroup(g.id)"
+                    >
+                      <span class="badge sm group">{{ initials(g.name) }}</span>
+                      {{ g.name }}
+                      @if (g.id === me.group.id) {
+                        <app-icon name="check" />
+                      }
+                    </button>
+                  }
+                }
+                @if (session.canAdmin(null)) {
+                  <hr os-menu-separator />
+                  <a os-menu-item routerLink="/settings/group"
+                    ><app-icon name="settings" />{{
+                      session.groupShown() ? 'Manage organizations' : 'Add an organization'
+                    }}</a
+                  >
+                }
+              </div>
             </div>
 
             <ul>
@@ -302,27 +312,26 @@ import { Palette } from './shared/palette';
                 <app-icon name="search" /><span>Search or jump to…</span
                 ><kbd>{{ mac ? '⌘' : 'Ctrl' }} K</kbd>
               </button>
-              <span class="tip-wrap">
-                <button
-                  type="button"
-                  class="agent-switch"
-                  role="switch"
-                  aria-checked="false"
-                  (click)="toggleAgentMode()"
-                  aria-describedby="agent-tip"
-                  [disabled]="switching()"
-                >
-                  <app-icon name="bot" [size]="15" /><span class="agent-switch-label"
-                    >Agent mode</span
-                  ><span class="track" aria-hidden="true"><span class="thumb"></span></span>
-                </button>
-                <span class="tip" role="tooltip" id="agent-tip">
-                  <strong>Agent mode</strong>
-                  See exactly what an agent in {{ session.org()?.name ?? 'an organization' }} gets
-                  back from OpenPurpose: the text of get_context and the other read tools, word for
-                  word, and nothing else.
-                </span>
-              </span>
+              <button
+                type="button"
+                class="agent-switch"
+                role="switch"
+                aria-checked="false"
+                (click)="toggleAgentMode()"
+                [disabled]="switching()"
+                interestfor="agent-tip"
+                aria-describedby="agent-tip"
+                #agentSwitch
+              >
+                <app-icon name="bot" [size]="15" /><span class="agent-switch-label"
+                  >Agent mode</span
+                ><span class="track" aria-hidden="true"><span class="thumb"></span></span>
+              </button>
+              <div class="os-tooltip agent-tip" popover="hint" id="agent-tip" #agentTip>
+                See exactly what an agent in {{ session.org()?.name ?? 'an organization' }} gets
+                back from OpenPurpose: the text of get_context and the other read tools, word for
+                word, and nothing else.
+              </div>
             </header>
             <main class="main" id="main">
               @for (k of [session.view()]; track k) {
@@ -400,7 +409,6 @@ export class App {
   private switcher = inject(ContextSwitch);
   readonly theme = inject(Theme);
   readonly railOpen = signal(false);
-  readonly wsOpen = signal(false);
   readonly signinError = signal('');
   readonly loadError = signal('');
   readonly initials = initials;
@@ -421,9 +429,14 @@ export class App {
     effect(() => {
       if (this.session.token()) untracked(() => void this.refreshMe());
     });
+    // The agent tip is anchored in CSS; the polyfill (where needed) has to see it once it renders.
+    effect(() => {
+      const trigger = this.agentSwitch()?.nativeElement;
+      const tip = this.agentTip()?.nativeElement;
+      if (trigger && tip) void positionAnchors([trigger, tip]);
+    });
     this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => {
       this.railOpen.set(false);
-      this.wsOpen.set(false);
       if (this.session.token()) void this.refreshMe();
     });
   }
@@ -437,12 +450,12 @@ export class App {
     ) {
       ev.preventDefault();
       this.session.palette.set(this.session.palette() === null ? '' : null);
-    } else if (ev.key === 'Escape') {
-      this.wsOpen.set(false);
     }
   }
 
   readonly switching = signal(false);
+  private readonly agentSwitch = viewChild<ElementRef<HTMLElement>>('agentSwitch');
+  private readonly agentTip = viewChild<ElementRef<HTMLElement>>('agentTip');
 
   async toggleAgentMode(): Promise<void> {
     const on = !this.session.me()?.agent_view;
@@ -504,7 +517,6 @@ export class App {
   }
 
   async pickGroup(id: string): Promise<void> {
-    this.wsOpen.set(false);
     try {
       await this.switcher.group(id);
       await this.router.navigate(['/organization']);
@@ -514,7 +526,6 @@ export class App {
   }
 
   async pickOrg(id: string): Promise<void> {
-    this.wsOpen.set(false);
     try {
       await this.switcher.org(id || null);
     } catch (e) {
