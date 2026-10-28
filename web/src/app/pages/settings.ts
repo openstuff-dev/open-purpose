@@ -47,7 +47,19 @@ organization, the project and the part of the code you are in (a repository or a
 5. Never try to change a section marked \`locked\`.
 6. \`[[name]]\` in OpenPurpose text links to another project or a glossary term, and
    \`[[org/name]]\` to a project in another organization. Use \`get_related\` when
-   your task touches a linked service.`;
+   your task touches a linked service.
+7. If \`get_context\` lists "Review feedback waiting on you", read it with
+   \`get_review\` before other work. Answer each thread with \`reply_to_review\`,
+   accept suggestions you agree with via \`apply_suggestion\`, and push other
+   fixes with \`revise_proposal\`. Tell me in one line what the reviewer asked for.
+8. When you call or implement an HTTP endpoint of this or a linked service, use
+   \`get_api\` (listed under "APIs" in \`get_context\`) for the exact paths,
+   parameters and DTOs. Don't guess request or response shapes.
+9. When you notice a real problem outside your task, don't fix it: call
+   \`report_finding\` with the file, a one-line title, what's wrong and how you
+   would fix it. Say in one line that you did. If \`get_context\` lists known
+   findings, don't report them again, and ask me before fixing one. After fixing
+   one, call \`resolve_finding\` with the commit or PR.`;
 
 @Component({
   selector: 'app-settings',

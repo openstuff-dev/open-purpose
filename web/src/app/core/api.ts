@@ -41,6 +41,9 @@ import type {
   SlugKind,
   SlugRename,
   ExportIncludes,
+  Finding,
+  FindingCounts,
+  FindingStatus,
   ImportOptions,
   ImportReport,
 } from './models';
@@ -247,6 +250,21 @@ export class Api {
   versions = (id: string) => this.get<SectionVersion[]>(`/sections/${id}/versions`);
   revert = (id: string, version: number) =>
     this.send<Section>('POST', `/sections/${id}/revert`, { version });
+
+  findings = (
+    q: { status?: FindingStatus[] | 'all'; organization_id?: string; project_id?: string } = {},
+  ) =>
+    this.get<Finding[]>('/findings', {
+      ...q,
+      status: Array.isArray(q.status) ? q.status.join(',') : q.status,
+    });
+  finding = (id: string) => this.get<Finding>(`/findings/${id}`);
+  findingCounts = (q: { organization_id?: string; project_id?: string } = {}) =>
+    this.get<FindingCounts>('/findings/counts', q);
+  setFindingStatus = (
+    id: string,
+    body: { status: FindingStatus; note?: string; remind_after?: string | null },
+  ) => this.send<Finding>('PUT', `/findings/${id}/status`, body);
 
   proposals = (status: ProposalStatus | 'all' = 'pending', level?: string) =>
     this.get<Proposal[]>('/proposals', { status, level });

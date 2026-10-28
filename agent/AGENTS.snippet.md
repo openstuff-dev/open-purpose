@@ -28,3 +28,8 @@ organization, the project and the part of the code you are in (a repository or a
 8. When you call or implement an HTTP endpoint of this or a linked service, use
    `get_api` (listed under "APIs" in `get_context`) for the exact paths,
    parameters and DTOs. Don't guess request or response shapes.
+9. When you notice a real problem outside your task, don't fix it: call
+   `report_finding` with the file, a one-line title, what's wrong and how you
+   would fix it. Say in one line that you did. If `get_context` lists known
+   findings, don't report them again, and ask me before fixing one. After fixing
+   one, call `resolve_finding` with the commit or PR.

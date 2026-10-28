@@ -883,6 +883,90 @@ definitions:`);
     expect((await api('POST', '/me/tokens', {}, { token: t.lars })).status).toBe(403);
   });
 
+  it('files findings agents report, lets people sort them and agents solve them', async () => {
+    const jonas = await mcp(t.jonas);
+    const report = (args: Record<string, unknown>) => jonas.call('report_finding', {
+      remote_url: SSH_REMOTE, problem: 'The total is summed before discounts apply.', proposed_fix: 'Apply discounts in CartTotal first.',
+      commit_sha: '0123456789abcdef', ...args,
+    });
+    const first = await report({ file: './frontend/src/app/cart.ts', line_start: 40, line_end: 52, title: 'Cart total ignores discounts' });
+    expect(first.text).toContain('filed under **Acme Logistics › Customer Portal › Frontend**');
+    const firstId = /Finding `([0-9a-f]{8})`/.exec(first.text)![1];
+
+    // Looks like the same problem: nothing is filed until the agent says it checked.
+    const similar = await report({ file: 'frontend/src/app/cart.ts', title: 'Cart total ignores discount codes' });
+    expect(similar.text).toContain('Not filed yet');
+    expect(similar.text).toContain(firstId);
+    const second = await report({ file: 'frontend/src/app/cart.ts', title: 'Cart total ignores discount codes', even_if_similar: true });
+    expect(second.text).toContain('filed under');
+    const backend = await report({ file: 'backend/Api/Orders.cs', title: 'Order export times out for large months' });
+    expect(backend.text).toContain('Customer Portal › Backend');
+    // Agents only write to their own organization.
+    const lars = await mcp(t.lars);
+    expect((await lars.call('report_finding', { remote_url: SSH_REMOTE, file: 'x.ts', title: 'Nope', problem: '', proposed_fix: '' })).isError).toBe(true);
+    await lars.client.close();
+
+    const list = (await api('GET', `/findings?project_id=${projectId}`)).data;
+    expect(list.map((f: any) => f.status)).toEqual(['new', 'new', 'new']);
+    const cart = list.find((f: any) => f.id.startsWith(firstId));
+    expect(cart).toMatchObject({
+      file: 'frontend/src/app/cart.ts', line_start: 40, line_end: 52, scope_name: 'Frontend', created_by_kind: 'agent',
+      where: 'Acme Logistics › Customer Portal › Frontend', commit_sha: '0123456789abcdef', can_triage: true,
+    });
+    const codes = list.find((f: any) => f.title === 'Cart total ignores discount codes');
+    expect((await api('GET', '/me')).data.new_findings).toBe(3);
+    // Payments may read Logistics, so Ida sees them, but only Logistics' editors sort them.
+    expect((await api('GET', `/findings/${cart.id}`, undefined, { token: t.ida })).data.can_triage).toBe(false);
+    expect((await api('PUT', `/findings/${cart.id}/status`, { status: 'dismissed' }, { token: t.ida })).status).toBe(403);
+
+    // New findings stay out of the context until a person has looked at them.
+    const ctx = () => jonas.call('get_context', { remote_url: SSH_REMOTE, path: 'frontend/src/app/checkout.ts' });
+    expect((await ctx()).text).not.toContain('Known findings here');
+
+    // Only people with edit rights sort findings; agents can't, and viewers can't.
+    expect((await api('PUT', `/findings/${cart.id}/status`, { status: 'todo' }, { token: t.jonas })).status).toBe(403);
+    expect((await api('PUT', `/findings/${cart.id}/status`, { status: 'todo' }, { token: t.anders })).status).toBe(403);
+    expect((await api('PUT', `/findings/${cart.id}/status`, { status: 'todo' })).data.status).toBe('todo');
+    const later = await api('PUT', `/findings/${codes.id}/status`, { status: 'ask_later', remind_after: '2999-01-01', note: 'Depends on the pricing rework' });
+    expect(later.data).toMatchObject({ status: 'ask_later', remind_after: '2999-01-01', status_by_name: 'Admin' });
+    expect((await api('GET', '/me')).data.new_findings).toBe(1);
+
+    let text = (await ctx()).text;
+    expect(text).toContain('## Known findings here');
+    expect(text).toContain(`\`${firstId}\` **Cart total ignores discounts** in \`frontend/src/app/cart.ts:40-52\``);
+    // Ask me later waits for its day; findings elsewhere in the project stay out.
+    expect(text).not.toContain('ignores discount codes');
+    expect(text).not.toContain('Order export');
+    await api('PUT', `/findings/${codes.id}/status`, { status: 'ask_later' });
+    text = (await ctx()).text;
+    expect(text).toContain('Ask the user about these');
+    expect(text).toContain('ignores discount codes');
+    expect((await jonas.call('get_context', { remote_url: SSH_REMOTE, path: 'backend/Api/Orders.cs' })).text).not.toContain('Cart total');
+
+    const todo = await jonas.call('list_findings', { remote_url: SSH_REMOTE });
+    expect(todo.text).toContain('1 "to do" finding');
+    expect(todo.text).toContain('Apply discounts in CartTotal first.');
+    expect(todo.text).toContain('reported at commit `0123456789ab`');
+    expect((await jonas.call('list_findings', { remote_url: SSH_REMOTE, status: 'open', path: 'backend' })).text).toContain('Order export');
+    // A file path means its folder, as in get_context.
+    expect((await jonas.call('list_findings', { remote_url: SSH_REMOTE, status: 'open', path: 'frontend/src/app/checkout.ts' })).text).toContain('ignores discount codes');
+
+    // An agent marks one solved, with the commit; it then drops out of the default list.
+    expect((await jonas.call('resolve_finding', { id: firstId, solved_ref: 'abc1234', note: 'Discounts first' })).text).toContain('is solved');
+    expect((await jonas.call('resolve_finding', { id: firstId, solved_ref: 'abc1234', note: 'Again' })).isError).toBe(true);
+    expect((await api('GET', `/findings?project_id=${projectId}`)).data.map((f: any) => f.title)).not.toContain('Cart total ignores discounts');
+    const solved = (await api('GET', `/findings?project_id=${projectId}&status=solved`)).data;
+    expect(solved[0]).toMatchObject({ title: 'Cart total ignores discounts', solved_ref: 'abc1234', status_note: 'Discounts first', status_by_name: 'Agent Jonas' });
+    expect((await ctx()).text).not.toContain('Cart total ignores discounts');
+    expect((await api('GET', `/findings/counts?project_id=${projectId}`)).data).toEqual({ new: 1, todo: 0, ask_later: 1, dismissed: 0, solved: 1 });
+    // Row-level security: another group's transaction sees none of them, even without a WHERE clause.
+    const count = (scope: { groupId: string | null; bypass?: boolean }) => withScope(pool, scope, async (c) =>
+      (await c.query<{ n: number }>('SELECT count(*)::int AS n FROM findings')).rows[0].n);
+    expect(await count({ groupId: '00000000-0000-0000-0000-000000000001' })).toBe(0);
+    expect(await count({ groupId: null, bypass: true })).toBe(3);
+    await jonas.client.close();
+  });
+
   it('keeps viewers read-only and revokes tokens', async () => {
     expect((await api('GET', '/projects', undefined, { token: t.anders })).status).toBe(200);
     expect((await api('POST', '/projects', { name: 'Nope', organization_id: o.logistics }, { token: t.anders })).status).toBe(403);
@@ -909,6 +993,7 @@ definitions:`);
     expect(file.documents.every((d: any) => d.organization === o.logistics)).toBe(true);
     expect(file.proposals.length).toBeGreaterThan(0);
     expect(file.api_specs.length).toBeGreaterThan(0);
+    expect(file.findings.map((f: any) => f.status).sort()).toEqual(['ask_later', 'new', 'solved']);
     expect(file.people.map((p: any) => p.name)).toContain('Anders H.');
     const sections = file.documents.flatMap((d: any) => d.sections).length;
 
@@ -933,6 +1018,7 @@ definitions:`);
     const imported = await api('POST', '/import', { file, organizations: asNew('logistics-copy') });
     expect(imported.status).toBe(201);
     expect(imported.data).toMatchObject({ ok: true, applied: true });
+    expect(imported.data.counts.findings).toBe(3);
     const copy = imported.data.organizations[0].id;
     copyOrg = copy;
     expect(await orgCount()).toBe(before + 1);

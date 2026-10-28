@@ -17,6 +17,7 @@ import { buildContext } from './service/context.js';
 import { backlinks, buildGraph, focusGraph, projectNode, resolveLink, trimRefs } from './service/graph.js';
 import * as projects from './service/projects.js';
 import * as proposals from './service/proposals.js';
+import * as findings from './service/findings.js';
 import * as review from './service/review.js';
 import { deleteAlias, listAliases } from './service/aliases.js';
 import { renameSlug } from './service/slugs.js';
@@ -172,6 +173,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
           switchable_organization_ids: req.person.orgs.filter((o) => !o.archived_at && canViewAsAgent(req.person!, o.id)).map((o) => o.id),
         } : null,
         pending_proposals: await proposals.countReviewable(req.db, a),
+        new_findings: await findings.countToSort(req.db, a),
         public_url: config.publicUrl,
         version: VERSION,
       };
@@ -545,6 +547,29 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       return reply.status(204).send();
     });
 
+    // findings
+    const findingStatus = z.enum(findings.FINDING_STATUSES as [findings.FindingStatus, ...findings.FindingStatus[]]);
+    api.get('/findings', async (req) => {
+      const q = req.query as { status?: string; project_id?: string; organization_id?: string; path?: string; q?: string };
+      const statuses = q.status === 'all' ? findings.FINDING_STATUSES
+        : q.status ? z.array(findingStatus).parse(q.status.split(',')) : undefined;
+      return findings.listFindings(req.db, req.access, {
+        statuses, projectId: qid(q.project_id) ?? undefined, organizationId: qid(q.organization_id) ?? undefined, path: q.path, q: q.q,
+      });
+    });
+    api.get('/findings/counts', async (req) => {
+      const q = req.query as { project_id?: string; organization_id?: string };
+      return findings.findingCounts(req.db, req.access, { projectId: qid(q.project_id) ?? undefined, organizationId: qid(q.organization_id) ?? undefined });
+    });
+    api.get('/findings/:id', async (req) => findings.getFinding(req.db, req.access, (req.params as { id: string }).id));
+    api.put('/findings/:id/status', async (req) => {
+      const body = parse(z.object({
+        status: findingStatus, note: z.string().max(2000).optional(), solved_ref: z.string().max(500).nullable().optional(),
+        remind_after: z.iso.date().nullable().optional(),
+      }), req.body);
+      return findings.setFindingStatus(req.db, req.access, (req.params as { id: string }).id, body);
+    });
+
     // context, search, graph
     api.post('/context', { config: { readOnly: true } }, async (req) => buildContext(req.db, req.access, parse(z.object({
       project: z.string().optional(), remote_url: z.string().optional(), path: z.string().optional(),
@@ -659,7 +684,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       const d = DEFAULT_INCLUDES;
       const file = await exportContent(req.db, req.access, qid(q.organization_id), {
         history: flag(q.history, d.history), proposals: flag(q.proposals, d.proposals),
-        people: flag(q.people, d.people), api_specs: flag(q.api_specs, d.api_specs),
+        people: flag(q.people, d.people), api_specs: flag(q.api_specs, d.api_specs), findings: flag(q.findings, d.findings),
       }, VERSION);
       const name = file.source.organization
         ? file.organizations.find((o) => o.key === file.source.organization)!.slug

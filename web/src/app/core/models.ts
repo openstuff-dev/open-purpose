@@ -43,6 +43,9 @@ export type {
   SlugRename,
   SlugRenameRef,
   ExportIncludes,
+  Finding,
+  FindingCounts,
+  FindingStatus,
   ImportChange,
   ImportChangePolicy,
   ImportOptions,
@@ -131,6 +134,8 @@ export interface Me {
     switchable_organization_ids: string[];
   } | null;
   pending_proposals: number;
+  /** New findings this person could sort. */
+  new_findings: number;
   public_url: string;
   version: string;
 }

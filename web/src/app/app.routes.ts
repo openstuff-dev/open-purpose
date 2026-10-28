@@ -58,6 +58,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/inbox').then((m) => m.InboxPage),
       },
       {
+        path: 'findings',
+        title: 'Findings',
+        loadComponent: () => import('./pages/findings').then((m) => m.FindingsPage),
+      },
+      {
         path: 'map',
         title: 'Map',
         loadComponent: () => import('./pages/map').then((m) => m.MapPage),

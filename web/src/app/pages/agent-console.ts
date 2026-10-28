@@ -59,6 +59,15 @@ function followUps(call: {
     add('get_context', { project });
     add('get_related', { project });
   }
+  // Known findings point to list_findings for the same repository and folder.
+  if (call.name === 'get_context' && text.includes('`list_findings`')) {
+    const { project, remote_url, path } = call.args;
+    add('list_findings', {
+      ...(project ? { project } : { remote_url }),
+      ...(path ? { path } : {}),
+      status: 'open',
+    });
+  }
   if (call.name === 'get_api' && call.args['project']) {
     const base: Args = {
       project: call.args['project'],
@@ -148,6 +157,7 @@ function followUps(call: {
         <button class="btn" type="button" (click)="call('list_scopes', project ? { project } : {})">
           list_scopes
         </button>
+        <button class="btn" type="button" (click)="listFindings()">list_findings</button>
       </div>
     </form>
 
@@ -293,6 +303,14 @@ export class AgentConsolePage {
         { path: this.manifestPath.trim() || 'package.json', content: this.manifest },
       ];
     return this.call('get_context', args);
+  }
+
+  listFindings(): Promise<void> {
+    const args: Args = { status: 'open' };
+    if (this.project) args['project'] = this.project;
+    else if (this.remote.trim()) args['remote_url'] = this.remote.trim();
+    if (this.path.trim()) args['path'] = this.path.trim();
+    return this.call('list_findings', args);
   }
 
   search(): Promise<void> {

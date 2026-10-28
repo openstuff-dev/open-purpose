@@ -29,7 +29,9 @@ const fileSchema = z.object({
     group: z.object({ slug: z.string(), name: z.string(), context_max_tokens: z.number().int().min(1000).nullable().optional() }),
     organization: ref,
   }),
-  includes: z.object({ history: z.boolean(), proposals: z.boolean(), people: z.boolean(), api_specs: z.boolean() }),
+  includes: z.object({
+    history: z.boolean(), proposals: z.boolean(), people: z.boolean(), api_specs: z.boolean(), findings: z.boolean().default(false),
+  }),
   people: z.array(z.object({
     key,
     name: z.string().min(1).max(200),
@@ -92,6 +94,15 @@ const fileSchema = z.object({
       })),
     })),
   })),
+  findings: z.array(z.object({
+    key, organization: key, project: key, scope: ref,
+    status: z.enum(['new', 'todo', 'ask_later', 'dismissed', 'solved']),
+    file: z.string().min(1), line_start: z.number().int().min(1).nullable(), line_end: z.number().int().min(1).nullable(),
+    title: z.string().min(1), problem: z.string(), proposed_fix: z.string(), commit_sha: z.string().nullable(),
+    remote: z.string().nullable(), context: z.record(z.string(), z.unknown()),
+    remind_after: z.iso.date().nullable(), solved_ref: z.string().nullable(),
+    created_by: ref, created_at: time, status_by: ref, status_at: time.nullable(), status_note: z.string(), updated_at: time,
+  })).default([]),
 });
 
 const invalid = (msg: string) => new AppError('bad_request', `This file can't be imported: ${msg}`);
@@ -139,6 +150,12 @@ export function parseExportFile(input: unknown): ExportFile {
     if (!s && d.project && projects.get(d.project)!.organization !== d.organization) {
       fail(`document "${d.slug}" and its project are in different organizations.`);
     }
+  }
+  for (const f of file.findings) {
+    const p = projects.get(f.project);
+    if (!p) fail(`finding "${f.title}" belongs to a project that isn't in the file.`);
+    if (p!.organization !== f.organization) fail(`finding "${f.title}" and its project are in different organizations.`);
+    if (f.scope && scopes.get(f.scope)?.project !== f.project) fail(`finding "${f.title}" is filed under a scope of another project.`);
   }
   for (const g of file.read_grants) {
     if (!orgs.has(g.reader) || !orgs.has(g.target)) fail('a read grant names an organization that isn\'t in the file.');

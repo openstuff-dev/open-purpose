@@ -125,6 +125,50 @@ export interface Review {
   can_review: boolean;
 }
 
+// ───────────────────────────── findings ─────────────────────────────
+
+/**
+ * new: reported, nobody has looked at it. todo: worth fixing; agents may pick it up.
+ * ask_later: a person must decide first; agents mention it but don't fix it.
+ * dismissed: not a problem, or not worth it. solved: fixed, with the commit or PR.
+ */
+export type FindingStatus = 'new' | 'todo' | 'ask_later' | 'dismissed' | 'solved';
+
+export interface Finding {
+  id: string;
+  organization_id: string;
+  project_id: string;
+  scope_id: string | null;
+  status: FindingStatus;
+  file: string;
+  line_start: number | null;
+  line_end: number | null;
+  title: string;
+  problem: string;
+  proposed_fix: string;
+  commit_sha: string | null;
+  remote: string | null;
+  remind_after: string | null;
+  solved_ref: string | null;
+  created_by_name: string | null;
+  created_by_kind: ActorKind | null;
+  created_at: string;
+  status_by_name: string | null;
+  status_at: string | null;
+  status_note: string;
+  updated_at: string;
+  organization_slug: string;
+  project_slug: string;
+  project_name: string;
+  scope_name: string | null;
+  /** Organization › project › scope. */
+  where: string;
+  /** The viewer may change its status (people with edit rights; agents only to solved). */
+  can_triage: boolean;
+}
+
+export type FindingCounts = Record<FindingStatus, number>;
+
 // ───────────────────────────── the link graph (map) ─────────────────────────────
 
 export type NodeType = 'group' | 'organization' | 'project' | 'term' | 'missing';
@@ -291,6 +335,8 @@ export interface ExportFile {
   scopes: ExportScope[];
   documents: ExportDocument[];
   proposals: ExportProposal[];
+  /** Empty unless `includes.findings`, and in files from before findings. */
+  findings: ExportFinding[];
 }
 
 export interface ExportIncludes {
@@ -301,6 +347,8 @@ export interface ExportIncludes {
   /** Names and memberships of people and agents (never tokens). */
   people: boolean;
   api_specs: boolean;
+  /** Findings, solved and dismissed ones too. false in files from before findings. */
+  findings: boolean;
 }
 
 export interface ExportPerson {
@@ -463,6 +511,31 @@ export interface ExportProposal {
   }>;
 }
 
+export interface ExportFinding {
+  key: string;
+  organization: string;
+  project: string;
+  scope: string | null;
+  status: FindingStatus;
+  file: string;
+  line_start: number | null;
+  line_end: number | null;
+  title: string;
+  problem: string;
+  proposed_fix: string;
+  commit_sha: string | null;
+  remote: string | null;
+  context: Record<string, unknown>;
+  remind_after: string | null;
+  solved_ref: string | null;
+  created_by: string | null;
+  created_at: string;
+  status_by: string | null;
+  status_at: string | null;
+  status_note: string;
+  updated_at: string;
+}
+
 /** How a changed section in a merge is handled. */
 export type ImportChangePolicy = 'propose' | 'file' | 'keep';
 
@@ -536,6 +609,7 @@ export interface ImportReport {
     sections: number;
     section_versions: number;
     proposals: number;
+    findings: number;
   };
   /** Rows matched to ones already here, and what happened to them. */
   merged: {

@@ -15,6 +15,7 @@ import { relatedTo } from './service/graph.js';
 import { tryParseRemote } from './domain/remote.js';
 import { addRepository, createProject, getProject, listProjects, listRepositories, resolveProject } from './service/projects.js';
 import { addSection, editSection, getProposalDetail, listProposals, proposeLearning } from './service/proposals.js';
+import { folderOf, listFindings, reportFinding, setFindingStatus, FINDING_STATUSES, OPEN_FINDING_STATUSES, type Finding } from './service/findings.js';
 import { addComment, applySuggestion, getReview, renderReviewForAgent, reviseProposal, setResolved, waitingOn } from './service/review.js';
 import type { Level, Scope } from './service/types.js';
 
@@ -45,7 +46,11 @@ Workflow:
    into another organization. Use get_related or get_context(project=...) to read about a linked project
    when your task touches it.
 6. When your task calls or implements an HTTP API of this or a related project, use get_api (listed under
-   "APIs" in get_context) for the exact endpoints, parameters and DTOs instead of guessing them.`;
+   "APIs" in get_context) for the exact endpoints, parameters and DTOs instead of guessing them.
+7. When you notice a real problem outside your task (a bug, a security risk, broken behaviour), don't fix it
+   and don't let it get lost: call report_finding with the file, a one-line title, what's wrong and how you
+   would fix it. Style preferences aren't findings. get_context lists known findings around your path: don't
+   report those again, and ask the user before fixing one. When you fix one, call resolve_finding.`;
 
 const manifestSchema = z.object({
   path: z.string().describe('Repo-relative path of the manifest, e.g. "frontend/package.json" or "src/Api/Api.csproj"'),
@@ -68,13 +73,13 @@ const json = (v: unknown): ToolResult => text(JSON.stringify(v, null, 2));
 /** Tools that change something; the activity overview counts them as writes, every other tool as a read. */
 const WRITE_TOOLS = [
   'update_section', 'add_section', 'propose_learning', 'reply_to_review', 'revise_proposal', 'apply_suggestion',
-  'register_repository', 'create_project',
+  'register_repository', 'create_project', 'report_finding', 'resolve_finding',
 ];
 
 /** Tools that only read. Agent mode in the UI may call these, and nothing else. */
 export const READ_TOOLS = [
   'get_context', 'resolve_project', 'list_organizations', 'list_projects', 'list_scopes',
-  'get_related', 'get_api', 'search', 'read_section',
+  'get_related', 'get_api', 'search', 'read_section', 'list_findings',
 ] as const;
 
 /**
@@ -396,6 +401,99 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
       next_move: p.awaiting === 'author' ? 'yours' : 'reviewers', open_threads: p.open_threads,
       where: [p.organization_name ?? a.group.name, p.project_name, p.scope_name].filter(Boolean).join(' › '),
     })));
+  }));
+
+  const lines = (f: Finding) => f.line_start ? `:${f.line_start}${f.line_end && f.line_end !== f.line_start ? `-${f.line_end}` : ''}` : '';
+  const STATUS_LABEL: Record<Finding['status'], string> = {
+    new: 'new', todo: 'to do', ask_later: 'ask me later', dismissed: 'dismissed', solved: 'solved',
+  };
+  const findingLine = (f: Finding) => `- \`${f.id.slice(0, 8)}\` **${f.title}** in \`${f.file}${lines(f)}\` (${STATUS_LABEL[f.status]})`;
+  const findingInFull = (f: Finding) => [
+    `### \`${f.id.slice(0, 8)}\` ${f.title}`,
+    '',
+    `- Status: ${STATUS_LABEL[f.status]}${f.status_note ? ` (${f.status_note})` : ''}${f.solved_ref ? `, solved in ${f.solved_ref}` : ''}`,
+    `- File: \`${f.file}${lines(f)}\`${f.commit_sha ? `, reported at commit \`${f.commit_sha.slice(0, 12)}\`` : ''}`,
+    `- Filed under: ${f.where}, by ${f.created_by_name ?? 'unknown'} on ${new Date(f.created_at).toISOString().slice(0, 10)}`,
+    '', '**Problem**', '', f.problem || '_(not described)_',
+    '', '**Proposed fix**', '', f.proposed_fix || '_(none given)_',
+  ].join('\n');
+
+  server.registerTool('report_finding', {
+    title: 'Report finding',
+    description: 'Record a real problem you noticed outside your task and didn\'t fix (a bug, a security risk, broken behaviour; not a style preference), so it isn\'t lost. '
+      + 'It is filed under the most specific scope of the file, and a person sorts it. If open findings look like the same problem, nothing is filed and they are listed instead. '
+      + 'Pass the same remote_url/manifests you used for get_context.',
+    inputSchema: {
+      file: z.string().describe('Repo-relative path of the file with the problem, e.g. "server/src/mcp.ts"'),
+      line_start: z.number().int().min(1).optional(),
+      line_end: z.number().int().min(1).optional(),
+      title: z.string().describe('The problem in one line a person can scan, e.g. "Token prefix lookup can match two findings"'),
+      problem: z.string().describe('What is wrong and how you noticed: the evidence, in a few sentences'),
+      proposed_fix: z.string().describe('How you would fix it: the steps, and what to test'),
+      commit_sha: z.string().optional().describe('Output of `git rev-parse HEAD`, so whoever fixes it can see what changed since'),
+      project: locate.project,
+      remote_url: locate.remote_url,
+      stacks: locate.stacks,
+      manifests: locate.manifests,
+      even_if_similar: z.boolean().optional().describe('File it even though similar findings exist, because you checked and it is a different problem'),
+    },
+  }, (x) => run('report_finding', async (db, track) => {
+    const r = await resolveProject(db, a, { project: x.project, remote_url: x.remote_url });
+    const project = r.project;
+    if (!project) throw new AppError('bad_request', 'No project resolved for this repository. Ask the user which project it is (register_repository).');
+    track.projectId = project.id;
+    const { target } = await resolveTarget(db, a, project.organization_id, project, { ...x, path: x.file });
+    const { finding, similar } = await reportFinding(db, a, {
+      organization_id: project.organization_id, project_id: project.id, scope_id: target.scope_id,
+      file: x.file, line_start: x.line_start, line_end: x.line_end, title: x.title, problem: x.problem,
+      proposed_fix: x.proposed_fix, commit_sha: x.commit_sha, remote: r.remote?.key ?? null,
+      context: { stacks: x.stacks ?? [], manifests: (x.manifests ?? []).map((m) => m.path) },
+    }, { evenIfSimilar: x.even_if_similar });
+    if (!finding) {
+      return text(`Not filed yet: these open findings look like the same problem.\n\n${similar.map(findingLine).join('\n')}\n\n`
+        + 'Read them with `list_findings` (status "open"). If yours is one of them, tell the user and leave it. If it is a different problem, call `report_finding` again with `even_if_similar: true`.');
+    }
+    return text(`Finding \`${finding.id.slice(0, 8)}\` filed under **${finding.where}**. A person will sort it; tell the user in one line that you reported it.`);
+  }));
+
+  server.registerTool('list_findings', {
+    title: 'List findings',
+    description: 'Problems agents found and nobody has fixed yet, with what\'s wrong and the proposed fix. '
+      + 'Use it when the user asks whether there is anything you could fix. Only fix "to do" findings the user agrees to; "ask me later" ones need the user\'s decision first.',
+    inputSchema: {
+      ...locate,
+      path: z.string().optional().describe('Only findings under this folder, or the folder of this file, e.g. "server/src". Leave empty for the whole project'),
+      status: z.enum(['open', ...FINDING_STATUSES] as ['open', ...Finding['status'][]]).optional()
+        .describe('Default "todo". "open": new, to do and ask me later.'),
+    },
+  }, (x) => run('list_findings', async (db, track) => {
+    const r = await resolveProject(db, a, { project: x.project, remote_url: x.remote_url });
+    if (!r.project) throw new AppError('bad_request', 'No project resolved for this repository; pass project or remote_url.');
+    track.projectId = r.project.id;
+    const status = (x.status ?? 'todo') as Finding['status'] | 'open';
+    const found = await listFindings(db, a, {
+      projectId: r.project.id, path: folderOf(x.path), statuses: status === 'open' ? OPEN_FINDING_STATUSES : [status], limit: 50,
+    });
+    const label = status === 'open' ? 'open' : `"${STATUS_LABEL[status]}"`;
+    const folder = folderOf(x.path);
+    if (!found.length) return text(`No ${label} findings in ${r.project.name}${folder ? ` under \`${folder}/\`` : ''}.`);
+    return text([`# ${found.length} ${label} finding${found.length === 1 ? '' : 's'} in ${r.project.name}`, '',
+      ...found.map(findingInFull), '',
+      'The proposed fix was written at the commit shown; check the code again before you follow it. After fixing one, call `resolve_finding`.'].join('\n\n').replace(/\n{3,}/g, '\n\n'));
+  }));
+
+  server.registerTool('resolve_finding', {
+    title: 'Resolve finding',
+    description: 'Mark a finding solved after you fixed it. It is hidden from the list from then on; a person can reopen it.',
+    inputSchema: {
+      id: z.string().describe('The finding\'s id, or its first 8 characters as listed'),
+      solved_ref: z.string().describe('The commit SHA or pull request URL with the fix'),
+      note: z.string().describe('What you changed, in one line'),
+    },
+  }, (x) => run('resolve_finding', async (db, track) => {
+    const f = await setFindingStatus(db, a, x.id, { status: 'solved', solved_ref: x.solved_ref, note: x.note });
+    track.projectId = f.project_id;
+    return text(`Finding \`${f.id.slice(0, 8)}\` "${f.title}" is solved.`);
   }));
 
   server.registerTool('get_review', {

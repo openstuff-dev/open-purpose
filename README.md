@@ -83,6 +83,17 @@ second organization under Settings › Organizations.
   focus mode ("everything within two steps of Order Service"). Agents get the
   same graph: `get_context` lists related projects, and `get_related` returns
   their purpose.
+- **Findings.** When an agent notices a real problem outside its task, it doesn't fix
+  it and doesn't let it get lost: `report_finding` files the file, a one-line title, what's
+  wrong and how to fix it under the most specific matching scope. If open findings look
+  like the same problem, nothing is filed until the agent says it checked. On the
+  **Findings** page people mark each one **To do**, **Ask me later** (optionally from a
+  date) or **Dismissed**. `get_context` lists to-do and ask-me-later findings around the
+  path an agent works in, so it doesn't report them again and asks before fixing one; ask
+  an agent "anything you could fix here?" and it calls `list_findings`. An agent that fixes
+  one calls `resolve_finding` with the commit or PR, and it's hidden until you turn on
+  **Solved**. Findings stay out of the team's issue tracker; **Copy as issue** gives you
+  Markdown for the rare one that belongs there.
 - **API specs per project.** Attach a project's `swagger.json` / `openapi.yaml`
   (OpenAPI 3 or Swagger 2, JSON or YAML) from a link or as a file. Linked specs are
   fetched again in the background when agents read them and they're over an hour old.
@@ -150,7 +161,7 @@ that organization.
 **Settings → Export and import** downloads the whole group or one organization as
 one JSON file: every document and section, projects, repositories, scopes, API specs
 and, if you choose, section history, proposals with their reviews, and the names and
-roles of people and agents. Tokens are never exported. A group export is a complete
+roles of people and agents, and findings. Tokens are never exported. A group export is a complete
 backup. The Markdown (.zip) format adds a readable `.md` file per document next to
 the same JSON (`manifest.json`).
 
@@ -167,7 +178,7 @@ For scheduled backups, run the export on the server:
 
 ```bash
 docker compose exec openpurpose node dist/export-cli.js --group my-group --out /tmp/backup.json
-# Options: --organization <slug>, --zip, --people, --no-history, --no-proposals, --no-api-specs
+# Options: --organization <slug>, --zip, --people, --no-history, --no-proposals, --no-api-specs, --no-findings
 ```
 
 Without Docker, use `npm run -s export -w server -- --group my-group --out backup.json`.
@@ -247,6 +258,7 @@ into your repo's `AGENTS.md` or `CLAUDE.md`.
 | `get_api` | Endpoints and DTOs from a project's OpenAPI/Swagger spec: all endpoints, one endpoint in detail, or one DTO |
 | `list_my_proposals`, `get_review` | The agent's own proposals and the review feedback on one, with numbered lines |
 | `reply_to_review`, `apply_suggestion`, `revise_proposal` | Answer a thread (and resolve it), accept a reviewer's suggestion, push a new revision |
+| `report_finding`, `list_findings`, `resolve_finding` | Record a problem found outside the task, list findings with their proposed fix, mark one solved |
 
 ## Layout
 
@@ -273,3 +285,4 @@ npm test
 - Sign-in through Entra ID / OIDC (tokens only for now)
 - Notifications when something lands in the inbox
 - Importing edited Markdown (exports include a Markdown copy, but imports read only its `manifest.json`)
+- Tracking which tasks agents are working on right now, and sending findings to issue trackers

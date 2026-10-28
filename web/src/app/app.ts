@@ -211,6 +211,16 @@ import { Palette } from './shared/palette';
                   }
                 </a>
               </li>
+              <li>
+                <a routerLink="/findings" routerLinkActive="active">
+                  <app-icon name="bug" />Findings
+                  @if (me.new_findings; as n) {
+                    <span class="count" [attr.aria-label]="n + ' new, not sorted yet'">{{
+                      n
+                    }}</span>
+                  }
+                </a>
+              </li>
             </ul>
             @if (session.groupShown()) {
               <div class="nav-label">{{ me.group.name }}</div>

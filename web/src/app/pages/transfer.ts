@@ -148,6 +148,10 @@ async function readUpload(file: File): Promise<ImportUpload> {
               specs</label
             >
             <label class="check"
+              ><input type="checkbox" name="findings" [(ngModel)]="includes.findings" /> Findings,
+              solved and dismissed ones too</label
+            >
+            <label class="check"
               ><input type="checkbox" name="people" [(ngModel)]="includes.people" /> Names and roles
               of people and agents <span class="quiet">(never their tokens)</span></label
             >
@@ -469,7 +473,13 @@ export class TransferPage {
 
   what = this.session.canAdmin(null) ? '' : (this.adminOrgs()[0]?.id ?? '');
   format: 'json' | 'zip' = 'json';
-  includes: ExportIncludes = { history: true, proposals: true, api_specs: true, people: false };
+  includes: ExportIncludes = {
+    history: true,
+    proposals: true,
+    api_specs: true,
+    findings: true,
+    people: false,
+  };
 
   readonly upload = signal<ImportUpload | null>(null);
   readonly fileName = signal('');
@@ -665,6 +675,7 @@ export class TransferPage {
       n(c.sections, 'section'),
       n(c.api_specs, 'API spec'),
       n(c.proposals, 'proposal'),
+      n(c.findings, 'finding'),
       n(c.people, 'person', 'people'),
     ]);
     const changed = list([

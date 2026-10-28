@@ -48,7 +48,10 @@ function emptyReport(file: ExportFile): ImportReport {
       proposals: file.proposals.filter((p) => !p.organization).length,
       included: false,
     },
-    counts: { people: 0, projects: 0, repositories: 0, api_specs: 0, scopes: 0, documents: 0, sections: 0, section_versions: 0, proposals: 0 },
+    counts: {
+      people: 0, projects: 0, repositories: 0, api_specs: 0, scopes: 0, documents: 0, sections: 0, section_versions: 0,
+      proposals: 0, findings: 0,
+    },
     merged: {
       people: 0, projects: 0, api_specs: 0, scopes: 0, documents: 0, sections: 0,
       unchanged: 0, proposed: 0, updated: 0, kept: 0, removed: 0, conflicts: 0,
@@ -662,6 +665,24 @@ async function apply(run: Run): Promise<void> {
           [thread[0].id, actor(cm.actor), cm.body, cm.suggestion, cm.applied_at, actor(cm.applied_by), cm.created_at]);
       }
     }
+  }
+
+  // ── findings
+  for (const f of file.findings) {
+    const orgId = orgOf(f.organization);
+    const projectId = id(ids.projects, f.project);
+    if (!orgId || !projectId) continue;
+    // Merging a file back into where it came from: its findings are already here.
+    if ((await c.query('SELECT 1 FROM findings WHERE id::text = $1 AND organization_id = $2', [f.key, orgId])).rowCount) continue;
+    await c.query(
+      `INSERT INTO findings (organization_id, project_id, scope_id, status, file, line_start, line_end, title, problem,
+                             proposed_fix, commit_sha, remote, context, remind_after, solved_ref, created_by, created_at,
+                             status_by, status_at, status_note, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
+      [orgId, projectId, id(ids.scopes, f.scope), f.status, f.file, f.line_start, f.line_end, f.title, f.problem,
+        f.proposed_fix, f.commit_sha, f.remote, JSON.stringify(f.context), f.remind_after, f.solved_ref, actor(f.created_by),
+        f.created_at, actor(f.status_by), f.status_at, f.status_note, f.updated_at]);
+    counts.findings++;
   }
 
   const gc = report.group_content;

@@ -6,7 +6,7 @@
  *   node dist/export-cli.js --group acme-group --organization payments --people --no-history > payments.json
  *
  * Options: --organization <slug>, --out <file>, --zip (Markdown files plus manifest.json, needs --out),
- * --people, --no-history, --no-proposals, --no-api-specs.
+ * --people, --no-history, --no-proposals, --no-api-specs, --no-findings.
  * With npm, pass -s so npm's own output stays out of the file: npm run -s export -w server -- --group acme-group
  */
 import fs from 'node:fs/promises';
@@ -28,6 +28,7 @@ const { values: args } = parseArgs({
     'no-history': { type: 'boolean', default: false },
     'no-proposals': { type: 'boolean', default: false },
     'no-api-specs': { type: 'boolean', default: false },
+    'no-findings': { type: 'boolean', default: false },
   },
 });
 
@@ -45,6 +46,7 @@ async function main() {
   if (orgId === undefined) throw new Error(`No organization "${args.organization}" in ${access.group.name}.`);
   const file = await withScope(pool, { groupId: access.group.id }, (db) => exportContent(db, access, orgId, {
     history: !args['no-history'], proposals: !args['no-proposals'], people: args.people, api_specs: !args['no-api-specs'],
+    findings: !args['no-findings'],
   }, VERSION));
   const text = JSON.stringify(file, null, 2);
   if (args.out) {

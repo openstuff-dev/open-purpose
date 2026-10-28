@@ -3,11 +3,11 @@ import type { Queryable } from '../../db.js';
 import { notFound } from '../../errors.js';
 import { FORMAT, FORMAT_VERSION } from './format.js';
 import type {
-  ExportApiSpec, ExportDocument, ExportFile, ExportIncludes, ExportOrganization, ExportPerson, ExportProject,
+  ExportApiSpec, ExportDocument, ExportFile, ExportFinding, ExportIncludes, ExportOrganization, ExportPerson, ExportProject,
   ExportProposal, ExportScope,
 } from '@openpurpose/contracts';
 
-export const DEFAULT_INCLUDES: ExportIncludes = { history: true, proposals: true, people: false, api_specs: true };
+export const DEFAULT_INCLUDES: ExportIncludes = { history: true, proposals: true, people: false, api_specs: true, findings: true };
 
 /** The whole group (organizationId null, group admins) or one organization (its admins). */
 export async function exportContent(
@@ -94,6 +94,13 @@ export async function exportContent(
 
   const proposals = includes.proposals ? await exportProposals(db, org, documents, who) : [];
 
+  const findings = !includes.findings ? [] : (await db.query<ExportFinding>(
+    `SELECT id AS key, organization_id AS organization, project_id AS project, scope_id AS scope, status, file, line_start,
+            line_end, title, problem, proposed_fix, commit_sha, remote, context, to_char(remind_after, 'YYYY-MM-DD') AS remind_after,
+            solved_ref, created_by, created_at, status_by, status_at, status_note, updated_at
+       FROM findings WHERE $1::uuid IS NULL OR organization_id = $1 ORDER BY created_at`, [org])).rows
+    .map((f) => ({ ...f, created_by: who(f.created_by), status_by: who(f.status_by) }));
+
   let people: ExportPerson[] = [];
   if (includes.people) {
     const memberships = (await db.query<{ actor_id: string; organization: string | null; role: ExportPerson['memberships'][number]['role'] }>(
@@ -130,6 +137,7 @@ export async function exportContent(
     scopes,
     documents,
     proposals,
+    findings,
   };
   // Dates become ISO strings, exactly as they will be in the file.
   return JSON.parse(JSON.stringify(file)) as ExportFile;

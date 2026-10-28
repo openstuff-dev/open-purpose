@@ -7,6 +7,8 @@ import { documentsAt, listSections } from './content.js';
 import { resolveProject, type Resolution } from './projects.js';
 import { relatedTo, type Related } from './graph.js';
 import { apisOfProjects, type ApiSpecMeta } from './apis.js';
+import { findingsNear, type NearbyFindings } from './findings.js';
+import type { Finding } from '@openpurpose/contracts';
 import { KIND_ORDER, type Document, type Level, type Project, type Scope, type Section } from './types.js';
 
 export interface ContextRequest {
@@ -60,6 +62,8 @@ export interface ContextResult {
   related: Related[];
   /** API specs of this project and of related projects the agent can read. */
   apis: ContextApi[];
+  /** To do and ask-me-later findings around the path; null without a project. */
+  findings: NearbyFindings | null;
   budget: ContextBudget;
   markdown: string;
 }
@@ -205,6 +209,7 @@ export async function buildContext(db: Queryable, a: Access, req: ContextRequest
     learning_target: target,
     related: [],
     apis: [],
+    findings: null,
     budget: { max_tokens: null, tokens: 0, shortened: 0 },
   };
   if (project) {
@@ -223,6 +228,7 @@ export async function buildContext(db: Queryable, a: Access, req: ContextRequest
         relation: own ? 'this' : rel?.direction ?? 'uses',
       };
     });
+    result.findings = await findingsNear(db, a, project.id, req.path, resolution.remote?.key);
   }
   // Once the group has several organizations it sets the budget; until then the organization does.
   const { rows: [budget] } = result.group.shown || !org
@@ -390,6 +396,20 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
     if (own.length) out.push('', 'This project:', ...own.map(line));
     if (uses.length) out.push('', 'Projects this one uses:', ...uses.map((s) => line(s).replace('- **', `- ${s.project_name}: **`)));
     if (usedBy.length) out.push('', 'Projects that use this one:', ...usedBy.map((s) => line(s).replace('- **', `- ${s.project_name}: **`)));
+  }
+  const nearby = ctx.findings;
+  if (nearby && (nearby.todo.length || nearby.ask_later.length)) {
+    const where = ctx.path ? `around \`${ctx.path}\`` : 'in this project';
+    out.push('', '---', '', '## Known findings here');
+    out.push(`Problems agents found ${where} that nobody has fixed yet. Don't report them again.`);
+    const line = (f: Finding) => `- \`${shortId(f.id)}\` **${f.title}** in \`${f.file}${f.line_start ? `:${f.line_start}${f.line_end && f.line_end !== f.line_start ? `-${f.line_end}` : ''}` : ''}\``;
+    if (nearby.ask_later.length) {
+      out.push('', "Ask the user about these when your work touches them. A person must decide first, so don't fix them on your own:", ...nearby.ask_later.map(line));
+    }
+    if (nearby.todo.length) {
+      out.push('', 'To do. Fix one only if the user asks, then call `resolve_finding`:', ...nearby.todo.map(line));
+    }
+    out.push('', `Read the problem and the proposed fix with \`list_findings\`${nearby.more ? ` (${nearby.more} more not listed)` : ''}.`);
   }
   out.push('', '---', '', `If the user corrects you in a way that should apply next time, call \`propose_learning\`. It will be filed under **${ctx.learning_target.label}** unless you pass a different scope.`);
   return out.join('\n');

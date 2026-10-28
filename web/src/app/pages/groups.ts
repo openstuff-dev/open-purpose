@@ -148,7 +148,7 @@ export class GroupsPage {
         organizationId: null,
         format: 'json',
         groupId: g.id,
-        includes: { history: true, proposals: true, api_specs: true, people: true },
+        includes: { history: true, proposals: true, api_specs: true, findings: true, people: true },
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
