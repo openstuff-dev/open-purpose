@@ -13,7 +13,15 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { Button, Control, IconButton, StatusDot, type Tone } from '@openstuff-dev/ui-angular';
+import {
+  Button,
+  Control,
+  DialogTitle,
+  Drawer,
+  IconButton,
+  StatusDot,
+  type Tone,
+} from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Finding, FindingCounts, FindingStatus } from '../core/models';
 import { Session } from '../core/session';
@@ -81,6 +89,8 @@ function lines(f: Finding): string {
     IconButton,
     Control,
     StatusDot,
+    Drawer,
+    DialogTitle,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)', class: 'wide-page' },
@@ -223,11 +233,13 @@ function lines(f: Finding): string {
 
     @if (current(); as f) {
       <div class="drawer-backdrop" (click)="close()"></div>
-      <aside
+      <!-- Not modal, like before: notices and the command palette stay usable on top. -->
+      <dialog
+        os-drawer
+        nonModal
         class="drawer"
-        role="dialog"
-        aria-modal="false"
-        [attr.aria-label]="f.title"
+        [open]="true"
+        (openChange)="$event || close()"
         #drawer
         tabindex="-1"
       >
@@ -272,7 +284,7 @@ function lines(f: Finding): string {
         </header>
 
         <div class="drawer-body">
-          <h2 class="drawer-title">{{ f.title }}</h2>
+          <h2 class="drawer-title" os-dialog-title>{{ f.title }}</h2>
           <p class="byline">
             <app-icon [name]="f.created_by_kind === 'human' ? 'user' : 'bot'" [size]="13" />
             <span
@@ -412,7 +424,7 @@ function lines(f: Finding): string {
             </div>
           </footer>
         }
-      </aside>
+      </dialog>
     }
   `,
 })
@@ -422,7 +434,7 @@ export class FindingsPage {
   private notices = inject(Notices);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
-  private drawer = viewChild<ElementRef<HTMLElement>>('drawer');
+  private drawer = viewChild('drawer', { read: ElementRef<HTMLElement> });
 
   readonly statuses = STATUSES;
   readonly label = STATUS;

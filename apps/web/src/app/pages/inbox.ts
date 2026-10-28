@@ -25,7 +25,7 @@ import {
   StatusDot,
   type Tone,
 } from '@openstuff-dev/ui-angular';
-import { SegmentedControl } from '@openstuff-dev/ui-angular';
+import { DialogTitle, Drawer, SegmentedControl } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import {
   MODE_LABEL,
@@ -139,6 +139,8 @@ function ago(iso: string): string {
     Badge,
     Chip,
     SegmentedControl,
+    Drawer,
+    DialogTitle,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)', class: 'wide-page' },
@@ -343,11 +345,13 @@ function ago(iso: string): string {
 
     @if (current(); as p) {
       <div class="drawer-backdrop" (click)="close()"></div>
-      <aside
+      <!-- Not modal, like before: notices and the command palette stay usable on top. -->
+      <dialog
+        os-drawer
+        nonModal
         class="drawer"
-        role="dialog"
-        aria-modal="false"
-        [attr.aria-label]="p.heading || 'Change'"
+        [open]="true"
+        (openChange)="$event || close()"
         #drawer
         tabindex="-1"
       >
@@ -394,7 +398,7 @@ function ago(iso: string): string {
         </header>
 
         <div class="drawer-body">
-          <h2 class="drawer-title">{{ p.heading || p.current_heading }}</h2>
+          <h2 class="drawer-title" os-dialog-title>{{ p.heading || p.current_heading }}</h2>
           <p class="byline">
             <app-icon [name]="p.created_by_kind === 'human' ? 'user' : 'bot'" [size]="13" />
             <span
@@ -853,7 +857,7 @@ function ago(iso: string): string {
             </footer>
           }
         }
-      </aside>
+      </dialog>
     }
   `,
 })
@@ -863,7 +867,7 @@ export class InboxPage {
   private notices = inject(Notices);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
-  private drawer = viewChild<ElementRef<HTMLElement>>('drawer');
+  private drawer = viewChild('drawer', { read: ElementRef<HTMLElement> });
 
   readonly kind = KIND;
   readonly statusLabel = STATUS;
