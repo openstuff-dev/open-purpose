@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Check, Checkbox } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { SlugAlias, SlugKind, SlugRename, SlugRenameRef } from '../core/models';
 import { aliasConflict, errorMessage } from '../core/session';
@@ -24,7 +24,7 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
  */
 @Component({
   selector: 'app-slug-rename',
-  imports: [FormsModule, RouterLink, Button],
+  imports: [FormsModule, RouterLink, Button, Check, Checkbox],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="slug-field">
@@ -39,11 +39,11 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
 
       @if (open()) {
         <form class="slug-rename" (ngSubmit)="apply()">
-          <label
-            >New slug
-            <input
+          <label class="os-field"
+            ><span class="os-label">New slug</span
+            ><input
               name="newslug"
-              class="mono"
+              class="os-input mono"
               [ngModel]="draft()"
               (ngModelChange)="onDraft($event)"
               autocomplete="off"
@@ -54,7 +54,7 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
           </label>
           <div id="slug-impact" aria-live="polite">
             @if (error()) {
-              <p class="field-error">{{ error() }}</p>
+              <p class="os-error">{{ error() }}</p>
             } @else if (checking()) {
               <p class="quiet">
                 Checking what uses <code>{{ slug() }}</code
@@ -71,8 +71,8 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
                     >). Repositories, agents and links that still use <code>{{ r.to }}</code> reach
                     {{ other.name }} today. Renaming sends them here instead.
                   </p>
-                  <label class="check"
-                    ><input type="checkbox" name="take" [(ngModel)]="take" /> Take
+                  <label os-check
+                    ><input os-checkbox type="checkbox" name="take" [(ngModel)]="take" /> Take
                     <code>{{ r.to }}</code> from {{ other.name }}</label
                   >
                 </div>
@@ -160,9 +160,9 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
                   </li>
                 </ul>
                 @if (r.rewrite.length) {
-                  <label class="check"
-                    ><input type="checkbox" name="rewrite" [(ngModel)]="rewrite" /> Update links I
-                    can edit</label
+                  <label os-check
+                    ><input os-checkbox type="checkbox" name="rewrite" [(ngModel)]="rewrite" />
+                    Update links I can edit</label
                   >
                 }
               </div>

@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { GroupRow } from '../core/models';
 import { Session } from '../core/session';
@@ -14,7 +14,7 @@ import { initials } from '../core/theme';
 /** Server admins: every group (tenant) on this OpenPurpose server. */
 @Component({
   selector: 'app-groups',
-  imports: [FormsModule, DatePipe, Icon, Button],
+  imports: [FormsModule, DatePipe, Icon, Button, Field, Control],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -72,20 +72,23 @@ import { initials } from '../core/theme';
     <section>
       <h3 class="list-label">New group</h3>
       <form class="inline-form panel" (ngSubmit)="create()">
-        <label class="grow"
-          >Company or client
-          <input name="name" [(ngModel)]="draft.name" required placeholder="Contoso"
-        /></label>
-        <label class="grow"
-          >First organization <span class="quiet">(if not the same)</span>
-          <input
+        <os-field label="Company or client" class="grow"
+          ><input os-input name="name" [(ngModel)]="draft.name" required placeholder="Contoso"
+        /></os-field>
+        <label class="os-field grow"
+          ><span class="os-label"
+            >First organization <span class="quiet">(if not the same)</span></span
+          ><input
+            os-input
             name="org"
             [(ngModel)]="draft.organization_name"
             [placeholder]="draft.name || 'Contoso Retail'"
         /></label>
-        <label class="full"
-          >First admin <span class="quiet">(leave empty to be the admin yourself)</span>
-          <input
+        <label class="os-field full"
+          ><span class="os-label"
+            >First admin <span class="quiet">(leave empty to be the admin yourself)</span></span
+          ><input
+            os-input
             name="admin"
             [(ngModel)]="draft.admin_name"
             placeholder="Name of the person who will run it"

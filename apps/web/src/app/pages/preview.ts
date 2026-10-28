@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ContextResult, Project } from '../core/models';
 import { MarkdownView } from '../shared/markdown';
@@ -11,7 +11,7 @@ import { splitList } from '../shared/scope-list';
 
 @Component({
   selector: 'app-preview',
-  imports: [FormsModule, RouterLink, MarkdownView, Button],
+  imports: [FormsModule, RouterLink, MarkdownView, Button, Field, Control],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -24,50 +24,56 @@ import { splitList } from '../shared/scope-list';
     </section>
 
     <form class="inline-form panel" (ngSubmit)="run()">
-      <label
-        >Project
-        <select name="project" [(ngModel)]="project">
+      <os-field label="Project"
+        ><select os-select name="project" [(ngModel)]="project">
           <option value="">Find it from the git remote</option>
           @for (p of projects(); track p.id) {
             <option [value]="p.id">{{ p.name }} ({{ p.organization_name }})</option>
           }
-        </select>
-      </label>
-      <label class="grow"
-        >Git remote URL
-        <input
+        </select></os-field
+      >
+      <os-field label="Git remote URL" class="grow"
+        ><input
+          os-input
           name="remote"
           class="mono"
           [(ngModel)]="remote"
           [disabled]="!!project"
           placeholder="git@ssh.dev.azure.com:v3/org/project/repo"
-      /></label>
-      <label class="full"
-        >File or folder in the repository
-        <input
+      /></os-field>
+      <os-field label="File or folder in the repository" class="full"
+        ><input
+          os-input
           name="path"
           class="mono"
           [(ngModel)]="path"
           placeholder="frontend/src/app/editor/toolbar.ts"
-      /></label>
-      <label
-        >Manifest file name
-        <input
+      /></os-field>
+      <os-field label="Manifest file name"
+        ><input
+          os-input
           name="mpath"
           class="mono"
           [(ngModel)]="manifestPath"
           placeholder="frontend/package.json"
+      /></os-field>
+      <label class="os-field grow"
+        ><span class="os-label">Stacks <span class="quiet">(optional, comma separated)</span></span
+        ><input os-input name="stacks" [(ngModel)]="stacks" placeholder="angular"
       /></label>
-      <label class="grow"
-        >Stacks <span class="quiet">(optional, comma separated)</span
-        ><input name="stacks" [(ngModel)]="stacks" placeholder="angular"
-      /></label>
-      <label class="full"
-        >Manifest content
-        <span class="quiet"
-          >(optional: paste package.json or a .csproj to detect stacks like an agent would)</span
-        >
-        <textarea name="manifest" class="mono" rows="4" [(ngModel)]="manifest"></textarea>
+      <label class="os-field full"
+        ><span class="os-label"
+          >Manifest content
+          <span class="quiet"
+            >(optional: paste package.json or a .csproj to detect stacks like an agent would)</span
+          ></span
+        ><textarea
+          os-textarea
+          name="manifest"
+          class="mono"
+          rows="4"
+          [(ngModel)]="manifest"
+        ></textarea>
       </label>
       <div class="form-actions full">
         <button os-button variant="primary" type="submit">Show context</button>

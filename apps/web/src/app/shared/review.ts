@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ReviewComment, ReviewThread } from '../core/models';
 import { diffLines } from './diff';
@@ -28,7 +28,7 @@ interface Row {
 /** One conversation: comments, suggestions with "Apply", reply box, resolve. */
 @Component({
   selector: 'app-thread',
-  imports: [FormsModule, DatePipe, Icon, MarkdownView, Button],
+  imports: [FormsModule, DatePipe, Icon, MarkdownView, Button, Control],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
@@ -113,6 +113,7 @@ interface Row {
           @if (replying()) {
             <form class="reply" (ngSubmit)="reply()">
               <textarea
+                os-textarea
                 name="reply"
                 rows="3"
                 [(ngModel)]="replyText"
@@ -223,7 +224,7 @@ export class ThreadView {
  */
 @Component({
   selector: 'app-review-text',
-  imports: [FormsModule, Icon, ThreadView, Button],
+  imports: [FormsModule, Icon, ThreadView, Button, Field, Control],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="rt" [class.can-comment]="canComment()" [class.single]="base() === null">
@@ -288,6 +289,7 @@ export class ThreadView {
                   </button>
                 </div>
                 <textarea
+                  os-textarea
                   name="body"
                   rows="3"
                   [(ngModel)]="body"
@@ -297,16 +299,16 @@ export class ThreadView {
                   (keydown.meta.enter)="submit()"
                 ></textarea>
                 @if (suggesting()) {
-                  <label
-                    >Replace with
+                  <os-field label="Replace with">
                     <textarea
+                      os-textarea
                       name="suggestion"
                       class="mono"
                       [rows]="selEnd()! - selStart()! + 2"
                       [(ngModel)]="suggestion"
                       aria-label="Suggested replacement"
                     ></textarea>
-                  </label>
+                  </os-field>
                 }
                 <div class="form-actions">
                   <button

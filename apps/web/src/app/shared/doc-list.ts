@@ -7,7 +7,7 @@ import { Session } from '../core/session';
 import { ModeBadge } from './mode';
 import { Icon } from './icon';
 import { DatePipe } from '@angular/common';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Control, Field } from '@openstuff-dev/ui-angular';
 
 const GLYPH: Record<DocKind, string> = {
   purpose: 'book',
@@ -31,7 +31,7 @@ const KIND_HINT: Record<DocKind, string> = {
 /** Documents at one level (organization, project or scope), with a form to add one. */
 @Component({
   selector: 'app-doc-list',
-  imports: [RouterLink, FormsModule, ModeBadge, Icon, DatePipe, Button],
+  imports: [RouterLink, FormsModule, ModeBadge, Icon, DatePipe, Button, Field, Control],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (docs().length) {
@@ -65,15 +65,16 @@ const KIND_HINT: Record<DocKind, string> = {
     @if (canEdit()) {
       @if (adding()) {
         <form class="inline-form" (ngSubmit)="create()">
-          <label
-            >Type
-            <select name="kind" [(ngModel)]="kind" (ngModelChange)="suggestTitle()">
+          <os-field label="Type"
+            ><select os-select name="kind" [(ngModel)]="kind" (ngModelChange)="suggestTitle()">
               @for (k of kinds; track k) {
                 <option [value]="k">{{ kindLabel[k] }}</option>
               }
-            </select>
-          </label>
-          <label class="grow">Title <input name="title" [(ngModel)]="title" required /></label>
+            </select></os-field
+          >
+          <os-field label="Title" class="grow"
+            ><input os-input name="title" [(ngModel)]="title" required
+          /></os-field>
           <p class="quiet full">{{ hint[kind] }}</p>
           <div class="form-actions full">
             <button os-button variant="primary" type="submit" [disabled]="!title.trim()">

@@ -10,7 +10,7 @@ import {
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import {
   KIND_LABEL,
@@ -52,6 +52,8 @@ interface Draft {
     ActivityFigure,
     StatStyleSwitch,
     Button,
+    Field,
+    Control,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -73,7 +75,13 @@ interface Draft {
         </nav>
         @if (editingTitle()) {
           <form class="title-form" (ngSubmit)="saveTitle()">
-            <input name="title" [(ngModel)]="titleDraft" aria-label="Document title" required />
+            <input
+              os-input
+              name="title"
+              [(ngModel)]="titleDraft"
+              aria-label="Document title"
+              required
+            />
             <button os-button variant="primary" type="submit">Save</button>
             <button os-button type="button" (click)="editingTitle.set(false)">Cancel</button>
           </form>
@@ -163,7 +171,9 @@ interface Draft {
           <article class="section" [attr.data-mode]="s.mode" [id]="'s-' + s.id.slice(0, 8)">
             @if (editing() === s.id) {
               <form class="section-edit" (ngSubmit)="saveSection(s)">
-                <label>Heading <input name="heading" [(ngModel)]="draft.heading" required /></label>
+                <os-field label="Heading"
+                  ><input os-input name="heading" [(ngModel)]="draft.heading" required
+                /></os-field>
                 <app-md-editor
                   [(value)]="draft.body"
                   [rows]="10"
@@ -171,9 +181,14 @@ interface Draft {
                   [fromProject]="d.project_id"
                   [fromOrganization]="d.organization_id"
                 />
-                <label
-                  >Note for history <span class="quiet">(optional)</span
-                  ><input name="note" [(ngModel)]="draft.note" placeholder="What changed and why"
+                <label class="os-field"
+                  ><span class="os-label"
+                    >Note for history <span class="quiet">(optional)</span></span
+                  ><input
+                    os-input
+                    name="note"
+                    [(ngModel)]="draft.note"
+                    placeholder="What changed and why"
                 /></label>
                 <div class="form-actions">
                   <button
@@ -361,16 +376,16 @@ interface Draft {
       @if (d.can_edit) {
         @if (adding()) {
           <form class="section-edit add" (ngSubmit)="addSection()">
-            <label
-              >Heading
-              <input
+            <os-field label="Heading"
+              ><input
+                os-input
                 name="heading"
                 [(ngModel)]="newDraft.heading"
                 required
                 [placeholder]="
                   d.kind === 'glossary' ? 'Term, e.g. Order' : 'One rule or topic per section'
                 "
-            /></label>
+            /></os-field>
             <app-md-editor
               [(value)]="newDraft.body"
               [rows]="8"

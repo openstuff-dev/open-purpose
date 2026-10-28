@@ -13,7 +13,7 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { Button, IconButton } from '@openstuff-dev/ui-angular';
+import { Button, Check, Checkbox, Control, Field, IconButton } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import {
   MODE_LABEL,
@@ -112,6 +112,10 @@ function ago(iso: string): string {
     Icon,
     Button,
     IconButton,
+    Field,
+    Control,
+    Check,
+    Checkbox,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)', class: 'wide-page' },
@@ -144,6 +148,7 @@ function ago(iso: string): string {
         <label class="search-field"
           ><app-icon name="search" />
           <input
+            os-input
             type="search"
             placeholder="Filter by text, person, project or file"
             aria-label="Filter"
@@ -151,22 +156,32 @@ function ago(iso: string): string {
             (ngModelChange)="q.set($event)"
           />
         </label>
-        <select aria-label="Type" [ngModel]="kindFilter()" (ngModelChange)="kindFilter.set($event)">
+        <select
+          os-select
+          aria-label="Type"
+          [ngModel]="kindFilter()"
+          (ngModelChange)="kindFilter.set($event)"
+        >
           <option value="">All types</option>
           <option value="learning">Learnings</option>
           <option value="edit_section">Changes</option>
           <option value="new_section">New sections</option>
         </select>
-        <select aria-label="Where" [ngModel]="level()" (ngModelChange)="setLevel($event)">
+        <select os-select aria-label="Where" [ngModel]="level()" (ngModelChange)="setLevel($event)">
           <option value="all">Everywhere I can see</option>
           <option value="group">{{ session.group()?.name }} only</option>
           @for (o of session.readableOrgs(); track o.id) {
             <option [value]="o.id">{{ o.name }}</option>
           }
         </select>
-        <label class="check"
-          ><input type="checkbox" [ngModel]="mine()" (ngModelChange)="mine.set($event)" /> Only what
-          I can review</label
+        <label os-check
+          ><input
+            os-checkbox
+            type="checkbox"
+            [ngModel]="mine()"
+            (ngModelChange)="mine.set($event)"
+          />
+          Only what I can review</label
         >
       </div>
     </div>
@@ -510,7 +525,9 @@ function ago(iso: string): string {
             </div>
             @if (r.editing) {
               <div class="section-edit">
-                <label>Heading <input [(ngModel)]="r.heading" name="heading" /></label>
+                <os-field label="Heading"
+                  ><input os-input [(ngModel)]="r.heading" name="heading"
+                /></os-field>
                 <app-md-editor
                   [(value)]="r.body"
                   [rows]="12"
@@ -530,6 +547,7 @@ function ago(iso: string): string {
                   <label
                     ><app-icon name="diff" [size]="14" />Compare with
                     <select
+                      os-select
                       [ngModel]="compare()"
                       (ngModelChange)="compare.set($event)"
                       aria-label="Compare with"
@@ -657,6 +675,7 @@ function ago(iso: string): string {
             @if (rv?.can_comment && isOpen(p.status)) {
               <div class="composer general">
                 <textarea
+                  os-textarea
                   rows="3"
                   [(ngModel)]="r.comment"
                   name="comment"
@@ -722,14 +741,13 @@ function ago(iso: string): string {
           @if (p.can_review) {
             <footer class="drawer-foot">
               @if (p.kind === 'learning') {
-                <label class="file-under"
-                  >File under
-                  <select [(ngModel)]="r.target" name="target" (ngModelChange)="touch()">
+                <os-field label="File under" class="file-under"
+                  ><select os-select [(ngModel)]="r.target" name="target" (ngModelChange)="touch()">
                     @for (t of r.targets; track t.key) {
                       <option [value]="t.key">{{ t.label }}</option>
                     }
-                  </select>
-                </label>
+                  </select></os-field
+                >
                 @if (isPromotion(r)) {
                   <p class="promote-note">Every agent in every organization will get this.</p>
                 }
@@ -746,6 +764,7 @@ function ago(iso: string): string {
                   </div>
                 }
                 <input
+                  os-input
                   class="note"
                   [(ngModel)]="r.note"
                   name="note"
@@ -795,6 +814,7 @@ function ago(iso: string): string {
               </p>
               @if (r.editing) {
                 <input
+                  os-input
                   class="note"
                   [(ngModel)]="r.note"
                   name="note"

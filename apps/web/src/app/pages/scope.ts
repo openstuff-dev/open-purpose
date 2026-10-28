@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Repository, ScopeDetail } from '../core/models';
 import { Session, provideHere } from '../core/session';
@@ -14,7 +14,17 @@ import { SlugRenameField } from '../shared/slug-rename';
 
 @Component({
   selector: 'app-scope',
-  imports: [DocList, FormsModule, RouterLink, SlugRenameField, Icon, RepoPicker, Button],
+  imports: [
+    DocList,
+    FormsModule,
+    RouterLink,
+    SlugRenameField,
+    Icon,
+    RepoPicker,
+    Button,
+    Field,
+    Control,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (scope(); as s) {
@@ -47,11 +57,17 @@ import { SlugRenameField } from '../shared/slug-rename';
         <h2>When this applies</h2>
         @if (editing()) {
           <form class="inline-form" (ngSubmit)="save()">
-            <label class="grow">Name <input name="name" [(ngModel)]="draft.name" required /></label>
-            <label class="full"
-              >Description
-              <textarea name="description" rows="3" [(ngModel)]="draft.description"></textarea>
-            </label>
+            <os-field label="Name" class="grow"
+              ><input os-input name="name" [(ngModel)]="draft.name" required
+            /></os-field>
+            <os-field label="Description" class="full">
+              <textarea
+                os-textarea
+                name="description"
+                rows="3"
+                [(ngModel)]="draft.description"
+              ></textarea>
+            </os-field>
             @if (s.project; as p) {
               <app-repo-picker
                 class="full"
@@ -60,13 +76,17 @@ import { SlugRenameField } from '../shared/slug-rename';
                 [(selected)]="repositoryIds"
               />
             }
-            <label class="full"
-              >Paths
-              <input name="globs" class="mono" [(ngModel)]="draft.globs" placeholder="frontend/**"
-            /></label>
-            <label class="full"
-              >Stacks <input name="stacks" [(ngModel)]="draft.stacks" placeholder="angular"
-            /></label>
+            <os-field label="Paths" class="full"
+              ><input
+                os-input
+                name="globs"
+                class="mono"
+                [(ngModel)]="draft.globs"
+                placeholder="frontend/**"
+            /></os-field>
+            <os-field label="Stacks" class="full"
+              ><input os-input name="stacks" [(ngModel)]="draft.stacks" placeholder="angular"
+            /></os-field>
             <div class="form-actions full">
               <button os-button variant="primary" type="submit">Save</button>
               <button os-button type="button" (click)="editing.set(false)">Cancel</button>

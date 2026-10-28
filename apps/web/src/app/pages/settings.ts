@@ -10,7 +10,7 @@ import {
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Checkbox, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Organization, TokenRow } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -76,6 +76,9 @@ organization, the project and the part of the code you are in (a repository or a
     SlugRenameField,
     TransferPage,
     Button,
+    Field,
+    Control,
+    Checkbox,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -132,7 +135,13 @@ organization, the project and the part of the code you are in (a repository or a
                     <p>Shown in history, the inbox and on proposals your agents make.</p>
                   </div>
                   <form (ngSubmit)="saveName()">
-                    <input name="name" [(ngModel)]="name" aria-label="Your name" required />
+                    <input
+                      os-input
+                      name="name"
+                      [(ngModel)]="name"
+                      aria-label="Your name"
+                      required
+                    />
                     <button
                       os-button
                       type="submit"
@@ -215,6 +224,7 @@ organization, the project and the part of the code you are in (a repository or a
                 <div class="setting-row">
                   <form (ngSubmit)="newToken()">
                     <input
+                      os-input
                       name="label"
                       [(ngModel)]="tokenLabel"
                       placeholder="Label, e.g. work laptop"
@@ -348,6 +358,7 @@ organization, the project and the part of the code you are in (a repository or a
                     </div>
                     <form (ngSubmit)="renameGroup()">
                       <input
+                        os-input
                         name="gname"
                         [(ngModel)]="groupName"
                         aria-label="Group name"
@@ -374,6 +385,7 @@ organization, the project and the part of the code you are in (a repository or a
                     </div>
                     <form (ngSubmit)="saveGroupBudget()">
                       <input
+                        os-input
                         name="gbudget"
                         type="number"
                         min="1000"
@@ -420,17 +432,22 @@ organization, the project and the part of the code you are in (a repository or a
                         style="margin:0;grid-column:1/-1"
                         (ngSubmit)="saveOrg(o)"
                       >
-                        <label class="grow"
-                          >Name <input name="oname" [(ngModel)]="orgDraft.name" required
-                        /></label>
-                        <label class="full"
-                          >Summary
-                          <textarea name="osum" rows="3" [(ngModel)]="orgDraft.summary"></textarea>
-                        </label>
+                        <os-field label="Name" class="grow"
+                          ><input os-input name="oname" [(ngModel)]="orgDraft.name" required
+                        /></os-field>
+                        <os-field label="Summary" class="full">
+                          <textarea
+                            os-textarea
+                            name="osum"
+                            rows="3"
+                            [(ngModel)]="orgDraft.summary"
+                          ></textarea>
+                        </os-field>
                         @if (!session.groupShown()) {
-                          <label class="full"
-                            >Context budget (tokens)
-                            <input
+                          <label class="os-field full"
+                            ><span class="os-label">Context budget (tokens)</span
+                            ><input
+                              os-input
                               name="obudget"
                               type="number"
                               min="1000"
@@ -516,35 +533,39 @@ organization, the project and the part of the code you are in (a repository or a
                         style="margin:0;grid-column:1/-1"
                         (ngSubmit)="createOrg()"
                       >
-                        <label class="grow"
-                          >Name
-                          <input
+                        <os-field label="Name" class="grow"
+                          ><input
+                            os-input
                             name="nname"
                             [(ngModel)]="newOrg.name"
                             required
                             placeholder="Acme Payments"
-                        /></label>
-                        <label
-                          >Slug
-                          <input
+                        /></os-field>
+                        <os-field label="Slug"
+                          ><input
+                            os-input
                             name="nslug"
                             class="mono"
                             [(ngModel)]="newOrg.slug"
                             placeholder="payments"
-                        /></label>
-                        <label class="full"
-                          >Summary
-                          <textarea name="nsum" rows="3" [(ngModel)]="newOrg.summary"></textarea>
-                        </label>
+                        /></os-field>
+                        <os-field label="Summary" class="full">
+                          <textarea
+                            os-textarea
+                            name="nsum"
+                            rows="3"
+                            [(ngModel)]="newOrg.summary"
+                          ></textarea>
+                        </os-field>
                         @if (!session.groupShown()) {
-                          <label class="full"
-                            >Name for both organizations together
-                            <input
+                          <os-field label="Name for both organizations together" class="full"
+                            ><input
+                              os-input
                               name="ngroup"
                               [(ngModel)]="groupName"
                               required
                               placeholder="Acme Group"
-                          /></label>
+                          /></os-field>
                           <p class="quiet full">
                             With a second organization, {{ session.org()?.name }} becomes one of
                             several in a group. The group gets its own rules that reach every
@@ -616,6 +637,7 @@ organization, the project and the part of the code you are in (a repository or a
                                 <span class="self" title="Always">—</span>
                               } @else {
                                 <input
+                                  os-checkbox
                                   type="checkbox"
                                   [checked]="t.readers.includes(r.id)"
                                   (change)="share(t, r, $any($event.target).checked)"

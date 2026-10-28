@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Check, Checkbox, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Project } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -10,7 +10,7 @@ import { Icon } from '../shared/icon';
 
 @Component({
   selector: 'app-projects',
-  imports: [RouterLink, FormsModule, Icon, Button],
+  imports: [RouterLink, FormsModule, Icon, Button, Field, Control, Check, Checkbox],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="page-head">
@@ -46,6 +46,7 @@ import { Icon } from '../shared/icon';
 
     <div class="toolbar">
       <input
+        os-input
         type="search"
         class="search"
         placeholder="Search by name, slug or repository"
@@ -53,8 +54,13 @@ import { Icon } from '../shared/icon';
         [ngModel]="q()"
         (ngModelChange)="search($event)"
       />
-      <label class="check"
-        ><input type="checkbox" [ngModel]="onlyReview()" (ngModelChange)="onlyReview.set($event)" />
+      <label os-check
+        ><input
+          os-checkbox
+          type="checkbox"
+          [ngModel]="onlyReview()"
+          (ngModelChange)="onlyReview.set($event)"
+        />
         Needs review</label
       >
     </div>
@@ -64,30 +70,41 @@ import { Icon } from '../shared/icon';
         <p class="full" style="margin:0">
           <strong>New project in {{ session.org()?.name }}</strong>
         </p>
-        <label class="grow"
-          >Name <input name="name" [(ngModel)]="draft.name" required placeholder="Customer Portal"
-        /></label>
-        <label
-          >Slug
-          <input name="slug" class="mono" [(ngModel)]="draft.slug" placeholder="customer-portal"
-        /></label>
-        <label class="full"
-          >Repository <span class="quiet">(optional, the git remote URL)</span>
-          <input
+        <os-field label="Name" class="grow"
+          ><input
+            os-input
+            name="name"
+            [(ngModel)]="draft.name"
+            required
+            placeholder="Customer Portal"
+        /></os-field>
+        <os-field label="Slug"
+          ><input
+            os-input
+            name="slug"
+            class="mono"
+            [(ngModel)]="draft.slug"
+            placeholder="customer-portal"
+        /></os-field>
+        <label class="os-field full"
+          ><span class="os-label"
+            >Repository <span class="quiet">(optional, the git remote URL)</span></span
+          ><input
+            os-input
             name="remote"
             class="mono"
             [(ngModel)]="draft.remote_url"
             placeholder="https://dev.azure.com/org/project/_git/repo"
         /></label>
-        <label class="full"
-          >Purpose
+        <os-field label="Purpose" class="full">
           <textarea
+            os-textarea
             name="purpose"
             rows="3"
             [(ngModel)]="draft.purpose"
             placeholder="What it does, who uses it, and what good looks like."
           ></textarea>
-        </label>
+        </os-field>
         <div class="form-actions full">
           <button os-button variant="primary" type="submit" [disabled]="!draft.name.trim()">
             Create project
