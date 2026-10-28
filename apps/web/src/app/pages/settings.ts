@@ -17,8 +17,7 @@ import {
   ConfirmDialog,
   Control,
   Field,
-  Callout,
-} from '@openstuff-dev/ui-angular';
+  Callout, PageHeader } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Organization, TokenRow } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -74,6 +73,7 @@ organization, the project and the part of the code you are in (a repository or a
 @Component({
   selector: 'app-settings',
   imports: [
+    PageHeader,
     Callout,
     FormsModule,
     DatePipe,
@@ -93,9 +93,7 @@ organization, the project and the part of the code you are in (a repository or a
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <header class="page-head">
-      <h1>Settings</h1>
-    </header>
+    <header os-page-header title="Settings"></header>
 
     <div class="settings">
       <nav class="settings-nav" aria-label="Settings">

@@ -15,20 +15,24 @@ import { ScopeList } from '../shared/scope-list';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (session.group(); as g) {
-      <header class="page-head">
-        <div class="title-row">
-          <span class="badge group" style="width:2.25rem;height:2.25rem;font-size:0.8rem">{{
-            initials(g.name)
-          }}</span>
-          <h1>{{ g.name }}</h1>
+      <header class="os-page-header">
+        <div>
+          <div class="title-row">
+            <span class="badge group" style="width:2.25rem;height:2.25rem;font-size:0.8rem">{{
+              initials(g.name)
+            }}</span>
+            <h1 class="os-page-title">{{ g.name }}</h1>
+          </div>
+          <p class="os-page-description">
+            Rules here reach every agent in every organization, before any organization or project
+            rules.
+          </p>
+        </div>
+        <div class="os-page-actions">
           @if (g.can_admin) {
             <a os-button routerLink="/settings/group"><app-icon name="settings" />Manage</a>
           }
         </div>
-        <p class="lede">
-          Rules here reach every agent in every organization, before any organization or project
-          rules.
-        </p>
       </header>
 
       <section class="block">

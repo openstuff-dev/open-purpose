@@ -18,8 +18,7 @@ import {
   Control,
   Field,
   Callout,
-  EmptyState,
-} from '@openstuff-dev/ui-angular';
+  EmptyState, Breadcrumbs } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import {
   KIND_LABEL,
@@ -50,6 +49,7 @@ interface Draft {
 @Component({
   selector: 'app-document',
   imports: [
+    Breadcrumbs,
     EmptyState,
     Callout,
     FormsModule,
@@ -71,106 +71,114 @@ interface Draft {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (doc(); as d) {
-      <header class="page-head doc-head">
-        <nav class="crumbs" aria-label="Breadcrumb">
-          @if (session.groupShown() || !d.organization) {
-            <a routerLink="/group">{{ session.group()?.name }}</a>
-          }
-          @if (d.organization; as o) {
-            <a routerLink="/organization">{{ o.name }}</a>
-          }
-          @if (d.project; as p) {
-            <a [routerLink]="['/projects', p.id]">{{ p.name }}</a>
-          }
-          @if (d.scope; as s) {
-            <a [routerLink]="['/scopes', s.id]">{{ s.name }}</a>
-          }
-        </nav>
-        @if (editingTitle()) {
-          <form class="title-form" (ngSubmit)="saveTitle()">
-            <input
-              os-input
-              name="title"
-              [(ngModel)]="titleDraft"
-              aria-label="Document title"
-              required
-            />
-            <button os-button variant="primary" type="submit">Save</button>
-            <button os-button type="button" (click)="editingTitle.set(false)">Cancel</button>
-          </form>
-        } @else {
-          <div class="title-row">
-            <h1>{{ d.title }}</h1>
-            @if (d.can_edit) {
-              <button
-                os-button
-                type="button"
-                (click)="titleDraft = d.title; editingTitle.set(true)"
-              >
-                <app-icon name="pencil" />Rename
-              </button>
-              <button
-                os-button
-                variant="danger"
-                type="button"
-                (click)="removeDoc()"
-                aria-label="Delete document"
-              >
-                <app-icon name="trash" />
-              </button>
-            }
-          </div>
-        }
-        <p class="meta">
-          <span os-chip>{{ kindLabel[d.kind] }}</span>
-          <span>{{ where() }}</span>
-          <span
-            >{{ d.sections.length }} {{ d.sections.length === 1 ? 'section' : 'sections' }}</span
-          >
-        </p>
-        @if (d.kind === 'glossary') {
-          <p class="quiet">
-            Each section is one term. Anyone can link to it with <code>[[Term name]]</code>, and it
-            shows up on the map.
-          </p>
-        }
-        <div class="doc-mode">
-          <span>New sections from agents</span>
-          @if (d.can_edit) {
-            <app-mode-picker
-              [mode]="d.mode"
-              (changed)="setDocMode($event)"
-              label="What agents may do when adding sections"
-            />
+      <header class="os-page-header doc-head">
+        <div>
+          <nav os-breadcrumbs>
+            <ol>
+              @if (session.groupShown() || !d.organization) {
+                <li>
+                  <a routerLink="/group">{{ session.group()?.name }}</a>
+                </li>
+              }
+              @if (d.organization; as o) {
+                <li>
+                  <a routerLink="/organization">{{ o.name }}</a>
+                </li>
+              }
+              @if (d.project; as p) {
+                <li>
+                  <a [routerLink]="['/projects', p.id]">{{ p.name }}</a>
+                </li>
+              }
+              @if (d.scope; as s) {
+                <li>
+                  <a [routerLink]="['/scopes', s.id]">{{ s.name }}</a>
+                </li>
+              }
+            </ol>
+          </nav>
+          @if (editingTitle()) {
+            <form class="title-form" (ngSubmit)="saveTitle()">
+              <input
+                os-input
+                name="title"
+                [(ngModel)]="titleDraft"
+                aria-label="Document title"
+                required
+              />
+              <button os-button variant="primary" type="submit">Save</button>
+              <button os-button type="button" (click)="editingTitle.set(false)">Cancel</button>
+            </form>
           } @else {
-            <app-mode-badge [mode]="d.mode" />
+            <h1 class="os-page-title">{{ d.title }}</h1>
           }
-          <span class="quiet">{{ modeHelp[d.mode] }}</span>
-        </div>
-        @if (d.disabled_at) {
-          <os-callout tone="neutral" title="Disabled" role="status">
-            Agents don't get this document, so it costs no tokens. People can still read and edit
-            it.
-            @if (d.can_edit) {
-              <button os-button os-actions type="button" (click)="setDisabled(false)">
-                Enable
-              </button>
-            }
-          </os-callout>
-        } @else if (d.staleness) {
-          <os-callout tone="warning" role="status">
-            <p>
-              Agents haven't requested this document in the last
-              {{ d.staleness === 'month' ? 'month' : 'week' }}. Disable it to stop sending it to
-              agents and save tokens. You can turn it back on at any time.
+          <p class="meta">
+            <span os-chip>{{ kindLabel[d.kind] }}</span>
+            <span>{{ where() }}</span>
+            <span
+              >{{ d.sections.length }} {{ d.sections.length === 1 ? 'section' : 'sections' }}</span
+            >
+          </p>
+          @if (d.kind === 'glossary') {
+            <p class="quiet">
+              Each section is one term. Anyone can link to it with <code>[[Term name]]</code>, and
+              it shows up on the map.
             </p>
+          }
+          <div class="doc-mode">
+            <span>New sections from agents</span>
             @if (d.can_edit) {
-              <button os-button os-actions type="button" (click)="setDisabled(true)">
-                <app-icon name="eye-off" />Disable document
-              </button>
+              <app-mode-picker
+                [mode]="d.mode"
+                (changed)="setDocMode($event)"
+                label="What agents may do when adding sections"
+              />
+            } @else {
+              <app-mode-badge [mode]="d.mode" />
             }
-          </os-callout>
-        }
+            <span class="quiet">{{ modeHelp[d.mode] }}</span>
+          </div>
+          @if (d.disabled_at) {
+            <os-callout tone="neutral" title="Disabled" role="status">
+              Agents don't get this document, so it costs no tokens. People can still read and edit
+              it.
+              @if (d.can_edit) {
+                <button os-button os-actions type="button" (click)="setDisabled(false)">
+                  Enable
+                </button>
+              }
+            </os-callout>
+          } @else if (d.staleness) {
+            <os-callout tone="warning" role="status">
+              <p>
+                Agents haven't requested this document in the last
+                {{ d.staleness === 'month' ? 'month' : 'week' }}. Disable it to stop sending it to
+                agents and save tokens. You can turn it back on at any time.
+              </p>
+              @if (d.can_edit) {
+                <button os-button os-actions type="button" (click)="setDisabled(true)">
+                  <app-icon name="eye-off" />Disable document
+                </button>
+              }
+            </os-callout>
+          }
+        </div>
+        <div class="os-page-actions">
+          @if (d.can_edit && !editingTitle()) {
+            <button os-button type="button" (click)="titleDraft = d.title; editingTitle.set(true)">
+              <app-icon name="pencil" />Rename
+            </button>
+            <button
+              os-button
+              variant="danger"
+              type="button"
+              (click)="removeDoc()"
+              aria-label="Delete document"
+            >
+              <app-icon name="trash" />
+            </button>
+          }
+        </div>
       </header>
 
       <div class="sections-head">

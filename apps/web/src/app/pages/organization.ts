@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Badge, Button, SegmentedControl, EmptyState } from '@openstuff-dev/ui-angular';
+import { Badge, Button, SegmentedControl, EmptyState, Breadcrumbs } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type {
   ActivityFigure as Figure,
@@ -37,6 +37,7 @@ function readPeriod(): ActivityPeriod {
 @Component({
   selector: 'app-organization',
   imports: [
+    Breadcrumbs,
     EmptyState,
     DocList,
     ScopeList,
@@ -51,20 +52,37 @@ function readPeriod(): ActivityPeriod {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (session.org(); as org) {
-      <header class="page-head">
-        @if (session.groupShown()) {
-          <nav class="crumbs" aria-label="Breadcrumb">
-            <a routerLink="/group">{{ session.group()?.name }}</a>
-          </nav>
-        }
-        <div class="title-row">
-          <span
-            class="badge"
-            style="width:2.25rem;height:2.25rem;font-size:0.8rem"
-            [style.background]="session.orgColor(org.id)"
-            >{{ initials(org.name) }}</span
-          >
-          <h1>{{ org.name }}</h1>
+      <header class="os-page-header">
+        <div>
+          @if (session.groupShown()) {
+            <nav os-breadcrumbs>
+              <ol>
+                <li>
+                  <a routerLink="/group">{{ session.group()?.name }}</a>
+                </li>
+              </ol>
+            </nav>
+          }
+          <div class="title-row">
+            <span
+              class="badge"
+              style="width:2.25rem;height:2.25rem;font-size:0.8rem"
+              [style.background]="session.orgColor(org.id)"
+              >{{ initials(org.name) }}</span
+            >
+            <h1 class="os-page-title">{{ org.name }}</h1>
+          </div>
+          <p class="os-page-description">
+            {{
+              org.summary ||
+                'Rules here reach every agent in ' +
+                  org.name +
+                  (session.groupShown() ? ', after the group rules and' : ',') +
+                  ' before project rules.'
+            }}
+          </p>
+        </div>
+        <div class="os-page-actions">
           @if (session.canAdmin(org.id)) {
             <a os-button routerLink="/settings/group"><app-icon name="settings" />Manage</a>
           }
@@ -74,15 +92,6 @@ function readPeriod(): ActivityPeriod {
             >
           }
         </div>
-        <p class="lede">
-          {{
-            org.summary ||
-              'Rules here reach every agent in ' +
-                org.name +
-                (session.groupShown() ? ', after the group rules and' : ',') +
-                ' before project rules.'
-          }}
-        </p>
       </header>
 
       <section class="block activity" aria-labelledby="activity-h">
@@ -266,13 +275,15 @@ function readPeriod(): ActivityPeriod {
         />
       </section>
     } @else {
-      <header class="page-head">
-        <h1>Choose an organization</h1>
-        <p class="lede">
-          Pick one in the switcher at the top of the menu, or start from
-          <a routerLink="/group">{{ session.group()?.name }}</a
-          >.
-        </p>
+      <header class="os-page-header">
+        <div>
+          <h1 class="os-page-title">Choose an organization</h1>
+          <p class="os-page-description">
+            Pick one in the switcher at the top of the menu, or start from
+            <a routerLink="/group">{{ session.group()?.name }}</a
+            >.
+          </p>
+        </div>
       </header>
     }
   `,

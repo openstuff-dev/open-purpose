@@ -85,11 +85,11 @@ body {
   text-rendering: optimizeLegibility;
 }
 /* Not on buttons: unlayered rules win over @openstuff-dev/ui's layers. */
-a:not(:where(.os-button, .os-tab, .os-menu-item)) {
+a:not(:where(.os-button, .os-tab, .os-menu-item, .os-breadcrumbs a)) {
   color: var(--accent-text);
   text-decoration: none;
 }
-a:not(:where(.os-button, .os-tab, .os-menu-item)):hover {
+a:not(:where(.os-button, .os-tab, .os-menu-item, .os-breadcrumbs a)):hover {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -108,7 +108,8 @@ h4 {
   color: var(--ink);
   line-height: 1.25;
 }
-h1 {
+/* Not the toolkit's page title, which sets its own size. */
+h1:not(:where(.os-page-title)) {
   font-size: var(--fs-xl);
   font-weight: 600;
   letter-spacing: -0.025em;
@@ -123,7 +124,7 @@ h3 {
   font-weight: 600;
 }
 /* Not the toolkit's own paragraphs: its components space them. */
-p:not(:where(.os-callout-title, .os-toast-message, .os-empty-state > p)) {
+p:not(:where(.os-callout-title, .os-toast-message, .os-empty-state > p, .os-page-description)) {
   margin: 0.5rem 0;
 }
 /* A callout's text starts and ends flush with its icon and actions. */
@@ -580,14 +581,15 @@ kbd {
 }
 
 /* ─── Page structure ─── */
-.page-head {
+.os-page-header {
   margin-bottom: 2rem;
-  display: grid;
-  gap: 0.35rem;
-  justify-items: start;
 }
-.page-head h1 + .os-button[data-variant='link'] {
-  margin-top: -0.1rem;
+/* A header with more under the title (a callout, a mode picker) keeps its buttons at the top. */
+.os-page-header:is(.project-head, .doc-head) {
+  align-items: start;
+}
+.os-page-description {
+  white-space: pre-line;
 }
 .title-row {
   display: flex;
@@ -595,17 +597,6 @@ kbd {
   align-items: center;
   gap: 0.75rem 1rem;
   width: 100%;
-}
-.title-row h1 {
-  margin-right: auto;
-}
-.lede {
-  font-size: var(--fs-md);
-  max-width: 62ch;
-  color: var(--muted);
-  margin: 0;
-  line-height: 1.5;
-  white-space: pre-line;
 }
 .multiline {
   white-space: pre-line;
@@ -624,26 +615,6 @@ kbd {
   background: var(--sunken);
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
-}
-.crumbs {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: var(--fs-sm);
-  margin-bottom: 0.35rem;
-}
-.crumbs a {
-  color: var(--muted);
-}
-.crumbs a:hover {
-  color: var(--ink);
-}
-.crumbs a + a::before {
-  content: '/';
-  color: var(--faint);
-  margin-right: 0.35rem;
-  display: inline-block;
 }
 .block {
   margin: 0 0 2.5rem;
@@ -1047,7 +1018,7 @@ pre {
 }
 
 /* ─── Document reading ─── */
-.doc-head h1 {
+.doc-head .os-page-title {
   font-size: var(--fs-2xl);
   letter-spacing: -0.03em;
 }
@@ -3462,7 +3433,7 @@ mark {
 }
 
 /* ---------- Project page: layer path, tabs, panels ---------- */
-.project-head {
+.os-page-header.project-head {
   margin-bottom: 1.25rem;
 }
 .layer-path {
