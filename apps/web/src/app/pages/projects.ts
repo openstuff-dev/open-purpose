@@ -10,8 +10,7 @@ import {
   ConfirmDialog,
   Control,
   Field,
-  EmptyState,
-} from '@openstuff-dev/ui-angular';
+  EmptyState, PageHeader } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Project } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -21,6 +20,7 @@ import { Icon } from '../shared/icon';
 @Component({
   selector: 'app-projects',
   imports: [
+    PageHeader,
     RouterLink,
     FormsModule,
     Icon,
@@ -35,19 +35,16 @@ import { Icon } from '../shared/icon';
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <header class="page-head">
-      <div class="title-row">
-        <h1>Projects</h1>
-        @if (session.org() && session.canEdit(session.orgId())) {
-          <button os-button variant="primary" type="button" (click)="adding.set(!adding())">
-            <app-icon name="plus" />New project
-          </button>
-        }
-      </div>
-      <p class="lede">
-        A project is one product. It can span several repositories, such as a frontend repo and an
-        API repo.
-      </p>
+    <header
+      os-page-header
+      title="Projects"
+      description="A project is one product. It can span several repositories, such as a frontend repo and an API repo."
+    >
+      @if (session.org() && session.canEdit(session.orgId())) {
+        <button os-button variant="primary" type="button" (click)="adding.set(!adding())">
+          <app-icon name="plus" />New project
+        </button>
+      }
     </header>
 
     <div class="os-tab-list list-tabs" role="tablist" aria-label="Which organizations">

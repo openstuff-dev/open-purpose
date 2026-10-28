@@ -23,8 +23,7 @@ import {
   Field,
   IconButton,
   StatusDot,
-  type Tone,
-} from '@openstuff-dev/ui-angular';
+  type Tone, PageHeader } from '@openstuff-dev/ui-angular';
 import { DialogTitle, Drawer, SegmentedControl } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import {
@@ -119,6 +118,7 @@ function ago(iso: string): string {
 @Component({
   selector: 'app-inbox',
   imports: [
+    PageHeader,
     FormsModule,
     RouterLink,
     DatePipe,
@@ -145,13 +145,11 @@ function ago(iso: string): string {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)', class: 'wide-page' },
   template: `
-    <header class="page-head">
-      <h1>Inbox</h1>
-      <p class="lede">
-        What agents learned from corrections, and changes they want to make to rules. Nothing here
-        reaches other agents until someone approves it.
-      </p>
-    </header>
+    <header
+      os-page-header
+      title="Inbox"
+      description="What agents learned from corrections, and changes they want to make to rules. Nothing here reaches other agents until someone approves it."
+    ></header>
 
     <div class="inbox-bar">
       <!-- The toolkit's segmented look, with a count after each label. -->

@@ -118,15 +118,15 @@ html.agent-mode h3 {
   letter-spacing: 0;
   font-weight: 600;
 }
-html.agent-mode .page-head h1,
+html.agent-mode .os-page-title,
 html.agent-mode .drawer-title {
   text-shadow: 0 0 12px color-mix(in srgb, var(--agent) 35%, transparent);
 }
-html.agent-mode .page-head h1::before {
+html.agent-mode .os-page-title::before {
   content: '> ';
   color: var(--agent);
 }
-html.agent-mode .page-head h1::after {
+html.agent-mode .os-page-title::after {
   content: '_';
   color: var(--agent);
   margin-left: 0.1em;
@@ -153,7 +153,7 @@ html.agent-mode .os-data-table th {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  html.agent-mode .page-head h1::after {
+  html.agent-mode .os-page-title::after {
     animation: none;
   }
 }

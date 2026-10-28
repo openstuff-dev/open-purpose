@@ -20,8 +20,7 @@ import {
   Drawer,
   IconButton,
   StatusDot,
-  type Tone,
-} from '@openstuff-dev/ui-angular';
+  type Tone, PageHeader } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Finding, FindingCounts, FindingStatus } from '../core/models';
 import { Session } from '../core/session';
@@ -80,6 +79,7 @@ function lines(f: Finding): string {
 @Component({
   selector: 'app-findings',
   imports: [
+    PageHeader,
     FormsModule,
     RouterLink,
     DatePipe,
@@ -95,14 +95,11 @@ function lines(f: Finding): string {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)', class: 'wide-page' },
   template: `
-    <header class="page-head">
-      <h1>Findings</h1>
-      <p class="lede">
-        Problems agents noticed outside their task and didn't fix. Mark the ones worth fixing as to
-        do, and agents can pick them up when you ask. Solved and dismissed ones are hidden unless
-        you turn them on.
-      </p>
-    </header>
+    <header
+      os-page-header
+      title="Findings"
+      description="Problems agents noticed outside their task and didn't fix. Mark the ones worth fixing as to do, and agents can pick them up when you ask. Solved and dismissed ones are hidden unless you turn them on."
+    ></header>
 
     <div class="inbox-bar">
       <!-- Several can be on at once, so checkboxes in the toolkit's segmented look. -->

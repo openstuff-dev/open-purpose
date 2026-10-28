@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Button, Chip, ConfirmDialog, Control, Field } from '@openstuff-dev/ui-angular';
+import { Button, Chip, ConfirmDialog, Control, Field, Breadcrumbs } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Repository, ScopeDetail } from '../core/models';
 import { Session, provideHere } from '../core/session';
@@ -15,6 +15,7 @@ import { SlugRenameField } from '../shared/slug-rename';
 @Component({
   selector: 'app-scope',
   imports: [
+    Breadcrumbs,
     DocList,
     FormsModule,
     RouterLink,
@@ -29,29 +30,39 @@ import { SlugRenameField } from '../shared/slug-rename';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (scope(); as s) {
-      <header class="page-head">
-        <nav class="crumbs" aria-label="Breadcrumb">
-          @if (session.groupShown()) {
-            <a routerLink="/group">{{ session.group()?.name }}</a>
-          }
-          @if (s.organization; as o) {
-            <a routerLink="/organization">{{ o.name }}</a>
-          }
-          @if (s.project; as p) {
-            <a [routerLink]="['/projects', p.id]">{{ p.name }}</a>
-          }
-        </nav>
-        <h1>{{ s.name }}</h1>
-        <p class="lede">
-          {{
-            s.description ||
-              (s.project
-                ? 'Rules for one part of ' + s.project.name + '.'
-                : s.organization
-                  ? 'Rules for a kind of code across ' + s.organization.name + '.'
-                  : 'Rules for a kind of code in every organization.')
-          }}
-        </p>
+      <header class="os-page-header">
+        <div>
+          <nav os-breadcrumbs>
+            <ol>
+              @if (session.groupShown()) {
+                <li>
+                  <a routerLink="/group">{{ session.group()?.name }}</a>
+                </li>
+              }
+              @if (s.organization; as o) {
+                <li>
+                  <a routerLink="/organization">{{ o.name }}</a>
+                </li>
+              }
+              @if (s.project; as p) {
+                <li>
+                  <a [routerLink]="['/projects', p.id]">{{ p.name }}</a>
+                </li>
+              }
+            </ol>
+          </nav>
+          <h1 class="os-page-title">{{ s.name }}</h1>
+          <p class="os-page-description">
+            {{
+              s.description ||
+                (s.project
+                  ? 'Rules for one part of ' + s.project.name + '.'
+                  : s.organization
+                    ? 'Rules for a kind of code across ' + s.organization.name + '.'
+                    : 'Rules for a kind of code in every organization.')
+            }}
+          </p>
+        </div>
       </header>
 
       <section class="block">

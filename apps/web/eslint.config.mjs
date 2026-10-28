@@ -39,6 +39,10 @@ const replaced = [
     message: 'Use <os-callout> or <os-empty-state> from @openstuff-dev/ui-angular, or Notices (shown with the Toaster), instead of .callout, .doc-notice, .empty or .notice.',
   },
   {
+    pattern: String.raw`class="([^"]*\s)?(page-head|lede|crumbs)[\s"]`,
+    message: 'Use <header os-page-header> (or .os-page-header with .os-page-title and .os-page-description) and <nav os-breadcrumbs> from @openstuff-dev/ui-angular instead of .page-head, .lede or .crumbs.',
+  },
+  {
     pattern: String.raw`role="dialog"`,
     message: 'Use <dialog os-dialog> or <dialog os-drawer> from @openstuff-dev/ui-angular instead of an element with role="dialog".',
   },

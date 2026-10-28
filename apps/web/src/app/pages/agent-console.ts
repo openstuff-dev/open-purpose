@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { Button, Control, Field, SegmentedControl, EmptyState } from '@openstuff-dev/ui-angular';
+import { Button, Control, Field, SegmentedControl, EmptyState, PageHeader } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Project } from '../core/models';
 import { Session } from '../core/session';
@@ -91,16 +91,14 @@ function followUps(call: {
  */
 @Component({
   selector: 'app-agent-console',
-  imports: [EmptyState, FormsModule, MarkdownView, Button, Field, Control, SegmentedControl],
+  imports: [PageHeader, EmptyState, FormsModule, MarkdownView, Button, Field, Control, SegmentedControl],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <header class="page-head">
-      <h1>What an agent in {{ session.org()?.name }} sees</h1>
-      <p class="quiet">
-        Ask like an agent would. Each answer below is the MCP tool's output, word for word. Write
-        tools aren't available here.
-      </p>
-    </header>
+    <header
+      os-page-header
+      [title]="'What an agent in ' + (session.org()?.name ?? '') + ' sees'"
+      description="Ask like an agent would. Each answer below is the MCP tool's output, word for word. Write tools aren't available here."
+    ></header>
 
     <form class="inline-form panel console-form" (ngSubmit)="getContext()">
       <os-field label="Project"

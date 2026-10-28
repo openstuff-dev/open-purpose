@@ -1,3 +1,4 @@
+import { PageHeader } from '@openstuff-dev/ui-angular';
 import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Api } from '../core/api';
@@ -6,25 +7,24 @@ import { Session } from '../core/session';
 /** Resolves a [[wikilink]] and redirects to the project or term. */
 @Component({
   selector: 'app-go',
-  imports: [RouterLink],
+  imports: [PageHeader, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (restricted(); as r) {
-      <header class="page-head">
-        <h1>{{ r.name }}</h1>
-        <p class="lede">
-          This belongs to {{ r.org }}, which you can't read. A group admin can share it with your
-          organization.
-        </p>
-      </header>
+      <header
+        os-page-header
+        [title]="r.name"
+        description="This belongs to {{
+          r.org
+        }}, which you can't read. A group admin can share it with your organization."
+      ></header>
       <p><a routerLink="/group">See who can read what</a></p>
     } @else if (missing()) {
-      <header class="page-head">
-        <h1>“{{ missing() }}” does not exist yet</h1>
-        <p class="lede">
-          Something links here, but there is no project or glossary term with that name.
-        </p>
-      </header>
+      <header
+        os-page-header
+        [title]="'“' + missing() + '” does not exist yet'"
+        description="Something links here, but there is no project or glossary term with that name."
+      ></header>
       <p>
         Create a project with this name on the <a routerLink="/projects">Projects</a> page, or add
         it as a term to a Glossary document. The link starts working right away. To point into

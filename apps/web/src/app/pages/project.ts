@@ -17,8 +17,7 @@ import {
   Control,
   Field,
   Callout,
-  EmptyState,
-} from '@openstuff-dev/ui-angular';
+  EmptyState, Breadcrumbs } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Graph, GraphNode, LinkRef, ProjectDetail } from '../core/models';
 import { Session, provideHere } from '../core/session';
@@ -50,6 +49,7 @@ const TABS: Tab[] = [
 @Component({
   selector: 'app-project',
   imports: [
+    Breadcrumbs,
     EmptyState,
     Callout,
     DocList,
@@ -69,21 +69,53 @@ const TABS: Tab[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (project(); as p) {
-      <header class="page-head project-head">
-        <nav class="crumbs" aria-label="Breadcrumb">
-          @if (session.groupShown()) {
-            <a routerLink="/group">{{ session.group()?.name }}</a>
+      <header class="os-page-header project-head">
+        <div>
+          <nav os-breadcrumbs>
+            <ol>
+              @if (session.groupShown()) {
+                <li>
+                  <a routerLink="/group">{{ session.group()?.name }}</a>
+                </li>
+              }
+              <li>
+                <a routerLink="/organization" (click)="openOrg(p.organization.id, $event)">{{
+                  p.organization.name
+                }}</a>
+              </li>
+              <li><a routerLink="/projects">Projects</a></li>
+            </ol>
+          </nav>
+          <div class="title-row">
+            <h1 class="os-page-title">{{ p.name }}</h1>
+            @if (p.archived_at) {
+              <span os-badge>Archived</span>
+            }
+          </div>
+          <p class="os-page-description">{{ p.summary || 'No summary yet.' }}</p>
+          <p class="meta">
+            <code>{{ p.organization.slug }}/{{ p.slug }}</code>
+          </p>
+          @if (!p.reviewed) {
+            <os-callout tone="brand">
+              <p>
+                An agent created this project. Check the name and purpose, then mark it reviewed.
+              </p>
+              @if (p.can_edit) {
+                <button
+                  os-button
+                  os-actions
+                  variant="primary"
+                  type="button"
+                  (click)="markReviewed()"
+                >
+                  Mark reviewed
+                </button>
+              }
+            </os-callout>
           }
-          <a routerLink="/organization" (click)="openOrg(p.organization.id, $event)">{{
-            p.organization.name
-          }}</a>
-          <a routerLink="/projects">Projects</a>
-        </nav>
-        <div class="title-row">
-          <h1>{{ p.name }}</h1>
-          @if (p.archived_at) {
-            <span os-badge>Archived</span>
-          }
+        </div>
+        <div class="os-page-actions">
           <a os-button [routerLink]="['/map']" [queryParams]="{ focus: p.id }"
             ><app-icon name="map" />Map</a
           >
@@ -93,20 +125,6 @@ const TABS: Tab[] = [
             >
           }
         </div>
-        <p class="lede">{{ p.summary || 'No summary yet.' }}</p>
-        <p class="meta">
-          <code>{{ p.organization.slug }}/{{ p.slug }}</code>
-        </p>
-        @if (!p.reviewed) {
-          <os-callout tone="brand">
-            <p>An agent created this project. Check the name and purpose, then mark it reviewed.</p>
-            @if (p.can_edit) {
-              <button os-button os-actions variant="primary" type="button" (click)="markReviewed()">
-                Mark reviewed
-              </button>
-            }
-          </os-callout>
-        }
       </header>
 
       <ol class="layer-path" aria-label="Where this project's rules sit">
