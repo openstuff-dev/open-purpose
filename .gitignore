@@ -7,3 +7,6 @@ AGENTS.md
 CLAUDE.md
 # Generated files, rebuilt by scripts (e.g. web/scripts/agent-mode-css.mjs)
 *.generated.*
+
+# Working notes that stay on this machine
+OPENSTUFF_HANDOFF.md
