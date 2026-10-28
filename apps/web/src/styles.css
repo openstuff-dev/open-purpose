@@ -2551,25 +2551,10 @@ mark {
   background: var(--surface);
   border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
-  overflow-x: auto;
 }
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--fs-sm);
-}
-.data-table th {
-  text-align: left;
-  font-weight: 500;
-  font-size: var(--fs-xs);
-  color: var(--muted);
-  padding: 0 0.85rem;
-  height: 2.4rem;
-  border-bottom: 1px var(--os-border-style) var(--line);
-  background: var(--ground);
-  white-space: nowrap;
-  position: sticky;
-  top: 0;
+/* Inbox and findings: rows open a drawer, and the columns have fixed widths. */
+.row-table {
+  table-layout: fixed;
 }
 .th-sort {
   background: none;
@@ -2584,42 +2569,23 @@ mark {
 .th-sort:hover {
   color: var(--ink);
 }
-.data-table td {
-  padding: 0.65rem 0.85rem;
-  border-bottom: 1px var(--os-border-style) var(--line);
-  vertical-align: middle;
+.row-table td {
+  overflow: hidden;
 }
-.data-table tbody tr:last-child td {
-  border-bottom: 0;
-}
-.data-table tbody tr {
+.row-table tbody tr[tabindex] {
   cursor: pointer;
-  transition: background 0.1s;
 }
-.data-table tbody tr:hover {
-  background: var(--ground);
+.row-table tbody tr[tabindex]:hover {
+  background: var(--os-bg-hover);
 }
-.data-table tbody tr:focus-visible {
-  outline: 2px solid var(--accent);
+.row-table tbody tr:focus-visible {
   outline-offset: -2px;
-  border-radius: 0;
 }
-.data-table tbody tr.selected {
+.row-table tbody tr[aria-current='true'] {
   background: var(--accent-soft);
 }
-.data-table tbody tr.selected td:first-child {
+.row-table tbody tr[aria-current='true'] td:first-child {
   box-shadow: inset 3px 0 0 var(--accent);
-}
-.data-table .empty-row {
-  cursor: default;
-}
-.data-table .empty-row td {
-  text-align: center;
-  color: var(--muted);
-  padding: 2.5rem 1rem;
-}
-.data-table .empty-row:hover {
-  background: none;
 }
 .cell-main {
   display: flex;
@@ -2631,38 +2597,9 @@ mark {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cell-sub {
-  display: block;
-  font-size: var(--fs-xs);
-  color: var(--muted);
+.row-table .os-cell-sub {
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-top: 0.1rem;
-}
-.col-kind {
-  width: 8.5rem;
-}
-.col-change {
-  min-width: 16rem;
-  max-width: 28rem;
-}
-.col-where {
-  min-width: 11rem;
-  max-width: 16rem;
-}
-.col-from {
-  width: 11rem;
-  white-space: nowrap;
-}
-.col-when {
-  width: 6.5rem;
-  white-space: nowrap;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.col-file {
-  max-width: 12rem;
   white-space: nowrap;
 }
 .col-file code {
@@ -2672,8 +2609,48 @@ mark {
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
 }
-.col-status {
-  width: 6.5rem;
+/* Stacked rows: a cell with a main and a second line keeps both beside its label. */
+@container (inline-size < 36rem) {
+  .row-table td[data-label] {
+    row-gap: 0.1rem;
+  }
+  .row-table td[data-label] > * {
+    grid-column: 2;
+  }
+}
+/* Widths and hidden columns only while it's a table; a narrow container stacks the rows. */
+@container (inline-size >= 36rem) {
+  .row-table .col-where {
+    width: 12.5rem;
+  }
+  .row-table .col-from {
+    width: 10rem;
+    white-space: nowrap;
+  }
+  .row-table .col-when {
+    width: 5.75rem;
+    white-space: nowrap;
+    color: var(--muted);
+  }
+  .row-table .col-file {
+    width: 9rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .row-table .col-status {
+    width: 8.5rem;
+  }
+  @media (max-width: 1100px) {
+    .row-table .col-file {
+      display: none;
+    }
+  }
+  @media (max-width: 820px) {
+    .row-table .col-from,
+    .row-table .col-status {
+      display: none;
+    }
+  }
 }
 .faint {
   color: var(--faint);
@@ -2926,10 +2903,6 @@ mark {
   .search-field {
     max-width: none;
   }
-  .col-file,
-  .col-kind {
-    display: none;
-  }
   .drawer-body,
   .drawer-foot {
     padding-left: 1rem;
@@ -3080,37 +3053,6 @@ mark {
 .main > .wide-page {
   max-width: 84rem;
 }
-.data-table {
-  table-layout: fixed;
-}
-.data-table .col-change {
-  width: auto;
-  min-width: 0;
-  max-width: none;
-}
-.data-table .col-where {
-  width: 14rem;
-  min-width: 0;
-  max-width: none;
-}
-.data-table .col-from {
-  width: 11rem;
-}
-.data-table .col-when {
-  width: 6.5rem;
-}
-.data-table .col-file {
-  width: 10.5rem;
-  max-width: none;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.data-table .col-status {
-  width: 7rem;
-}
-.data-table td {
-  overflow: hidden;
-}
 .change-cell {
   display: flex;
   align-items: center;
@@ -3153,35 +3095,6 @@ mark {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
-}
-@media (max-width: 1100px) {
-  .data-table .col-file {
-    display: none;
-  }
-}
-@media (max-width: 820px) {
-  .data-table .col-from,
-  .data-table .col-status {
-    display: none;
-  }
-  .data-table .col-where {
-    width: 9rem;
-  }
-}
-.data-table .col-where {
-  width: 12.5rem;
-}
-.data-table .col-from {
-  width: 10rem;
-}
-.data-table .col-when {
-  width: 5.75rem;
-}
-.data-table .col-file {
-  width: 9rem;
-}
-.data-table .col-status {
-  width: 8.5rem;
 }
 .change-text .cell-main {
   white-space: normal;

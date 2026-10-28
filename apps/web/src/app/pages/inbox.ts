@@ -214,12 +214,13 @@ function ago(iso: string): string {
       </div>
     </div>
 
-    <div class="table-wrap">
-      <table class="data-table" [attr.aria-busy]="!loaded()">
-        <thead>
-          <tr>
+    <div class="os-data-table table-wrap">
+      <table role="table" class="row-table" [attr.aria-busy]="!loaded()">
+        <thead role="rowgroup">
+          <tr role="row">
             @for (c of columns; track c.key) {
               <th
+                role="columnheader"
                 scope="col"
                 [class]="'col-' + c.key"
                 [attr.aria-sort]="
@@ -234,27 +235,27 @@ function ago(iso: string): string {
                 </button>
               </th>
             }
-            <th scope="col" class="col-file">File</th>
-            <th scope="col" class="col-status">Status</th>
+            <th role="columnheader" scope="col" class="col-file">File</th>
+            <th role="columnheader" scope="col" class="col-status">Status</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup">
           @for (p of rows(); track p.id) {
             <tr
-              [class.selected]="p.id === openId()"
+              role="row"
               (click)="open(p.id)"
               tabindex="0"
               (keydown.enter)="open(p.id)"
-              [attr.aria-selected]="p.id === openId()"
+              [attr.aria-current]="p.id === openId() || null"
             >
-              <td class="col-change">
+              <td role="cell" class="col-change" data-label="Change">
                 <span class="change-cell">
                   <span class="kind-dot" [attr.data-kind]="p.kind" [title]="kind[p.kind].label"
                     ><app-icon [name]="kind[p.kind].icon" [size]="13"
                   /></span>
                   <span class="change-text">
                     <span class="cell-main">{{ p.heading || p.current_heading }}</span>
-                    <span class="cell-sub"
+                    <span class="os-cell-sub"
                       ><span class="kind-word" [attr.data-kind]="p.kind">{{
                         kind[p.kind].label
                       }}</span>
@@ -276,7 +277,7 @@ function ago(iso: string): string {
                   </span>
                 </span>
               </td>
-              <td class="col-where">
+              <td role="cell" class="col-where" data-label="Where">
                 <span class="cell-main"
                   ><i
                     class="dot"
@@ -286,9 +287,9 @@ function ago(iso: string): string {
                   ></i
                   >{{ p.organization_name ?? session.group()?.name }}</span
                 >
-                <span class="cell-sub">{{ whereTail(p) }}</span>
+                <span class="os-cell-sub">{{ whereTail(p) }}</span>
               </td>
-              <td class="col-from">
+              <td role="cell" class="col-from" data-label="From">
                 <span class="who"
                   ><app-icon
                     [name]="p.created_by_kind === 'human' ? 'user' : 'bot'"
@@ -296,17 +297,17 @@ function ago(iso: string): string {
                   />{{ p.created_by_name ?? 'Unknown' }}</span
                 >
               </td>
-              <td class="col-when" [title]="p.created_at | date: 'd MMM y, HH:mm'">
+              <td role="cell" class="col-when" data-label="When" [title]="p.created_at | date: 'd MMM y, HH:mm'">
                 {{ ago(p.created_at) }}
               </td>
-              <td class="col-file">
+              <td role="cell" class="col-file" data-label="File">
                 @if (p.context.path) {
                   <code [title]="p.context.path">{{ shortPath(p.context.path) }}</code>
                 } @else {
                   <span class="faint">—</span>
                 }
               </td>
-              <td class="col-status">
+              <td role="cell" class="col-status" data-label="Status">
                 <span os-status-dot [tone]="statusTone[p.status]">{{ statusLabel[p.status] }}</span>
                 @if (p.awaiting === 'author') {
                   <span
@@ -320,8 +321,8 @@ function ago(iso: string): string {
             </tr>
           } @empty {
             @if (loaded()) {
-              <tr class="empty-row">
-                <td colspan="6">
+              <tr role="row">
+                <td role="cell" class="os-data-table-empty" colspan="6">
                   @if (all().length) {
                     Nothing matches these filters.
                   } @else if (status() === 'pending') {

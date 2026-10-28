@@ -138,12 +138,13 @@ function lines(f: Finding): string {
       </div>
     </div>
 
-    <div class="table-wrap">
-      <table class="data-table" [attr.aria-busy]="!loaded()">
-        <thead>
-          <tr>
+    <div class="os-data-table table-wrap">
+      <table role="table" class="row-table" [attr.aria-busy]="!loaded()">
+        <thead role="rowgroup">
+          <tr role="row">
             @for (c of columns; track c.key) {
               <th
+                role="columnheader"
                 scope="col"
                 [class]="'col-' + c.col"
                 [attr.aria-sort]="
@@ -158,39 +159,39 @@ function lines(f: Finding): string {
                 </button>
               </th>
             }
-            <th scope="col" class="col-from">Reported by</th>
-            <th scope="col" class="col-status">Status</th>
+            <th role="columnheader" scope="col" class="col-from">Reported by</th>
+            <th role="columnheader" scope="col" class="col-status">Status</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup">
           @for (f of rows(); track f.id) {
             <tr
-              [class.selected]="f.id === openId()"
+              role="row"
               (click)="open(f.id)"
               tabindex="0"
               (keydown.enter)="open(f.id)"
-              [attr.aria-selected]="f.id === openId()"
+              [attr.aria-current]="f.id === openId() || null"
             >
-              <td class="col-change">
+              <td role="cell" class="col-change" data-label="Finding">
                 <span class="cell-main">{{ f.title }}</span>
                 @if (f.problem) {
-                  <span class="cell-sub finding-gist">{{ plain(f.problem) }}</span>
+                  <span class="os-cell-sub finding-gist">{{ plain(f.problem) }}</span>
                 }
               </td>
-              <td class="col-file">
+              <td role="cell" class="col-file" data-label="File">
                 <code [title]="f.file + lines(f)">{{ shortPath(f.file) }}{{ lines(f) }}</code>
               </td>
-              <td class="col-where">
+              <td role="cell" class="col-where" data-label="Where">
                 <span class="cell-main"
                   ><i class="dot" [style.background]="session.orgColor(f.organization_id)"></i
                   >{{ f.project_name }}</span
                 >
-                <span class="cell-sub">{{ f.scope_name ?? 'Whole project' }}</span>
+                <span class="os-cell-sub">{{ f.scope_name ?? 'Whole project' }}</span>
               </td>
-              <td class="col-when" [title]="f.created_at | date: 'd MMM y, HH:mm'">
+              <td role="cell" class="col-when" data-label="Reported" [title]="f.created_at | date: 'd MMM y, HH:mm'">
                 {{ ago(f.created_at) }}
               </td>
-              <td class="col-from">
+              <td role="cell" class="col-from" data-label="Reported by">
                 <span class="who"
                   ><app-icon
                     [name]="f.created_by_kind === 'human' ? 'user' : 'bot'"
@@ -198,7 +199,7 @@ function lines(f: Finding): string {
                   />{{ f.created_by_name ?? 'Unknown' }}</span
                 >
               </td>
-              <td class="col-status">
+              <td role="cell" class="col-status" data-label="Status">
                 <span os-status-dot [tone]="tone[f.status]">{{ label[f.status] }}</span>
                 @if (f.status === 'ask_later' && f.remind_after) {
                   <span class="awaiting">From {{ f.remind_after | date: 'd MMM y' }}</span>
@@ -207,8 +208,8 @@ function lines(f: Finding): string {
             </tr>
           } @empty {
             @if (loaded()) {
-              <tr class="empty-row">
-                <td colspan="6">
+              <tr role="row">
+                <td role="cell" class="os-data-table-empty" colspan="6">
                   @if (all().length) {
                     Nothing matches these filters.
                   } @else if (!shown().length) {
