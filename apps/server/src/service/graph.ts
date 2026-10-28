@@ -13,22 +13,55 @@ import type { Graph, GraphEdge, GraphNode, LinkRef, LinkResolution } from '@open
  * points into an organization the viewer can't read shows the target's name
  * only (restricted), never its content.
  */
-export type { Graph, GraphEdge, GraphNode, LinkRef, LinkResolution, NodeType } from '@openpurpose/contracts';
+export type {
+  Graph,
+  GraphEdge,
+  GraphNode,
+  LinkRef,
+  LinkResolution,
+  NodeType,
+} from '@openpurpose/contracts';
 
 export const GROUP_NODE = 'group';
 export const orgNode = (id: string) => `org:${id}`;
 export const projectNode = (id: string) => `project:${id}`;
 export const termNode = (sectionId: string) => `term:${sectionId}`;
 
-interface ProjectRow { id: string; organization_id: string; slug: string; name: string; summary: string; purpose: string | null; aliases: string[] }
-interface TermRow { id: string; heading: string; body: string; organization_id: string | null; project_id: string | null; document_id: string }
+interface ProjectRow {
+  id: string;
+  organization_id: string;
+  slug: string;
+  name: string;
+  summary: string;
+  purpose: string | null;
+  aliases: string[];
+}
+interface TermRow {
+  id: string;
+  heading: string;
+  body: string;
+  organization_id: string | null;
+  project_id: string | null;
+  document_id: string;
+}
 interface LinkRow {
-  section_id: string; heading: string; target_kind: 'project' | 'term' | 'any'; target: string;
-  document_title: string; doc_kind: string; organization_id: string | null; project_id: string | null;
+  section_id: string;
+  heading: string;
+  target_kind: 'project' | 'term' | 'any';
+  target: string;
+  document_title: string;
+  doc_kind: string;
+  organization_id: string | null;
+  project_id: string | null;
 }
 
 function firstLine(text: string, max = 160): string {
-  const line = text.replace(/[_*`#>]/g, '').split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? '';
+  const line =
+    text
+      .replace(/[_*`#>]/g, '')
+      .split('\n')
+      .map((l) => l.trim())
+      .find((l) => l.length > 0) ?? '';
   return line.length > max ? line.slice(0, max - 1) + '…' : line;
 }
 
@@ -43,14 +76,15 @@ class LinkIndex {
     readonly terms: TermRow[],
   ) {
     for (const p of projects) {
-      if (!this.projectsByOrg.has(p.organization_id)) this.projectsByOrg.set(p.organization_id, new Map());
-      const m = this.projectsByOrg.get(p.organization_id)!;
+      const m = this.projectsByOrg.get(p.organization_id) ?? new Map<string, ProjectRow>();
+      this.projectsByOrg.set(p.organization_id, m);
       m.set(p.slug, p);
       m.set(normalizeTarget(p.name), p);
     }
     // Old slugs, after every current slug and name so those win.
     for (const p of projects) {
-      const m = this.projectsByOrg.get(p.organization_id)!;
+      const m = this.projectsByOrg.get(p.organization_id);
+      if (!m) continue;
       for (const old of p.aliases) if (!m.has(old)) m.set(old, p);
     }
     for (const t of terms) {
@@ -64,32 +98,56 @@ class LinkIndex {
     return m?.get(target) ?? m?.get(slugify(target));
   }
 
-  /** Same organization first, then a unique match among readable organizations, then any organization. */
+  /**
+   * Same organization first, then a unique match among readable organizations, then any
+   * organization.
+   */
   private findProject(target: string, fromOrg: string | null): ProjectRow | undefined {
     if (fromOrg) {
       const own = this.projectIn(fromOrg, target);
       if (own) return own;
     }
-    const hits = this.a.orgs.map((o) => this.projectIn(o.id, target)).filter((p): p is ProjectRow => !!p);
+    const hits = this.a.orgs
+      .map((o) => this.projectIn(o.id, target))
+      .filter((p): p is ProjectRow => !!p);
     const readable = hits.filter((p) => this.a.canRead(p.organization_id));
     if (readable.length === 1) return readable[0];
     if (readable.length === 0 && hits.length === 1) return hits[0];
     return undefined;
   }
 
-  /** Same project's glossary, then the organization's, then the group's, then a unique match elsewhere. */
-  private findTerm(target: string, fromOrg: string | null, fromProject: string | null, onlyOrg?: string, exclude?: string): TermRow | undefined {
+  /**
+   * Same project's glossary, then the organization's, then the group's, then a unique match
+   * elsewhere.
+   */
+  private findTerm(
+    target: string,
+    fromOrg: string | null,
+    fromProject: string | null,
+    onlyOrg?: string,
+    exclude?: string,
+  ): TermRow | undefined {
     let c = (this.termsByKey.get(target) ?? []).filter((t) => t.id !== exclude);
     if (onlyOrg) c = c.filter((t) => t.organization_id === onlyOrg);
-    return c.find((t) => fromProject && t.project_id === fromProject)
-      ?? c.find((t) => fromOrg && t.organization_id === fromOrg && !t.project_id)
-      ?? c.find((t) => t.organization_id === null)
-      ?? (c.length === 1 ? c[0] : undefined);
+    return (
+      c.find((t) => fromProject && t.project_id === fromProject) ??
+      c.find((t) => fromOrg && t.organization_id === fromOrg && !t.project_id) ??
+      c.find((t) => t.organization_id === null) ??
+      (c.length === 1 ? c[0] : undefined)
+    );
   }
 
-  /** `exclude`: the linking section itself, so a term that mentions its own name links to the broader definition. */
-  resolve(kind: LinkRow['target_kind'], target: string, fromOrg: string | null, fromProject: string | null, exclude?: string):
-    { type: 'project'; row: ProjectRow } | { type: 'term'; row: TermRow } | null {
+  /**
+   * `exclude`: the linking section itself, so a term that mentions its own name links to the
+   * broader definition.
+   */
+  resolve(
+    kind: LinkRow['target_kind'],
+    target: string,
+    fromOrg: string | null,
+    fromProject: string | null,
+    exclude?: string,
+  ): { type: 'project'; row: ProjectRow } | { type: 'term'; row: TermRow } | null {
     // "github/actions-runner" or "term:github/Pull request"
     const slash = target.indexOf('/');
     if (slash > 0) {
@@ -120,16 +178,16 @@ class LinkIndex {
 
 async function loadIndex(db: Queryable, a: Access, includeArchived: boolean): Promise<LinkIndex> {
   const { rows: projects } = await db.query<ProjectRow>(
-      `SELECT p.id, p.organization_id, p.slug, p.name, p.summary,
+    `SELECT p.id, p.organization_id, p.slug, p.name, p.summary,
               (SELECT s.body FROM documents d JOIN sections s ON s.document_id = d.id
                 WHERE d.project_id = p.id AND d.scope_id IS NULL AND d.kind = 'purpose'
                 ORDER BY d.position, s.position LIMIT 1) AS purpose,
               ARRAY(SELECT x.old_slug FROM slug_aliases x WHERE x.project_id = p.id) AS aliases
          FROM projects p WHERE $1 OR p.archived_at IS NULL`,
-      [includeArchived],
+    [includeArchived],
   );
   const { rows: terms } = await db.query<TermRow>(
-      `SELECT s.id, s.heading, s.body, d.organization_id, d.project_id, d.id AS document_id
+    `SELECT s.id, s.heading, s.body, d.organization_id, d.project_id, d.id AS document_id
          FROM sections s JOIN documents d ON d.id = s.document_id WHERE d.kind = 'glossary'`,
   );
   return new LinkIndex(a, projects, terms);
@@ -142,7 +200,9 @@ export async function linkResolver(db: Queryable, a: Access): Promise<LinkIndex[
 }
 
 export async function buildGraph(
-  db: Queryable, a: Access, opts: { includeMissing?: boolean; includeArchived?: boolean } = {},
+  db: Queryable,
+  a: Access,
+  opts: { includeMissing?: boolean; includeArchived?: boolean } = {},
 ): Promise<Graph> {
   const index = await loadIndex(db, a, opts.includeArchived ?? false);
   const { rows: links } = await db.query<LinkRow>(
@@ -156,29 +216,55 @@ export async function buildGraph(
   const nodes = new Map<string, GraphNode>();
   const orgSlug = (id: string | null) => a.org(id)?.slug ?? null;
   nodes.set(GROUP_NODE, {
-    id: GROUP_NODE, type: 'group', label: a.group.name, slug: null, summary: '',
-    organization_id: null, organization_slug: null, project_id: null, restricted: false,
+    id: GROUP_NODE,
+    type: 'group',
+    label: a.group.name,
+    slug: null,
+    summary: '',
+    organization_id: null,
+    organization_slug: null,
+    project_id: null,
+    restricted: false,
   });
   for (const o of a.orgs) {
     nodes.set(orgNode(o.id), {
-      id: orgNode(o.id), type: 'organization', label: o.name, slug: o.slug, summary: '',
-      organization_id: o.id, organization_slug: o.slug, project_id: null, restricted: !a.canRead(o.id),
+      id: orgNode(o.id),
+      type: 'organization',
+      label: o.name,
+      slug: o.slug,
+      summary: '',
+      organization_id: o.id,
+      organization_slug: o.slug,
+      project_id: null,
+      restricted: !a.canRead(o.id),
     });
   }
   for (const p of index.projects) {
     const restricted = !a.canRead(p.organization_id);
     nodes.set(projectNode(p.id), {
-      id: projectNode(p.id), type: 'project', label: p.name, slug: p.slug,
+      id: projectNode(p.id),
+      type: 'project',
+      label: p.name,
+      slug: p.slug,
       summary: restricted ? '' : p.summary || firstLine(p.purpose ?? ''),
-      organization_id: p.organization_id, organization_slug: orgSlug(p.organization_id), project_id: p.id, restricted,
+      organization_id: p.organization_id,
+      organization_slug: orgSlug(p.organization_id),
+      project_id: p.id,
+      restricted,
     });
   }
   for (const t of index.terms) {
     const restricted = !a.canRead(t.organization_id);
     nodes.set(termNode(t.id), {
-      id: termNode(t.id), type: 'term', label: t.heading, slug: null,
+      id: termNode(t.id),
+      type: 'term',
+      label: t.heading,
+      slug: null,
       summary: restricted ? '' : firstLine(t.body),
-      organization_id: t.organization_id, organization_slug: orgSlug(t.organization_id), project_id: t.project_id, restricted,
+      organization_id: t.organization_id,
+      organization_slug: orgSlug(t.organization_id),
+      project_id: t.project_id,
+      restricted,
     });
   }
 
@@ -198,36 +284,72 @@ export async function buildGraph(
     edges.set(id, e);
   };
 
-  // Who defines each term. Terms in unreadable organizations only appear when something readable links to them.
+  // Who defines each term. Terms in unreadable organizations only appear when something readable
+  // links to them.
   for (const t of index.terms) {
     if (!a.canRead(t.organization_id)) continue;
-    const owner = t.project_id ? projectNode(t.project_id) : t.organization_id ? orgNode(t.organization_id) : GROUP_NODE;
+    const owner = t.project_id
+      ? projectNode(t.project_id)
+      : t.organization_id
+        ? orgNode(t.organization_id)
+        : GROUP_NODE;
     addEdge(owner, termNode(t.id), 'defines');
   }
 
   for (const l of links) {
-    const source = l.doc_kind === 'glossary' ? termNode(l.section_id)
-      : l.project_id ? projectNode(l.project_id)
-      : l.organization_id ? orgNode(l.organization_id) : GROUP_NODE;
-    const location = l.project_id ? nodes.get(projectNode(l.project_id))?.label ?? ''
-      : l.organization_id ? a.org(l.organization_id)?.name ?? '' : a.group.name;
-    const ref: LinkRef = { section_id: l.section_id, heading: l.heading, document_title: l.document_title, location };
-    const hit = index.resolve(l.target_kind, l.target, l.organization_id, l.project_id, l.section_id);
-    let target: string | null = hit ? (hit.type === 'project' ? projectNode(hit.row.id) : termNode(hit.row.id)) : null;
+    const source =
+      l.doc_kind === 'glossary'
+        ? termNode(l.section_id)
+        : l.project_id
+          ? projectNode(l.project_id)
+          : l.organization_id
+            ? orgNode(l.organization_id)
+            : GROUP_NODE;
+    const location = l.project_id
+      ? (nodes.get(projectNode(l.project_id))?.label ?? '')
+      : l.organization_id
+        ? (a.org(l.organization_id)?.name ?? '')
+        : a.group.name;
+    const ref: LinkRef = {
+      section_id: l.section_id,
+      heading: l.heading,
+      document_title: l.document_title,
+      location,
+    };
+    const hit = index.resolve(
+      l.target_kind,
+      l.target,
+      l.organization_id,
+      l.project_id,
+      l.section_id,
+    );
+    let target: string | null = hit
+      ? hit.type === 'project'
+        ? projectNode(hit.row.id)
+        : termNode(hit.row.id)
+      : null;
     if (!target) {
       if (!opts.includeMissing) continue;
       target = `missing:${l.target_kind}:${l.target}`;
       if (!nodes.has(target)) {
         nodes.set(target, {
-          id: target, type: 'missing', label: l.target, slug: null, summary: 'Linked, but not created yet',
-          organization_id: null, organization_slug: null, project_id: null, restricted: false,
+          id: target,
+          type: 'missing',
+          label: l.target,
+          slug: null,
+          summary: 'Linked, but not created yet',
+          organization_id: null,
+          organization_slug: null,
+          project_id: null,
+          restricted: false,
         });
       }
     }
     addEdge(source, target, 'link', ref);
   }
 
-  // Drop nodes nobody can see a reason for: restricted things nothing readable links to, and empty org/group nodes.
+  // Drop nodes nobody can see a reason for: restricted things nothing readable links to, and empty
+  // org/group nodes.
   const used = new Set<string>();
   for (const e of edges.values()) {
     used.add(e.source);
@@ -241,7 +363,12 @@ export async function buildGraph(
   return {
     nodes: keep,
     edges: [...edges.values()],
-    organizations: a.orgs.map((o) => ({ id: o.id, slug: o.slug, name: o.name, readable: a.canRead(o.id) })),
+    organizations: a.orgs.map((o) => ({
+      id: o.id,
+      slug: o.slug,
+      name: o.name,
+      readable: a.canRead(o.id),
+    })),
   };
 }
 
@@ -249,10 +376,12 @@ export async function buildGraph(
 export function focusGraph(graph: Graph, focus: string, depth = 1): Graph {
   const adjacent = new Map<string, Set<string>>();
   for (const e of graph.edges) {
-    if (!adjacent.has(e.source)) adjacent.set(e.source, new Set());
-    if (!adjacent.has(e.target)) adjacent.set(e.target, new Set());
-    adjacent.get(e.source)!.add(e.target);
-    adjacent.get(e.target)!.add(e.source);
+    const from = adjacent.get(e.source) ?? new Set<string>();
+    const to = adjacent.get(e.target) ?? new Set<string>();
+    from.add(e.target);
+    to.add(e.source);
+    adjacent.set(e.source, from);
+    adjacent.set(e.target, to);
   }
   const keep = new Set([focus]);
   let frontier = [focus];
@@ -294,38 +423,63 @@ export async function relatedTo(db: Queryable, a: Access, projectId: string): Pr
   const out: Related[] = [];
   for (const e of graph.edges) {
     if (e.kind !== 'link') continue;
-    const other = e.source === self ? byId.get(e.target) : e.target === self ? byId.get(e.source) : undefined;
+    const other =
+      e.source === self ? byId.get(e.target) : e.target === self ? byId.get(e.source) : undefined;
     if (!other || other.type === 'group' || other.type === 'organization') continue;
     out.push({ node: other, direction: e.source === self ? 'uses' : 'used_by', refs: e.refs });
   }
-  return out.sort((x, y) => x.direction.localeCompare(y.direction) || y.refs.length - x.refs.length);
+  return out.sort(
+    (x, y) => x.direction.localeCompare(y.direction) || y.refs.length - x.refs.length,
+  );
 }
 
 /** Every readable section that links to a node (project or term). */
-export async function backlinks(db: Queryable, a: Access, nodeId: string): Promise<Array<{ source: GraphNode; refs: LinkRef[] }>> {
+export async function backlinks(
+  db: Queryable,
+  a: Access,
+  nodeId: string,
+): Promise<{ source: GraphNode; refs: LinkRef[] }[]> {
   const graph = await buildGraph(db, a);
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
   return graph.edges
-    .filter((e) => e.kind === 'link' && e.target === nodeId && byId.has(e.source))
-    .map((e) => ({ source: byId.get(e.source)!, refs: e.refs }));
+    .filter((e) => e.kind === 'link' && e.target === nodeId)
+    .flatMap((e) => {
+      const source = byId.get(e.source);
+      return source ? [{ source, refs: e.refs }] : [];
+    });
 }
 
 /** Resolve one [[link]] for navigation in the UI, with the same rules as the graph. */
 export async function resolveLink(
-  db: Queryable, a: Access, raw: string, from: { organizationId?: string | null; projectId?: string | null } = {},
+  db: Queryable,
+  a: Access,
+  raw: string,
+  from: { organizationId?: string | null; projectId?: string | null } = {},
 ): Promise<LinkResolution> {
   const index = await loadIndex(db, a, true);
   const prefixed = /^(project|term)\s*:\s*(.+)$/i.exec(raw.split('#')[0].trim());
   const kind = (prefixed ? prefixed[1].toLowerCase() : 'any') as LinkRow['target_kind'];
   const target = normalizeTarget(prefixed ? prefixed[2] : raw.split('#')[0]);
   let fromOrg = from.organizationId ?? null;
-  if (!fromOrg && from.projectId) fromOrg = index.projects.find((p) => p.id === from.projectId)?.organization_id ?? null;
+  if (!fromOrg && from.projectId)
+    fromOrg = index.projects.find((p) => p.id === from.projectId)?.organization_id ?? null;
   const hit = index.resolve(kind, target, fromOrg, from.projectId ?? null);
   if (!hit) return { type: 'missing', target };
   if (hit.type === 'project') {
-    return { type: 'project', id: hit.row.id, slug: hit.row.slug, name: hit.row.name,
-      organization_slug: a.org(hit.row.organization_id)?.slug ?? null, restricted: !a.canRead(hit.row.organization_id) };
+    return {
+      type: 'project',
+      id: hit.row.id,
+      slug: hit.row.slug,
+      name: hit.row.name,
+      organization_slug: a.org(hit.row.organization_id)?.slug ?? null,
+      restricted: !a.canRead(hit.row.organization_id),
+    };
   }
-  return { type: 'term', section_id: hit.row.id, document_id: hit.row.document_id, heading: hit.row.heading,
-    restricted: !a.canRead(hit.row.organization_id) };
+  return {
+    type: 'term',
+    section_id: hit.row.id,
+    document_id: hit.row.document_id,
+    heading: hit.row.heading,
+    restricted: !a.canRead(hit.row.organization_id),
+  };
 }

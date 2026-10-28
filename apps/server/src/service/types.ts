@@ -1,12 +1,26 @@
 import type { DocKind, EditMode, ProposalKind, ProposalStatus } from '@openpurpose/contracts';
 
-export type { DocKind, EditMode, ProposalKind, ProposalStatus, Repository, Scope } from '@openpurpose/contracts';
+export type {
+  DocKind,
+  EditMode,
+  ProposalKind,
+  ProposalStatus,
+  Repository,
+  Scope,
+} from '@openpurpose/contracts';
 
 /** Still being worked on: waiting for a review, or for the author after changes were requested. */
 export const OPEN_STATUSES: ProposalStatus[] = ['pending', 'changes_requested'];
 
 export const EDIT_MODES: EditMode[] = ['locked', 'propose', 'open'];
-export const DOC_KINDS: DocKind[] = ['purpose', 'business_logic', 'glossary', 'guidelines', 'reference', 'learnings'];
+export const DOC_KINDS: DocKind[] = [
+  'purpose',
+  'business_logic',
+  'glossary',
+  'guidelines',
+  'reference',
+  'learnings',
+];
 
 /** Order in which document kinds appear inside one level of the context. */
 export const KIND_ORDER: Record<DocKind, number> = {
@@ -30,7 +44,10 @@ export interface Organization {
   slug: string;
   name: string;
   summary: string;
-  /** Largest get_context, in estimated tokens, before general sections are shortened. null = no limit. */
+  /**
+   * Largest get_context, in estimated tokens, before general sections are shortened. null = no
+   * limit.
+   */
   context_max_tokens: number | null;
   created_at: string;
   archived_at: string | null;

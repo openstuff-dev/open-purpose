@@ -13,7 +13,8 @@
 // ───────────────────────────── vocabulary ─────────────────────────────
 
 export type EditMode = 'locked' | 'propose' | 'open';
-export type DocKind = 'purpose' | 'business_logic' | 'glossary' | 'guidelines' | 'reference' | 'learnings';
+export type DocKind =
+  'purpose' | 'business_logic' | 'glossary' | 'guidelines' | 'reference' | 'learnings';
 export type ProposalKind = 'edit_section' | 'new_section' | 'learning';
 export type ProposalStatus = 'pending' | 'changes_requested' | 'approved' | 'rejected';
 export type ActorKind = 'human' | 'agent';
@@ -51,7 +52,9 @@ export interface Scope {
   description: string;
   path_globs: string[];
   stacks: string[];
-  /** Project scopes only: the repositories it is bound to. Empty = any repository of the project. */
+  /**
+   * Project scopes only: the repositories it is bound to. Empty = any repository of the project.
+   */
   repository_ids: string[];
   position: number;
 }
@@ -207,14 +210,21 @@ export interface GraphEdge {
 export interface Graph {
   nodes: GraphNode[];
   edges: GraphEdge[];
-  organizations: Array<{ id: string; slug: string; name: string; readable: boolean }>;
+  organizations: { id: string; slug: string; name: string; readable: boolean }[];
 }
 
 /** One [[link]] resolved for navigation. */
 export type LinkResolution =
-  | { type: 'project'; id: string; slug: string; name: string; organization_slug: string | null; restricted: boolean }
-  | { type: 'term'; section_id: string; document_id: string; heading: string; restricted: boolean }
-  | { type: 'missing'; target: string };
+  | {
+    type: 'project';
+    id: string;
+    slug: string;
+    name: string;
+    organization_slug: string | null;
+    restricted: boolean;
+  } |
+  { type: 'term'; section_id: string; document_id: string; heading: string; restricted: boolean } |
+  { type: 'missing'; target: string };
 
 // ───────────────────────────── slug renames ─────────────────────────────
 
@@ -244,7 +254,9 @@ export interface SlugRename {
   alias_of: { id: string; name: string; slug: string } | null;
   /** Sections whose links get the new slug (or got it, once applied). */
   rewrite: SlugRenameRef[];
-  /** Sections that use the old slug but the viewer can't edit. They keep working through the alias. */
+  /**
+   * Sections that use the old slug but the viewer can't edit. They keep working through the alias.
+   */
   cannot_edit: SlugRenameRef[];
   /** Repositories mapped to the project(s), whose .openpurpose.json may name the old slug. */
   repositories: number;
@@ -271,19 +283,28 @@ export interface ActivityFigure {
 
 export interface OrgActivity {
   period: ActivityPeriod;
-  /** The days the `daily` arrays cover, as YYYY-MM-DD, oldest first. All time shows the last 53 weeks. */
+  /**
+   * The days the `daily` arrays cover, as YYYY-MM-DD, oldest first. All time shows the last 53
+   * weeks.
+   */
   days: string[];
   /** When the first agent request in the group was recorded; null = none yet. */
   tracking_since: string | null;
   reads: ActivityFigure;
   writes: ActivityFigure;
   /** Top 3 each, most first. Documents include the group-wide ones every organization gets. */
-  most_read_documents: Array<ActivityFigure & { id: string; title: string; where: string }>;
-  most_read_projects: Array<ActivityFigure & { id: string; name: string; slug: string }>;
-  most_written_documents: Array<ActivityFigure & { id: string; title: string; where: string }>;
-  top_writers: Array<ActivityFigure & { id: string; name: string }>;
+  most_read_documents: (ActivityFigure & { id: string; title: string; where: string })[];
+  most_read_projects: (ActivityFigure & { id: string; name: string; slug: string })[];
+  most_written_documents: (ActivityFigure & { id: string; title: string; where: string })[];
+  top_writers: (ActivityFigure & { id: string; name: string })[];
   /** Enabled documents agents stopped requesting: week-stale for 7d, month-stale otherwise. */
-  stale_documents: Array<{ id: string; title: string; where: string; staleness: Staleness; last_read_at: string | null }>;
+  stale_documents: {
+    id: string;
+    title: string;
+    where: string;
+    staleness: Staleness;
+    last_read_at: string | null;
+  }[];
 }
 
 /** How often agents requested one section. */
@@ -329,7 +350,7 @@ export interface ExportFile {
   /** Empty unless `includes.people`. Without people, every actor reference is null. */
   people: ExportPerson[];
   organizations: ExportOrganization[];
-  read_grants: Array<{ reader: string; target: string }>;
+  read_grants: { reader: string; target: string }[];
   projects: ExportProject[];
   api_specs: ExportApiSpec[];
   scopes: ExportScope[];
@@ -356,7 +377,7 @@ export interface ExportPerson {
   name: string;
   kind: ActorKind;
   /** organization null = a role in the group itself. */
-  memberships: Array<{ organization: string | null; role: Role }>;
+  memberships: { organization: string | null; role: Role }[];
 }
 
 export interface ExportOrganization {
@@ -383,7 +404,13 @@ export interface ExportProject {
   updated_at: string;
   archived_at: string | null;
   aliases: string[];
-  repositories: Array<{ key: string; remote_key: string; remote_url: string; created_by: string | null; created_at: string }>;
+  repositories: {
+    key: string;
+    remote_key: string;
+    remote_url: string;
+    created_by: string | null;
+    created_at: string;
+  }[];
 }
 
 export interface ExportApiSpec {
@@ -456,7 +483,7 @@ export interface ExportSection {
   updated_at: string;
   updated_by: string | null;
   /** Every version, oldest first. Empty unless `includes.history`. */
-  versions: Array<{
+  versions: {
     version: number;
     heading: string;
     body: string;
@@ -464,7 +491,7 @@ export interface ExportSection {
     actor: string | null;
     note: string;
     created_at: string;
-  }>;
+  }[];
 }
 
 export interface ExportProposal {
@@ -489,9 +516,22 @@ export interface ExportProposal {
   reviewed_by: string | null;
   reviewed_at: string | null;
   review_note: string;
-  revisions: Array<{ revision: number; heading: string; body: string; note: string; actor: string | null; created_at: string }>;
-  events: Array<{ kind: ReviewEvent['kind']; revision: number; note: string; actor: string | null; created_at: string }>;
-  threads: Array<{
+  revisions: {
+    revision: number;
+    heading: string;
+    body: string;
+    note: string;
+    actor: string | null;
+    created_at: string;
+  }[];
+  events: {
+    kind: ReviewEvent['kind'];
+    revision: number;
+    note: string;
+    actor: string | null;
+    created_at: string;
+  }[];
+  threads: {
     revision: number;
     line_start: number | null;
     line_end: number | null;
@@ -500,15 +540,15 @@ export interface ExportProposal {
     resolved_by: string | null;
     created_by: string | null;
     created_at: string;
-    comments: Array<{
+    comments: {
       actor: string | null;
       body: string;
       suggestion: string | null;
       applied_at: string | null;
       applied_by: string | null;
       created_at: string;
-    }>;
-  }>;
+    }[];
+  }[];
 }
 
 export interface ExportFinding {
@@ -541,12 +581,13 @@ export type ImportChangePolicy = 'propose' | 'file' | 'keep';
 
 /** What to do with one organization of the file. */
 export type ImportOrgChoice =
-  | { action: 'new'; slug?: string }
-  | { action: 'merge'; into: string }
-  | { action: 'skip' };
+  { action: 'new'; slug?: string } | { action: 'merge'; into: string } | { action: 'skip' };
 
 export interface ImportOptions {
-  /** By organization key. Without a choice, an organization is imported as new (left out for non-group-admins). */
+  /**
+   * By organization key. Without a choice, an organization is imported as new (left out for
+   * non-group-admins).
+   */
   organizations?: Record<string, ImportOrgChoice>;
   /** Merge the file's group-wide content into this group's. A new group always gets it. */
   group_content?: boolean;
@@ -554,7 +595,10 @@ export interface ImportOptions {
   changes?: ImportChangePolicy;
   /** Per section, by section key; overrides `changes`. */
   section_changes?: Record<string, ImportChangePolicy>;
-  /** In merged organizations: delete sections, documents and scopes, and archive projects, that aren't in the file. */
+  /**
+   * In merged organizations: delete sections, documents and scopes, and archive projects, that
+   * aren't in the file.
+   */
   remove_missing?: boolean;
 }
 
@@ -574,13 +618,21 @@ export interface ImportChange {
 
 /** What an import does (or, as a preview, would do). */
 export interface ImportReport {
-  /** false when a conflict blocks the import; `organizations` and `group` say which slug to change. */
+  /**
+   * false when a conflict blocks the import; `organizations` and `group` say which slug to change.
+   */
   ok: boolean;
   applied: boolean;
   source: ExportFile['source'] & { exported_at: string };
   /** Set when the file becomes a new group. */
-  group: { id: string | null; name: string; slug: string; conflict: string | null; suggested_slug: string | null } | null;
-  organizations: Array<{
+  group: {
+    id: string | null;
+    name: string;
+    slug: string;
+    conflict: string | null;
+    suggested_slug: string | null;
+  } | null;
+  organizations: {
     key: string;
     name: string;
     /** The slug in the file. */
@@ -589,13 +641,15 @@ export interface ImportReport {
     /** The slug a new organization gets. */
     new_slug: string | null;
     into: { id: string; name: string } | null;
-    /** An organization here that already answers to the file's slug: the natural one to merge into. */
+    /**
+     * An organization here that already answers to the file's slug: the natural one to merge into.
+     */
     existing: { id: string; name: string } | null;
     conflict: string | null;
     suggested_slug: string | null;
     /** Set once applied. */
     id: string | null;
-  }>;
+  }[];
   /** Group-wide content in the file, and whether it is imported. */
   group_content: { documents: number; scopes: number; proposals: number; included: boolean };
   /** New rows. */

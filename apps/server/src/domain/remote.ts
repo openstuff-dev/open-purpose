@@ -66,7 +66,7 @@ function splitRemote(raw: string): { host: string; segments: string[] } {
 }
 
 export function parseRemote(raw: string): RemoteInfo {
-  if (!raw || !raw.trim()) throw new Error('Empty remote URL');
+  if (!raw.trim()) throw new Error('Empty remote URL');
   const { host, segments: rawSegments } = splitRemote(raw);
   const segments = rawSegments.filter((s) => s.length > 0);
 
@@ -77,7 +77,8 @@ export function parseRemote(raw: string): RemoteInfo {
   }
   if (host === 'ssh.dev.azure.com' || host === 'vs-ssh.visualstudio.com') {
     // v3/{org}/{project}/{repo}
-    if (segments[0] === 'v3' && segments.length >= 4) return azure(segments[1], segments[2], segments[3]);
+    if (segments[0] === 'v3' && segments.length >= 4)
+      return azure(segments[1], segments[2], segments[3]);
   }
   const vs = /^([^.]+)\.visualstudio\.com$/.exec(host);
   if (vs) {
@@ -107,12 +108,17 @@ export function tryParseRemote(raw: string | undefined | null): RemoteInfo | nul
 
 /** Suggest a project slug from a repo name, e.g. "Portal.Frontend" -> "portal-frontend". */
 export function slugify(input: string): string {
-  return input
-    .replace(/æ/gi, 'ae').replace(/ø/gi, 'oe').replace(/å/gi, 'aa').replace(/ß/g, 'ss')
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 63) || 'project';
+  return (
+    input
+      .replace(/æ/gi, 'ae')
+      .replace(/ø/gi, 'oe')
+      .replace(/å/gi, 'aa')
+      .replace(/ß/g, 'ss')
+      .normalize('NFKD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 63) || 'project'
+  );
 }

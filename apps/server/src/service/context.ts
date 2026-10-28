@@ -9,7 +9,14 @@ import { relatedTo, type Related } from './graph.js';
 import { apisOfProjects, type ApiSpecMeta } from './apis.js';
 import { findingsNear, type NearbyFindings } from './findings.js';
 import type { Finding } from '@openpurpose/contracts';
-import { KIND_ORDER, type Document, type Level, type Project, type Scope, type Section } from './types.js';
+import {
+  KIND_ORDER,
+  type Document,
+  type Level,
+  type Project,
+  type Scope,
+  type Section,
+} from './types.js';
 
 export interface ContextRequest {
   /** Project slug ("slug" or "org/slug"), e.g. from .openpurpose.json. Wins over remote_url. */
@@ -24,16 +31,19 @@ export interface ContextRequest {
   include_learnings?: boolean;
 }
 
-export type LevelKind = 'group' | 'group-scope' | 'organization' | 'organization-scope' | 'project' | 'project-scope';
+export type LevelKind =
+  'group' | 'group-scope' | 'organization' | 'organization-scope' | 'project' | 'project-scope';
 
 export interface ContextBlock {
   level: LevelKind;
   label: string;
   scope: (Pick<Scope, 'id' | 'slug' | 'name'> & { reason: string }) | null;
-  documents: Array<Pick<Document, 'id' | 'kind' | 'title' | 'mode'> & { sections: ContextSection[] }>;
+  documents: (Pick<Document, 'id' | 'kind' | 'title' | 'mode'> & { sections: ContextSection[] })[];
 }
 
-/** shortened: only the first sentence goes to the agent, to stay within the organization's budget. */
+/**
+ * shortened: only the first sentence goes to the agent, to stay within the organization's budget.
+ */
 export type ContextSection = Section & { shortened?: boolean };
 
 export interface ContextBudget {
@@ -53,7 +63,10 @@ export interface ContextResult {
   resolution: Pick<Resolution, 'via' | 'remote' | 'renamed' | 'suggestions'>;
   path: string;
   stacks: string[];
-  /** Names of repository-bound scopes skipped because remote_url was missing or not one of the project's repositories. */
+  /**
+   * Names of repository-bound scopes skipped because remote_url was missing or not one of the
+   * project's repositories.
+   */
   missed_repository_scopes: string[];
   blocks: ContextBlock[];
   /** Where propose_learning will file a learning for this same request by default. */
@@ -76,14 +89,22 @@ export interface ContextApi extends ApiSpecMeta {
 }
 
 function byKind(a: Document, b: Document): number {
-  return KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.position - b.position || a.title.localeCompare(b.title);
+  return (
+    KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
+    a.position - b.position ||
+    a.title.localeCompare(b.title)
+  );
 }
 
 const SCOPE_COLS = `id, organization_id, project_id, slug, name, description, path_globs, stacks, position,
   ARRAY(SELECT sr.repository_id FROM scope_repositories sr WHERE sr.scope_id = scopes.id) AS repository_ids,
   ARRAY(SELECT x.old_slug FROM slug_aliases x WHERE x.scope_id = scopes.id) AS aliases`;
 
-async function scopesAt(db: Queryable, organizationId: string | null, projectId: string | null): Promise<Scope[]> {
+async function scopesAt(
+  db: Queryable,
+  organizationId: string | null,
+  projectId: string | null,
+): Promise<Scope[]> {
   const { rows } = await db.query<Scope>(
     `SELECT ${SCOPE_COLS} FROM scopes WHERE organization_id IS NOT DISTINCT FROM $1 AND project_id IS NOT DISTINCT FROM $2
       ORDER BY position, name`,
@@ -93,11 +114,17 @@ async function scopesAt(db: Queryable, organizationId: string | null, projectId:
 }
 
 /** The project's repository the agent is working in, when its remote is one of them. */
-async function repositoryOf(db: Queryable, projectId: string, remoteUrl: string | null | undefined): Promise<{ id: string; key: string } | null> {
+async function repositoryOf(
+  db: Queryable,
+  projectId: string,
+  remoteUrl: string | null | undefined,
+): Promise<{ id: string; key: string } | null> {
   const remote = tryParseRemote(remoteUrl);
   if (!remote) return null;
   const { rows } = await db.query<{ id: string; key: string }>(
-    'SELECT id, remote_key AS key FROM repositories WHERE project_id = $1 AND remote_key = $2', [projectId, remote.key]);
+    'SELECT id, remote_key AS key FROM repositories WHERE project_id = $1 AND remote_key = $2',
+    [projectId, remote.key],
+  );
   return rows[0] ?? null;
 }
 
@@ -106,7 +133,9 @@ export interface Matches {
   groupMatches: ScopeMatch<Scope>[];
   orgMatches: ScopeMatch<Scope>[];
   projectMatches: ScopeMatch<Scope>[];
-  /** Scopes bound to repositories that could not apply because the agent's repository is unknown. */
+  /**
+   * Scopes bound to repositories that could not apply because the agent's repository is unknown.
+   */
   missedRepoScopes: string[];
   target: Level & { label: string };
 }
@@ -118,7 +147,10 @@ export interface Matches {
  * default outside any organization; reviewers promote learnings to the group.
  */
 export async function resolveTarget(
-  db: Queryable, a: Access, orgId: string | null, project: Project | null,
+  db: Queryable,
+  a: Access,
+  orgId: string | null,
+  project: Project | null,
   req: Pick<ContextRequest, 'remote_url' | 'path' | 'stacks' | 'manifests' | 'scopes'>,
 ): Promise<Matches> {
   const stacks = normalizeTags([...(req.stacks ?? []), ...detectStacks(req.manifests ?? [])]);
@@ -128,7 +160,9 @@ export async function resolveTarget(
   const repository = project ? await repositoryOf(db, project.id, req.remote_url) : null;
   const projectScopes = project ? await scopesAt(db, project.organization_id, project.id) : [];
   const projectMatches = matchScopes(projectScopes, { ...input, repository });
-  const missedRepoScopes = repository ? [] : projectScopes.filter((s) => s.repository_ids?.length).map((s) => s.name);
+  const missedRepoScopes = repository
+    ? []
+    : projectScopes.filter((s) => s.repository_ids.length).map((s) => s.name);
   const org = a.org(orgId);
   const prefix = org ? `${org.name} › ` : '';
   let target: Level & { label: string };
@@ -136,45 +170,107 @@ export async function resolveTarget(
   const bestOrg = mostSpecific(orgMatches);
   const bestGroup = mostSpecific(groupMatches);
   if (project && bestProject) {
-    target = { organization_id: project.organization_id, project_id: project.id, scope_id: bestProject.id, label: `${prefix}${project.name} › ${bestProject.name}` };
+    target = {
+      organization_id: project.organization_id,
+      project_id: project.id,
+      scope_id: bestProject.id,
+      label: `${prefix}${project.name} › ${bestProject.name}`,
+    };
   } else if (project) {
-    target = { organization_id: project.organization_id, project_id: project.id, scope_id: null, label: `${prefix}${project.name}` };
+    target = {
+      organization_id: project.organization_id,
+      project_id: project.id,
+      scope_id: null,
+      label: `${prefix}${project.name}`,
+    };
   } else if (org && bestOrg) {
-    target = { organization_id: org.id, project_id: null, scope_id: bestOrg.id, label: `${org.name} › ${bestOrg.name}` };
+    target = {
+      organization_id: org.id,
+      project_id: null,
+      scope_id: bestOrg.id,
+      label: `${org.name} › ${bestOrg.name}`,
+    };
   } else if (org) {
     target = { organization_id: org.id, project_id: null, scope_id: null, label: org.name };
   } else if (bestGroup) {
-    target = { organization_id: null, project_id: null, scope_id: bestGroup.id, label: `${a.group.name} › ${bestGroup.name}` };
+    target = {
+      organization_id: null,
+      project_id: null,
+      scope_id: bestGroup.id,
+      label: `${a.group.name} › ${bestGroup.name}`,
+    };
   } else {
     target = { organization_id: null, project_id: null, scope_id: null, label: a.group.name };
   }
   return { stacks, groupMatches, orgMatches, projectMatches, missedRepoScopes, target };
 }
 
-export async function buildContext(db: Queryable, a: Access, req: ContextRequest): Promise<ContextResult> {
-  const resolution = await resolveProject(db, a, { project: req.project, remote_url: req.remote_url });
+export async function buildContext(
+  db: Queryable,
+  a: Access,
+  req: ContextRequest,
+): Promise<ContextResult> {
+  const resolution = await resolveProject(db, a, {
+    project: req.project,
+    remote_url: req.remote_url,
+  });
   const project = resolution.project;
   const orgId = project?.organization_id ?? a.orgId;
   if (orgId) a.requireRead(orgId);
   const org = a.org(orgId);
-  const { stacks, groupMatches, orgMatches, projectMatches, missedRepoScopes, target } = await resolveTarget(db, a, orgId, project, req);
+  const { stacks, groupMatches, orgMatches, projectMatches, missedRepoScopes, target } =
+    await resolveTarget(db, a, orgId, project, req);
 
-  type L = { level: Level; kind: LevelKind; label: string; match: ScopeMatch<Scope> | null };
+  interface L { level: Level; kind: LevelKind; label: string; match: ScopeMatch<Scope> | null }
   const g = a.group.name;
   const levels: L[] = [
-    { level: { organization_id: null, project_id: null, scope_id: null }, kind: 'group', label: g, match: null },
-    ...groupMatches.map((m) => ({ level: { organization_id: null, project_id: null, scope_id: m.scope.id }, kind: 'group-scope' as const, label: `${g} › ${m.scope.name}`, match: m })),
+    {
+      level: { organization_id: null, project_id: null, scope_id: null },
+      kind: 'group',
+      label: g,
+      match: null,
+    },
+    ...groupMatches.map((m) => ({
+      level: { organization_id: null, project_id: null, scope_id: m.scope.id },
+      kind: 'group-scope' as const,
+      label: `${g} › ${m.scope.name}`,
+      match: m,
+    })),
   ];
   if (org) {
-    levels.push({ level: { organization_id: org.id, project_id: null, scope_id: null }, kind: 'organization', label: org.name, match: null });
+    levels.push({
+      level: { organization_id: org.id, project_id: null, scope_id: null },
+      kind: 'organization',
+      label: org.name,
+      match: null,
+    });
     for (const m of orgMatches) {
-      levels.push({ level: { organization_id: org.id, project_id: null, scope_id: m.scope.id }, kind: 'organization-scope', label: `${org.name} › ${m.scope.name}`, match: m });
+      levels.push({
+        level: { organization_id: org.id, project_id: null, scope_id: m.scope.id },
+        kind: 'organization-scope',
+        label: `${org.name} › ${m.scope.name}`,
+        match: m,
+      });
     }
   }
   if (project) {
-    levels.push({ level: { organization_id: project.organization_id, project_id: project.id, scope_id: null }, kind: 'project', label: project.name, match: null });
+    levels.push({
+      level: { organization_id: project.organization_id, project_id: project.id, scope_id: null },
+      kind: 'project',
+      label: project.name,
+      match: null,
+    });
     for (const m of projectMatches) {
-      levels.push({ level: { organization_id: project.organization_id, project_id: project.id, scope_id: m.scope.id }, kind: 'project-scope', label: `${project.name} › ${m.scope.name}`, match: m });
+      levels.push({
+        level: {
+          organization_id: project.organization_id,
+          project_id: project.id,
+          scope_id: m.scope.id,
+        },
+        kind: 'project-scope',
+        label: `${project.name} › ${m.scope.name}`,
+        match: m,
+      });
     }
   }
 
@@ -182,18 +278,38 @@ export async function buildContext(db: Queryable, a: Access, req: ContextRequest
   const keepDoc = (d: Document) => includeLearnings || d.kind !== 'learnings';
   const docsPerLevel: Document[][] = [];
   for (const l of levels) docsPerLevel.push(await documentsAt(db, l.level, { forAgents: true }));
-  const sections = await listSections(db, docsPerLevel.flat().filter(keepDoc).map((d) => d.id));
+  const sections = await listSections(
+    db,
+    docsPerLevel
+      .flat()
+      .filter(keepDoc)
+      .map((d) => d.id),
+  );
   const sectionsByDoc = new Map<string, Section[]>();
-  for (const s of sections) sectionsByDoc.set(s.document_id, [...(sectionsByDoc.get(s.document_id) ?? []), s]);
+  for (const s of sections)
+    sectionsByDoc.set(s.document_id, [...(sectionsByDoc.get(s.document_id) ?? []), s]);
 
   const blocks: ContextBlock[] = levels.map((l, i) => ({
     level: l.kind,
     label: l.label,
-    scope: l.match ? { id: l.match.scope.id, slug: l.match.scope.slug, name: l.match.scope.name, reason: l.match.reason } : null,
+    scope: l.match
+      ? {
+          id: l.match.scope.id,
+          slug: l.match.scope.slug,
+          name: l.match.scope.name,
+          reason: l.match.reason,
+        }
+      : null,
     documents: docsPerLevel[i]
       .filter(keepDoc)
       .sort(byKind)
-      .map((d) => ({ id: d.id, kind: d.kind, title: d.title, mode: d.mode, sections: sectionsByDoc.get(d.id) ?? [] }))
+      .map((d) => ({
+        id: d.id,
+        kind: d.kind,
+        title: d.title,
+        mode: d.mode,
+        sections: sectionsByDoc.get(d.id) ?? [],
+      }))
       .filter((d) => d.sections.length > 0),
   }));
 
@@ -201,7 +317,12 @@ export async function buildContext(db: Queryable, a: Access, req: ContextRequest
     group: { name: g, shown: a.orgs.length > 1 },
     organization: org ? { id: org.id, slug: org.slug, name: org.name } : null,
     project,
-    resolution: { via: resolution.via, remote: resolution.remote, renamed: resolution.renamed, suggestions: resolution.suggestions },
+    resolution: {
+      via: resolution.via,
+      remote: resolution.remote,
+      renamed: resolution.renamed,
+      suggestions: resolution.suggestions,
+    },
     path: normalizePath(req.path),
     stacks,
     missed_repository_scopes: missedRepoScopes,
@@ -214,8 +335,10 @@ export async function buildContext(db: Queryable, a: Access, req: ContextRequest
   };
   if (project) {
     result.related = await relatedTo(db, a, project.id);
-    const relatedProjects = result.related.filter((r) => r.node.type === 'project' && r.node.project_id && !r.node.restricted);
-    const ids = [project.id, ...relatedProjects.map((r) => r.node.project_id!)];
+    const relatedProjects = result.related.filter(
+      (r) => r.node.type === 'project' && r.node.project_id && !r.node.restricted,
+    );
+    const ids = [project.id, ...relatedProjects.flatMap((r) => r.node.project_id ?? [])];
     const specs = await apisOfProjects(db, a, [...new Set(ids)]);
     result.apis = specs.map((s) => {
       const rel = relatedProjects.find((r) => r.node.project_id === s.project_id);
@@ -224,24 +347,36 @@ export async function buildContext(db: Queryable, a: Access, req: ContextRequest
       return {
         ...s,
         project_ref: own ? `${orgSlug}/${project.slug}` : `${orgSlug}/${rel?.node.slug ?? '?'}`,
-        project_name: own ? project.name : rel?.node.label ?? '',
-        relation: own ? 'this' : rel?.direction ?? 'uses',
+        project_name: own ? project.name : (rel?.node.label ?? ''),
+        relation: own ? 'this' : (rel?.direction ?? 'uses'),
       };
     });
     result.findings = await findingsNear(db, a, project.id, req.path, resolution.remote?.key);
   }
   // Once the group has several organizations it sets the budget; until then the organization does.
-  const { rows: [budget] } = result.group.shown || !org
-    ? await db.query<{ max: number | null }>('SELECT context_max_tokens AS max FROM groups WHERE id = $1', [a.group.id])
-    : await db.query<{ max: number | null }>('SELECT context_max_tokens AS max FROM organizations WHERE id = $1', [org.id]);
-  return compact(result, budget?.max ?? null);
+  const { rows } =
+    result.group.shown || !org
+      ? await db.query<{ max: number | null }>(
+          'SELECT context_max_tokens AS max FROM groups WHERE id = $1',
+          [a.group.id],
+        )
+      : await db.query<{ max: number | null }>(
+          'SELECT context_max_tokens AS max FROM organizations WHERE id = $1',
+          [org.id],
+        );
+  return compact(result, rows.at(0)?.max ?? null);
 }
 
 const estimateTokens = (text: string) => Math.ceil(text.length / 4);
 
 /** Which kinds of document give way first inside one level. */
 const SHORTEN_ORDER: Record<Document['kind'], number> = {
-  learnings: 0, reference: 1, glossary: 2, guidelines: 3, business_logic: 4, purpose: 5,
+  learnings: 0,
+  reference: 1,
+  glossary: 2,
+  guidelines: 3,
+  business_logic: 4,
+  purpose: 5,
 };
 
 /**
@@ -251,12 +386,23 @@ const SHORTEN_ORDER: Record<Document['kind'], number> = {
  * first. The most specific rules are the last to go. Sections keep their full
  * body in the result; only the markdown shows the excerpt.
  */
-export function compact(ctx: Omit<ContextResult, 'markdown'>, maxTokens: number | null): ContextResult {
+export function compact(
+  ctx: Omit<ContextResult, 'markdown'>,
+  maxTokens: number | null,
+): ContextResult {
   let markdown = renderMarkdown(ctx);
   let tokens = estimateTokens(markdown);
   if (maxTokens !== null && tokens > maxTokens) {
-    const candidates = ctx.blocks.flatMap((b, level) => b.documents.flatMap((d) => d.sections.map((s) => ({ s, level, kind: d.kind }))))
-      .sort((x, y) => x.level - y.level || SHORTEN_ORDER[x.kind] - SHORTEN_ORDER[y.kind] || y.s.body.length - x.s.body.length);
+    const candidates = ctx.blocks
+      .flatMap((b, level) =>
+        b.documents.flatMap((d) => d.sections.map((s) => ({ s, level, kind: d.kind }))),
+      )
+      .sort(
+        (x, y) =>
+          x.level - y.level ||
+          SHORTEN_ORDER[x.kind] - SHORTEN_ORDER[y.kind] ||
+          y.s.body.length - x.s.body.length,
+      );
     // The notice about shortened sections costs a little too.
     let estimate = tokens + estimateTokens(shortenedNotice(candidates.length, maxTokens));
     for (const { s } of candidates) {
@@ -284,18 +430,27 @@ export function excerpt(s: Pick<Section, 'id' | 'body'>): string {
   let inFence = false;
   for (const raw of lines) {
     const line = raw.trim();
-    if (line.startsWith('```')) { inFence = !inFence; continue; }
+    if (line.startsWith('```')) {
+      inFence = !inFence;
+      continue;
+    }
     if (inFence || /^(#+|\||>\s*$|---+$)/.test(line)) continue;
-    if (!line) { if (prose.length) break; continue; }
+    if (!line) {
+      if (prose.length) break;
+      continue;
+    }
     prose.push(line.replace(/^(?:[-*+]|\d+[.)]|>)\s+/, ''));
   }
   const paragraph = prose.join(' ');
   // A sentence ends before a capital, so "e.g. 100" doesn't end it.
-  const sentence = paragraph.match(/^.+?[.!?](?=\s+[\p{Lu}"'(\[*_`]|$)/u)?.[0] ?? paragraph;
+  const sentence = (/^.+?[.!?](?=\s+[\p{Lu}"'(\[*_`]|$)/u.exec(paragraph))?.[0] ?? paragraph;
   let lead = sentence;
   if (lead.length > EXCERPT_CHARS) {
     const cut = lead.slice(0, EXCERPT_CHARS);
-    lead = cut.slice(0, cut.lastIndexOf(' ') > EXCERPT_CHARS / 2 ? cut.lastIndexOf(' ') : EXCERPT_CHARS);
+    lead = cut.slice(
+      0,
+      cut.lastIndexOf(' ') > EXCERPT_CHARS / 2 ? cut.lastIndexOf(' ') : EXCERPT_CHARS,
+    );
   }
   const words = (t: string) => t.split(/\s+/).filter(Boolean).length;
   const rest = Math.max(words(s.body) - words(lead), 0);
@@ -304,56 +459,85 @@ export function excerpt(s: Pick<Section, 'id' | 'body'>): string {
 }
 
 function shortenedNotice(count: number, maxTokens: number): string {
-  return `> **${count} section${count === 1 ? ' is' : 's are'} shortened** to fit the context budget (~${maxTokens.toLocaleString('en-US')} tokens). `
-    + 'The most general ones were shortened first. When one looks relevant to your task, read it in full with `read_section`.';
+  return (
+    `> **${count} section${count === 1 ? ' is' : 's are'} shortened** to fit the context budget (~${maxTokens.toLocaleString('en-US')} tokens). ` +
+    'The most general ones were shortened first. When one looks relevant to your task, read it in full with `read_section`.'
+  );
 }
 
 const shortId = (id: string) => id.slice(0, 8);
 
 export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
   const out: string[] = [];
-  out.push(`# Context from OpenPurpose`);
+  out.push('# Context from OpenPurpose');
   const projectLine = ctx.project
     ? `**${ctx.project.name}** (\`${ctx.organization ? ctx.organization.slug + '/' : ''}${ctx.project.slug}\`, found via ${ctx.resolution.via === 'project' ? 'project name' : 'git remote'})`
     : '_none resolved_';
   out.push('');
   if (ctx.group.shown) out.push(`- Group: **${ctx.group.name}**`);
-  out.push(`- Organization: ${ctx.organization ? `**${ctx.organization.name}**` : '_none_'}`, `- Project: ${projectLine}`);
+  out.push(
+    `- Organization: ${ctx.organization ? `**${ctx.organization.name}**` : '_none_'}`,
+    `- Project: ${projectLine}`,
+  );
   if (ctx.path || ctx.stacks.length) {
-    out.push(`- Path: ${ctx.path ? '`' + ctx.path + '`' : '_repo root_'}`, `- Stacks: ${ctx.stacks.length ? ctx.stacks.join(', ') : '_none given_'}`);
+    out.push(
+      `- Path: ${ctx.path ? '`' + ctx.path + '`' : '_repo root_'}`,
+      `- Stacks: ${ctx.stacks.length ? ctx.stacks.join(', ') : '_none given_'}`,
+    );
   }
   const scoped = ctx.blocks.filter((b) => b.scope);
-  out.push(`- Scopes applied: ${scoped.length ? scoped.map((b) => `${b.label} (${b.scope!.reason})`).join('; ') : '_none_'}`);
+  out.push(
+    `- Scopes applied: ${scoped.length ? scoped.map((b) => `${b.label} (${b.scope?.reason ?? ''})`).join('; ') : '_none_'}`,
+  );
   out.push('');
 
   if (ctx.resolution.renamed) {
     const { asked, current } = ctx.resolution.renamed;
-    out.push(`> **\`${asked}\` is an old slug of this project.** Use \`${current}\` from now on. If \`.openpurpose.json\` in this repository still says \`${asked}\`, update it (ask the user first if you can't edit files).`);
+    out.push(
+      `> **\`${asked}\` is an old slug of this project.** Use \`${current}\` from now on. If \`.openpurpose.json\` in this repository still says \`${asked}\`, update it (ask the user first if you can't edit files).`,
+    );
     out.push('');
   }
 
   if (ctx.project && ctx.missed_repository_scopes.length) {
     const names = ctx.missed_repository_scopes.map((n) => `"${n}"`).join(', ');
-    out.push(ctx.resolution.remote
-      ? `> **This repository (\`${ctx.resolution.remote.key}\`) is not one of ${ctx.project.name}'s repositories**, so its repository scopes (${names}) were left out. If it belongs to the project, ask the user and call \`register_repository\`.`
-      : `> **Repository scopes left out: ${names}.** They only apply inside specific repositories. Call \`get_context\` again with \`remote_url\` (\`git remote get-url origin\`).`);
+    out.push(
+      ctx.resolution.remote
+        ? `> **This repository (\`${ctx.resolution.remote.key}\`) is not one of ${ctx.project.name}'s repositories**, so its repository scopes (${names}) were left out. If it belongs to the project, ask the user and call \`register_repository\`.`
+        : `> **Repository scopes left out: ${names}.** They only apply inside specific repositories. Call \`get_context\` again with \`remote_url\` (\`git remote get-url origin\`).`,
+    );
     out.push('');
   }
 
   if (!ctx.project) {
-    const wide = ctx.organization ? (ctx.group.shown ? 'group and organization' : 'organization') : 'group';
-    out.push(`> **No project found for this repository.** Only ${wide}-wide context is included below.`);
+    const wide = ctx.organization
+      ? ctx.group.shown
+        ? 'group and organization'
+        : 'organization'
+      : 'group';
+    out.push(
+      `> **No project found for this repository.** Only ${wide}-wide context is included below.`,
+    );
     if (ctx.resolution.suggestions.length) {
-      out.push(`> Possible matches: ${ctx.resolution.suggestions.map((s) => `\`${s.organization_slug}/${s.slug}\` (${s.name})`).join(', ')}.`);
+      out.push(
+        `> Possible matches: ${ctx.resolution.suggestions.map((s) => `\`${s.organization_slug}/${s.slug}\` (${s.name})`).join(', ')}.`,
+      );
     }
-    out.push('> Ask the user which project this is, then call `register_repository` (existing project) or `create_project` (new one) and fetch context again.');
+    out.push(
+      '> Ask the user which project this is, then call `register_repository` (existing project) or `create_project` (new one) and fetch context again.',
+    );
     out.push('');
   }
 
-  out.push(`How to read this: general rules come first (${ctx.group.shown ? 'group, then organization' : 'organization'}), specific ones last (project, then the part of the code you are in). When two rules conflict, the more specific one wins.`);
+  out.push(
+    `How to read this: general rules come first (${ctx.group.shown ? 'group, then organization' : 'organization'}), specific ones last (project, then the part of the code you are in). When two rules conflict, the more specific one wins.`,
+  );
   out.push('');
-  out.push('Each section has a marker `[s:<id> · <mode>]`. **locked**: read-only for you. **propose**: your edits become proposals a person approves. **open**: you may edit directly.');
-  if (ctx.budget.shortened && ctx.budget.max_tokens !== null) out.push('', shortenedNotice(ctx.budget.shortened, ctx.budget.max_tokens));
+  out.push(
+    'Each section has a marker `[s:<id> · <mode>]`. **locked**: read-only for you. **propose**: your edits become proposals a person approves. **open**: you may edit directly.',
+  );
+  if (ctx.budget.shortened && ctx.budget.max_tokens !== null)
+    out.push('', shortenedNotice(ctx.budget.shortened, ctx.budget.max_tokens));
 
   let any = false;
   for (const block of ctx.blocks) {
@@ -363,7 +547,12 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
     for (const doc of block.documents) {
       out.push('', `### ${doc.title}`);
       for (const s of doc.sections) {
-        out.push('', `#### ${s.heading}  \`[s:${shortId(s.id)} · ${s.mode}]\``, '', s.shortened ? excerpt(s) : s.body.trim() || '_(empty)_');
+        out.push(
+          '',
+          `#### ${s.heading}  \`[s:${shortId(s.id)} · ${s.mode}]\``,
+          '',
+          s.shortened ? excerpt(s) : s.body.trim() || '_(empty)_',
+        );
       }
     }
   }
@@ -372,12 +561,27 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
   if (ctx.related.length) {
     out.push('', '---', '', '## Related projects and terms');
     out.push('Linked with [[wikilinks]] in documents, in either direction.');
-    out.push('Call `get_related` or `get_context` with one of these projects if your task touches it.');
+    out.push(
+      'Call `get_related` or `get_context` with one of these projects if your task touches it.',
+    );
     const line = (r: Related) => {
-      const where = r.node.organization_slug && r.node.organization_id !== ctx.organization?.id ? `${r.node.organization_slug}/` : '';
-      const name = r.node.type === 'project' ? `**${r.node.label}** (\`${where}${r.node.slug}\`)` : `term **${r.node.label}**`;
-      const refs = r.refs.slice(0, 2).map((x) => `"${x.heading}"`).join(', ');
-      const about = r.node.restricted ? ' — in an organization you can\'t read' : r.node.summary ? ` — ${r.node.summary}` : '';
+      const where =
+        r.node.organization_slug && r.node.organization_id !== ctx.organization?.id
+          ? `${r.node.organization_slug}/`
+          : '';
+      const name =
+        r.node.type === 'project'
+          ? `**${r.node.label}** (\`${where}${r.node.slug}\`)`
+          : `term **${r.node.label}**`;
+      const refs = r.refs
+        .slice(0, 2)
+        .map((x) => `"${x.heading}"`)
+        .join(', ');
+      const about = r.node.restricted
+        ? " — in an organization you can't read"
+        : r.node.summary
+          ? ` — ${r.node.summary}`
+          : '';
       return `- ${name}${about}${refs ? ` · via ${refs}` : ''}`;
     };
     const uses = ctx.related.filter((r) => r.direction === 'uses');
@@ -387,31 +591,59 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
   }
   if (ctx.apis.length) {
     out.push('', '---', '', '## APIs');
-    out.push('OpenAPI/Swagger specs people attached to projects. Use `get_api` for endpoints and DTOs instead of guessing request and response shapes.');
+    out.push(
+      'OpenAPI/Swagger specs people attached to projects. Use `get_api` for endpoints and DTOs instead of guessing request and response shapes.',
+    );
     const line = (s: ContextApi) =>
       `- **${s.name}**${s.version ? ` ${s.version}` : ''} (${s.spec_version}, ${s.endpoint_count} endpoints, ${s.schema_count} schemas): \`get_api project="${s.project_ref}"${s.name !== s.title ? ` api="${s.name}"` : ''}\``;
     const own = ctx.apis.filter((s) => s.relation === 'this');
     const uses = ctx.apis.filter((s) => s.relation === 'uses');
     const usedBy = ctx.apis.filter((s) => s.relation === 'used_by');
     if (own.length) out.push('', 'This project:', ...own.map(line));
-    if (uses.length) out.push('', 'Projects this one uses:', ...uses.map((s) => line(s).replace('- **', `- ${s.project_name}: **`)));
-    if (usedBy.length) out.push('', 'Projects that use this one:', ...usedBy.map((s) => line(s).replace('- **', `- ${s.project_name}: **`)));
+    if (uses.length)
+      out.push(
+        '',
+        'Projects this one uses:',
+        ...uses.map((s) => line(s).replace('- **', `- ${s.project_name}: **`)),
+      );
+    if (usedBy.length)
+      out.push(
+        '',
+        'Projects that use this one:',
+        ...usedBy.map((s) => line(s).replace('- **', `- ${s.project_name}: **`)),
+      );
   }
   const nearby = ctx.findings;
   if (nearby && (nearby.todo.length || nearby.ask_later.length)) {
     const where = ctx.path ? `around \`${ctx.path}\`` : 'in this project';
     out.push('', '---', '', '## Known findings here');
     out.push(`Problems agents found ${where} that nobody has fixed yet. Don't report them again.`);
-    const line = (f: Finding) => `- \`${shortId(f.id)}\` **${f.title}** in \`${f.file}${f.line_start ? `:${f.line_start}${f.line_end && f.line_end !== f.line_start ? `-${f.line_end}` : ''}` : ''}\``;
+    const line = (f: Finding) =>
+      `- \`${shortId(f.id)}\` **${f.title}** in \`${f.file}${f.line_start ? `:${f.line_start}${f.line_end && f.line_end !== f.line_start ? `-${f.line_end}` : ''}` : ''}\``;
     if (nearby.ask_later.length) {
-      out.push('', "Ask the user about these when your work touches them. A person must decide first, so don't fix them on your own:", ...nearby.ask_later.map(line));
+      out.push(
+        '',
+        "Ask the user about these when your work touches them. A person must decide first, so don't fix them on your own:",
+        ...nearby.ask_later.map(line),
+      );
     }
     if (nearby.todo.length) {
-      out.push('', 'To do. Fix one only if the user asks, then call `resolve_finding`:', ...nearby.todo.map(line));
+      out.push(
+        '',
+        'To do. Fix one only if the user asks, then call `resolve_finding`:',
+        ...nearby.todo.map(line),
+      );
     }
-    out.push('', `Read the problem and the proposed fix with \`list_findings\`${nearby.more ? ` (${nearby.more} more not listed)` : ''}.`);
+    out.push(
+      '',
+      `Read the problem and the proposed fix with \`list_findings\`${nearby.more ? ` (${nearby.more} more not listed)` : ''}.`,
+    );
   }
-  out.push('', '---', '', `If the user corrects you in a way that should apply next time, call \`propose_learning\`. It will be filed under **${ctx.learning_target.label}** unless you pass a different scope.`);
+  out.push(
+    '',
+    '---',
+    '',
+    `If the user corrects you in a way that should apply next time, call \`propose_learning\`. It will be filed under **${ctx.learning_target.label}** unless you pass a different scope.`,
+  );
   return out.join('\n');
 }
-

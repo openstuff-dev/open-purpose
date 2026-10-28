@@ -3,8 +3,17 @@ import type { Db, Queryable } from '../db.js';
 import { tx } from '../db.js';
 import { AppError, badRequest, forbidden, notFound } from '../errors.js';
 import {
-  applySectionChange, assertMode, checkVersion, ensureLearningsDocument, getDocument, getSection,
-  insertSection, loadSection, resolveLevel, type SectionChange, type SectionInput,
+  applySectionChange,
+  assertMode,
+  checkVersion,
+  ensureLearningsDocument,
+  getDocument,
+  getSection,
+  insertSection,
+  loadSection,
+  resolveLevel,
+  type SectionChange,
+  type SectionInput,
 } from './content.js';
 import type { EditMode, Level, Proposal, ProposalStatus, Section } from './types.js';
 import type { ProposalCounts } from '@openpurpose/contracts';
@@ -13,32 +22,52 @@ const PROPOSAL_COLS = `x.id, x.kind, x.status, x.organization_id, x.project_id, 
   x.base_version, x.heading, x.body, x.rationale, x.context, x.created_by, a.name AS created_by_name,
   x.created_at, x.reviewed_by, x.reviewed_at, x.review_note, x.result_section_id, x.revision, x.updated_at`;
 
-export const isOpen = (status: ProposalStatus) => status === 'pending' || status === 'changes_requested';
+export const isOpen = (status: ProposalStatus) =>
+  status === 'pending' || status === 'changes_requested';
 
 export async function addEvent(
-  c: Queryable, a: Access, proposalId: string, kind: 'proposed' | 'revised' | 'changes_requested' | 'approved' | 'rejected' | 'commented',
-  revision: number, note = '',
+  c: Queryable,
+  a: Access,
+  proposalId: string,
+  kind: 'proposed' | 'revised' | 'changes_requested' | 'approved' | 'rejected' | 'commented',
+  revision: number,
+  note = '',
 ): Promise<void> {
   await c.query(
     'INSERT INTO proposal_events (proposal_id, kind, revision, note, actor_id) VALUES ($1, $2, $3, $4, $5)',
-    [proposalId, kind, revision, note, a.actor.id]);
+    [proposalId, kind, revision, note, a.actor.id],
+  );
 }
 
 async function insertProposal(
-  c: Queryable, a: Access, p: Partial<Proposal> & { kind: Proposal['kind']; body: string },
+  c: Queryable,
+  a: Access,
+  p: Partial<Proposal> & { kind: Proposal['kind']; body: string },
 ): Promise<Proposal> {
   const { rows } = await c.query<{ id: string }>(
     `INSERT INTO proposals (kind, organization_id, project_id, scope_id, document_id, section_id, base_version,
                             heading, body, rationale, context, created_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
-    [p.kind, p.organization_id ?? null, p.project_id ?? null, p.scope_id ?? null, p.document_id ?? null,
-      p.section_id ?? null, p.base_version ?? null, p.heading ?? '', p.body, p.rationale ?? '',
-      JSON.stringify(p.context ?? {}), a.actor.id],
+    [
+      p.kind,
+      p.organization_id ?? null,
+      p.project_id ?? null,
+      p.scope_id ?? null,
+      p.document_id ?? null,
+      p.section_id ?? null,
+      p.base_version ?? null,
+      p.heading ?? '',
+      p.body,
+      p.rationale ?? '',
+      JSON.stringify(p.context ?? {}),
+      a.actor.id,
+    ],
   );
   const id = rows[0].id;
   await c.query(
     'INSERT INTO proposal_revisions (proposal_id, revision, heading, body, note, actor_id) VALUES ($1, 1, $2, $3, $4, $5)',
-    [id, p.heading ?? '', p.body, p.rationale ?? '', a.actor.id]);
+    [id, p.heading ?? '', p.body, p.rationale ?? '', a.actor.id],
+  );
   await addEvent(c, a, id, 'proposed', 1, p.rationale ?? '');
   return loadProposal(c, id);
 }
@@ -46,7 +75,9 @@ async function insertProposal(
 async function loadProposal(db: Queryable, id: string): Promise<Proposal> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw notFound('Proposal');
   const { rows } = await db.query<Proposal>(
-    `SELECT ${PROPOSAL_COLS} FROM proposals x LEFT JOIN actors a ON a.id = x.created_by WHERE x.id = $1`, [id]);
+    `SELECT ${PROPOSAL_COLS} FROM proposals x LEFT JOIN actors a ON a.id = x.created_by WHERE x.id = $1`,
+    [id],
+  );
   if (!rows[0]) throw notFound('Proposal');
   return rows[0];
 }
@@ -75,7 +106,9 @@ export interface ProposalListItem extends Proposal {
   document_mode: EditMode | null;
   open_threads: number;
   comment_count: number;
-  /** Who has the next move: reviewers, or the author (changes requested, or unanswered comments). */
+  /**
+   * Who has the next move: reviewers, or the author (changes requested, or unanswered comments).
+   */
   awaiting: 'review' | 'author' | null;
   can_review: boolean;
 }
@@ -100,8 +133,16 @@ export const AUTHOR_OWES_REPLY = `EXISTS (
                                       WHERE r.proposal_id = x.id AND r.revision > 1 AND r.actor_id = x.created_by), '-infinity'))`;
 
 export async function listProposals(
-  db: Queryable, a: Access,
-  opts: { status?: ProposalStatus | 'open'; level?: string; projectId?: string; id?: string; createdBy?: string; limit?: number } = {},
+  db: Queryable,
+  a: Access,
+  opts: {
+    status?: ProposalStatus | 'open';
+    level?: string;
+    projectId?: string;
+    id?: string;
+    createdBy?: string;
+    limit?: number;
+  } = {},
 ): Promise<ProposalListItem[]> {
   const orgFilter = opts.level && opts.level !== 'group' ? opts.level : null;
   if (orgFilter) a.requireRead(orgFilter);
@@ -137,20 +178,37 @@ export async function listProposals(
         AND ($9::uuid IS NULL OR x.created_by = $9)
       ORDER BY x.updated_at DESC
       LIMIT $6`,
-    [opts.status && opts.status !== 'open' ? opts.status : null, a.readableOrgIds(), orgFilter, opts.level === 'group',
-      opts.projectId ?? null, Math.min(opts.limit ?? 300, 1000), opts.id ?? null, opts.status === 'open', opts.createdBy ?? null],
+    [
+      opts.status && opts.status !== 'open' ? opts.status : null,
+      a.readableOrgIds(),
+      orgFilter,
+      opts.level === 'group',
+      opts.projectId ?? null,
+      Math.min(opts.limit ?? 300, 1000),
+      opts.id ?? null,
+      opts.status === 'open',
+      opts.createdBy ?? null,
+    ],
   );
   return rows.map((r) => ({ ...r, can_review: canReview(a, r) }));
 }
 
-export async function getProposalDetail(db: Queryable, a: Access, id: string): Promise<ProposalListItem> {
-  const [p] = await listProposals(db, a, { id });
+export async function getProposalDetail(
+  db: Queryable,
+  a: Access,
+  id: string,
+): Promise<ProposalListItem> {
+  const p = (await listProposals(db, a, { id })).at(0);
   if (!p) throw notFound('Proposal');
   return p;
 }
 
 /** How many proposals per status the actor can see, for the tab counts. */
-export async function proposalCounts(db: Queryable, a: Access, level?: string): Promise<ProposalCounts> {
+export async function proposalCounts(
+  db: Queryable,
+  a: Access,
+  level?: string,
+): Promise<ProposalCounts> {
   const orgFilter = level && level !== 'group' ? level : null;
   if (orgFilter) a.requireRead(orgFilter);
   const { rows } = await db.query<{ status: ProposalStatus; n: number }>(
@@ -190,16 +248,19 @@ export async function countReviewable(db: Queryable, a: Access): Promise<number>
 // ───────────────────────── mode-aware edits (humans and agents) ─────────────────────────
 
 export type EditResult =
-  | { status: 'applied'; section: Section }
-  | { status: 'proposed'; proposal: Proposal };
+  { status: 'applied'; section: Section } | { status: 'proposed'; proposal: Proposal };
 
 /**
  * The single entry point for changing a section's content.
- *  - Editors of the section's level: applied directly, whatever the mode (they can also change the mode).
- *  - Agents (own organization or group-wide content): "open" → applied; "propose" → proposal; "locked" → refused.
+ *  - Editors of the section's level: applied directly, whatever the mode (they can also change
+ *    the mode).
+ *  - Agents (own organization or group-wide content): "open" → applied; "propose" → proposal;
+ *    "locked" → refused.
  */
 export async function editSection(
-  db: Db, a: Access, ref: string,
+  db: Db,
+  a: Access,
+  ref: string,
   change: SectionChange & { expected_version?: number; note?: string; rationale?: string },
 ): Promise<EditResult> {
   return tx(db, async (c) => {
@@ -208,16 +269,28 @@ export async function editSection(
     a.requireContribute(orgId);
     checkVersion(section, change.expected_version);
     if (a.canEdit(orgId)) {
-      return { status: 'applied', section: await applySectionChange(c, section, change, a.actor.id, change.note ?? '') };
+      return {
+        status: 'applied',
+        section: await applySectionChange(c, section, change, a.actor.id, change.note ?? ''),
+      };
     }
     if (change.mode !== undefined && change.mode !== section.mode) {
       throw forbidden('Agents cannot change edit modes; ask a person to do it in the web UI');
     }
     if (section.mode === 'locked') {
-      throw new AppError('locked', `Section "${section.heading}" is locked. Agents can read it but not change or propose changes to it.`);
+      throw new AppError(
+        'locked',
+        `Section "${section.heading}" is locked. Agents can read it but not change or propose changes to it.`,
+      );
     }
     if (section.mode === 'open') {
-      const updated = await applySectionChange(c, section, { heading: change.heading, body: change.body }, a.actor.id, change.note ?? '');
+      const updated = await applySectionChange(
+        c,
+        section,
+        { heading: change.heading, body: change.body },
+        a.actor.id,
+        change.note ?? '',
+      );
       return { status: 'applied', section: updated };
     }
     const doc = await getDocument(c, a, section.document_id);
@@ -239,19 +312,34 @@ export async function editSection(
 
 /** Same policy as editSection, applied to the document's mode. */
 export async function addSection(
-  db: Db, a: Access, documentId: string, input: SectionInput & { note?: string; rationale?: string },
+  db: Db,
+  a: Access,
+  documentId: string,
+  input: SectionInput & { note?: string; rationale?: string },
 ): Promise<EditResult> {
   return tx(db, async (c) => {
     const doc = await getDocument(c, a, documentId);
     a.requireContribute(doc.organization_id);
     if (a.canEdit(doc.organization_id)) {
-      return { status: 'applied', section: await insertSection(c, doc.id, input, a.actor.id, input.note ?? 'Created') };
+      return {
+        status: 'applied',
+        section: await insertSection(c, doc.id, input, a.actor.id, input.note ?? 'Created'),
+      };
     }
     if (doc.mode === 'locked') {
-      throw new AppError('locked', `Document "${doc.title}" is locked; agents cannot add sections to it.`);
+      throw new AppError(
+        'locked',
+        `Document "${doc.title}" is locked; agents cannot add sections to it.`,
+      );
     }
     if (doc.mode === 'open') {
-      const section = await insertSection(c, doc.id, { ...input, mode: 'open' }, a.actor.id, input.note ?? 'Added by agent');
+      const section = await insertSection(
+        c,
+        doc.id,
+        { ...input, mode: 'open' },
+        a.actor.id,
+        input.note ?? 'Added by agent',
+      );
       return { status: 'applied', section };
     }
     const proposal = await insertProposal(c, a, {
@@ -279,8 +367,9 @@ export interface LearningInput extends Partial<Level> {
 
 /** Always a proposal, even from editors: learnings are reviewed before they become rules. */
 export async function proposeLearning(db: Db, a: Access, input: LearningInput): Promise<Proposal> {
-  if (!input.heading?.trim()) throw badRequest('heading (a one-line summary of the learning) is required');
-  if (!input.body?.trim()) throw badRequest('body is required');
+  if (!input.heading.trim())
+    throw badRequest('heading (a one-line summary of the learning) is required');
+  if (!input.body.trim()) throw badRequest('body is required');
   const level = await resolveLevel(db, input);
   a.requireContribute(level.organization_id);
   return insertProposal(db, a, {
@@ -309,14 +398,21 @@ export interface ApproveInput {
 }
 
 export async function approveProposal(
-  db: Db, a: Access, id: string, input: ApproveInput = {},
+  db: Db,
+  a: Access,
+  id: string,
+  input: ApproveInput = {},
 ): Promise<{ proposal: Proposal; section: Section }> {
   return tx(db, async (c) => {
-    const { rows } = await c.query<{ status: ProposalStatus }>('SELECT status FROM proposals WHERE id = $1 FOR UPDATE', [id]);
+    const { rows } = await c.query<{ status: ProposalStatus }>(
+      'SELECT status FROM proposals WHERE id = $1 FOR UPDATE',
+      [id],
+    );
     if (!rows[0]) throw notFound('Proposal');
     const p = await getProposal(c, a, id);
     if (!canReview(a, p)) a.requireEdit(p.organization_id);
-    if (!isOpen(rows[0].status)) throw new AppError('conflict', `Proposal is already ${rows[0].status}`);
+    if (!isOpen(rows[0].status))
+      throw new AppError('conflict', `Proposal is already ${rows[0].status}`);
     const heading = input.heading?.trim() || p.heading;
     const body = input.body ?? p.body;
     let revision = p.revision;
@@ -326,25 +422,51 @@ export async function approveProposal(
     }
     const note = input.note || `Approved proposal from ${p.created_by_name ?? 'unknown'}`;
     let section: Section;
-    let level: Level = { organization_id: p.organization_id, project_id: p.project_id, scope_id: p.scope_id };
+    let level: Level = {
+      organization_id: p.organization_id,
+      project_id: p.project_id,
+      scope_id: p.scope_id,
+    };
 
     if (p.kind === 'edit_section') {
-      if (!p.section_id) throw new AppError('conflict', 'The section this proposal edits no longer exists');
+      if (!p.section_id)
+        throw new AppError('conflict', 'The section this proposal edits no longer exists');
       const current = await loadSection(c, p.section_id, { forUpdate: true });
-      section = await applySectionChange(c, current, { heading, body, mode: assertMode(input.mode) }, a.actor.id, note);
+      section = await applySectionChange(
+        c,
+        current,
+        { heading, body, mode: assertMode(input.mode) },
+        a.actor.id,
+        note,
+      );
     } else if (p.kind === 'new_section') {
-      if (!p.document_id) throw new AppError('conflict', 'The document for this proposal no longer exists');
-      section = await insertSection(c, p.document_id, { heading, body, mode: assertMode(input.mode) }, a.actor.id, note);
+      if (!p.document_id)
+        throw new AppError('conflict', 'The document for this proposal no longer exists');
+      section = await insertSection(
+        c,
+        p.document_id,
+        { heading, body, mode: assertMode(input.mode) },
+        a.actor.id,
+        note,
+      );
     } else {
       if (input.target) level = await resolveLevel(c, input.target);
       // Filing somewhere else (e.g. promoting to the group) needs edit rights there too.
       if (!a.canEdit(level.organization_id)) {
-        throw forbidden(level.organization_id === p.organization_id || level.organization_id
-          ? `Only editors of ${a.levelName(level.organization_id)} can file it there`
-          : `Only group editors can promote a learning to ${a.group.name}`);
+        throw forbidden(
+          level.organization_id === p.organization_id || level.organization_id
+            ? `Only editors of ${a.levelName(level.organization_id)} can file it there`
+            : `Only group editors can promote a learning to ${a.group.name}`,
+        );
       }
       const doc = await ensureLearningsDocument(c, level);
-      section = await insertSection(c, doc.id, { heading, body, mode: assertMode(input.mode) ?? 'propose' }, a.actor.id, note);
+      section = await insertSection(
+        c,
+        doc.id,
+        { heading, body, mode: assertMode(input.mode) ?? 'propose' },
+        a.actor.id,
+        note,
+      );
     }
 
     await c.query(
@@ -352,8 +474,18 @@ export async function approveProposal(
               result_section_id = $4, heading = $5, body = $6, organization_id = $7, project_id = $8, scope_id = $9,
               document_id = COALESCE(document_id, $10)
         WHERE id = $1`,
-      [id, a.actor.id, input.note ?? '', section.id, heading, body, level.organization_id, level.project_id,
-        level.scope_id, section.document_id],
+      [
+        id,
+        a.actor.id,
+        input.note ?? '',
+        section.id,
+        heading,
+        body,
+        level.organization_id,
+        level.project_id,
+        level.scope_id,
+        section.document_id,
+      ],
     );
     await c.query('UPDATE proposals SET updated_at = now() WHERE id = $1', [id]);
     await addEvent(c, a, id, 'approved', revision, input.note ?? '');
@@ -378,14 +510,22 @@ export async function rejectProposal(db: Db, a: Access, id: string, note = ''): 
 
 /** Add a revision row and bump the proposal's text. Returns the new revision number. */
 export async function insertRevision(
-  c: Queryable, a: Access, p: Pick<Proposal, 'id' | 'revision'>, heading: string, body: string, note: string,
+  c: Queryable,
+  a: Access,
+  p: Pick<Proposal, 'id' | 'revision'>,
+  heading: string,
+  body: string,
+  note: string,
 ): Promise<number> {
   const revision = p.revision + 1;
   await c.query(
     'INSERT INTO proposal_revisions (proposal_id, revision, heading, body, note, actor_id) VALUES ($1, $2, $3, $4, $5, $6)',
-    [p.id, revision, heading, body, note, a.actor.id]);
-  await c.query('UPDATE proposals SET heading = $2, body = $3, revision = $4, updated_at = now() WHERE id = $1',
-    [p.id, heading, body, revision]);
+    [p.id, revision, heading, body, note, a.actor.id],
+  );
+  await c.query(
+    'UPDATE proposals SET heading = $2, body = $3, revision = $4, updated_at = now() WHERE id = $1',
+    [p.id, heading, body, revision],
+  );
   return revision;
 }
 

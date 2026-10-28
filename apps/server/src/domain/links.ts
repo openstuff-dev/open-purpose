@@ -42,7 +42,12 @@ export function parseLink(inner: string, label?: string): WikiLink | null {
   }
   const target = normalizeTarget(text);
   if (!target) return null;
-  return { kind, target, label: (label ?? '').trim(), raw: `[[${inner}${label ? '|' + label : ''}]]` };
+  return {
+    kind,
+    target,
+    label: (label ?? '').trim(),
+    raw: `[[${inner}${label ? '|' + label : ''}]]`,
+  };
 }
 
 export function extractLinks(markdown: string): WikiLink[] {
@@ -61,7 +66,10 @@ export function extractLinks(markdown: string): WikiLink[] {
  * and its target as written, and returns the new target, or null to leave it
  * alone. The `project:`/`term:` prefix, `#anchor` and `|label` are kept as written.
  */
-export function rewriteLinks(markdown: string, fn: (link: WikiLink, written: string) => string | null): string {
+export function rewriteLinks(
+  markdown: string,
+  fn: (link: WikiLink, written: string) => string | null,
+): string {
   const masked = stripCode(markdown);
   let out = '';
   let last = 0;
@@ -75,8 +83,8 @@ export function rewriteLinks(markdown: string, fn: (link: WikiLink, written: str
     const next = fn(link, head.slice(prefix.length).trim());
     if (!next) continue;
     const rebuilt = prefix + next + (hash >= 0 ? inner.slice(hash) : '');
-    const start = m.index!;
-    out += markdown.slice(last, start) + `[[${rebuilt}${m[2] !== undefined ? '|' + m[2] : ''}]]`;
+    const start = m.index;
+    out += markdown.slice(last, start) + `[[${rebuilt}${(m[2] as string | undefined) !== undefined ? '|' + m[2] : ''}]]`;
     last = start + m[0].length;
   }
   return out + markdown.slice(last);

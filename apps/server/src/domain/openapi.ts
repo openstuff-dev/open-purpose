@@ -3,6 +3,10 @@
  * agents: endpoints as one line each, DTOs as TypeScript-like interfaces.
  * Pure functions; no I/O.
  */
+// Specs are arbitrary JSON, read through Json and checked with str() and Array.isArray().
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { parse as parseYaml } from 'yaml';
 
 // Specs are arbitrary JSON; we read them defensively.
@@ -31,7 +35,7 @@ export interface ApiOperation {
   deprecated: boolean;
   params: ApiParam[];
   body: { contentType: string; required: boolean; schema: Json; description: string } | null;
-  responses: Array<{ status: string; description: string; contentType: string; schema: Json }>;
+  responses: { status: string; description: string; contentType: string; schema: Json }[];
   security: string[];
 }
 
@@ -67,7 +71,8 @@ export function parseSpecText(text: string): { doc: Json; format: 'json' | 'yaml
   }
 }
 
-const isObj = (v: unknown): v is Record<string, Json> => !!v && typeof v === 'object' && !Array.isArray(v);
+const isObj = (v: unknown): v is Record<string, Json> =>
+  !!v && typeof v === 'object' && !Array.isArray(v);
 const str = (v: unknown) => (typeof v === 'string' ? v : '');
 
 function pointer(doc: Json, ref: string): Json {
@@ -112,16 +117,28 @@ export function readApi(doc: Json): Api {
   const isV3 = typeof doc.openapi === 'string' && doc.openapi.startsWith('3');
   const isV2 = String(doc.swagger) === '2.0';
   if (!isV3 && !isV2) {
-    throw new SpecError('Not an OpenAPI 3 or Swagger 2 document (no "openapi: 3.x" or "swagger: 2.0" field)');
+    throw new SpecError(
+      'Not an OpenAPI 3 or Swagger 2 document (no "openapi: 3.x" or "swagger: 2.0" field)',
+    );
   }
   if (!isObj(doc.paths)) throw new SpecError('The document has no "paths"');
   const info = isObj(doc.info) ? doc.info : {};
 
   const servers = isV3
-    ? (Array.isArray(doc.servers) ? doc.servers.map((s: Json) => str(s?.url)).filter(Boolean) : [])
-    : doc.host ? (Array.isArray(doc.schemes) && doc.schemes.length ? doc.schemes : ['https']).map((s: string) => `${s}://${doc.host}${doc.basePath ?? ''}`) : doc.basePath ? [doc.basePath] : [];
+    ? Array.isArray(doc.servers)
+      ? doc.servers.map((s: Json) => str(s?.url)).filter(Boolean)
+      : []
+    : doc.host
+      ? (Array.isArray(doc.schemes) && doc.schemes.length ? doc.schemes : ['https']).map(
+          (s: string) => `${s}://${doc.host}${doc.basePath ?? ''}`,
+        )
+      : doc.basePath
+        ? [doc.basePath]
+        : [];
 
-  const globalSecurity: string[] = Array.isArray(doc.security) ? doc.security.flatMap((s: Json) => Object.keys(s ?? {})) : [];
+  const globalSecurity: string[] = Array.isArray(doc.security)
+    ? doc.security.flatMap((s: Json) => Object.keys(s ?? {}))
+    : [];
   const operations: ApiOperation[] = [];
   for (const [path, rawItem] of Object.entries(doc.paths)) {
     const item = deref(doc, rawItem);
@@ -142,22 +159,52 @@ export function readApi(doc: Json): Api {
       const formRequired: string[] = [];
       for (const p of byKey.values()) {
         if (isV2 && p.in === 'body') {
-          body = { contentType: (op.consumes ?? doc.consumes ?? ['application/json'])[0], required: !!p.required, schema: p.schema, description: str(p.description) };
+          body = {
+            contentType: (op.consumes ?? doc.consumes ?? ['application/json'])[0],
+            required: !!p.required,
+            schema: p.schema,
+            description: str(p.description),
+          };
         } else if (isV2 && p.in === 'formData') {
-          form[p.name] = { type: p.type, format: p.format, items: p.items, description: p.description, enum: p.enum };
+          form[p.name] = {
+            type: p.type,
+            format: p.format,
+            items: p.items,
+            description: p.description,
+            enum: p.enum,
+          };
           if (p.required) formRequired.push(p.name);
         } else {
-          const schema = isV3 ? p.schema ?? pickContent(p.content)?.schema : { type: p.type, format: p.format, items: p.items, enum: p.enum, default: p.default };
-          params.push({ name: str(p.name), in: str(p.in), required: !!p.required || p.in === 'path', description: str(p.description), schema });
+          const schema = isV3
+            ? (p.schema ?? pickContent(p.content)?.schema)
+            : { type: p.type, format: p.format, items: p.items, enum: p.enum, default: p.default };
+          params.push({
+            name: str(p.name),
+            in: str(p.in),
+            required: !!p.required || p.in === 'path',
+            description: str(p.description),
+            schema,
+          });
         }
       }
       if (Object.keys(form).length) {
-        body = { contentType: (op.consumes ?? doc.consumes ?? ['multipart/form-data'])[0], required: formRequired.length > 0, schema: { type: 'object', properties: form, required: formRequired }, description: '' };
+        body = {
+          contentType: (op.consumes ?? doc.consumes ?? ['multipart/form-data'])[0],
+          required: formRequired.length > 0,
+          schema: { type: 'object', properties: form, required: formRequired },
+          description: '',
+        };
       }
       if (isV3 && op.requestBody) {
         const rb = deref(doc, op.requestBody);
         const c = pickContent(rb?.content);
-        if (c) body = { contentType: c.contentType, required: !!rb.required, schema: c.schema, description: str(rb.description) };
+        if (c)
+          body = {
+            contentType: c.contentType,
+            required: !!rb.required,
+            schema: c.schema,
+            description: str(rb.description),
+          };
       }
       const responses: ApiOperation['responses'] = [];
       for (const [status, raw] of Object.entries(isObj(op.responses) ? op.responses : {})) {
@@ -165,12 +212,24 @@ export function readApi(doc: Json): Api {
         if (!isObj(r)) continue;
         if (isV3) {
           const c = pickContent(r.content);
-          responses.push({ status, description: str(r.description), contentType: c?.contentType ?? '', schema: c?.schema });
+          responses.push({
+            status,
+            description: str(r.description),
+            contentType: c?.contentType ?? '',
+            schema: c?.schema,
+          });
         } else {
-          responses.push({ status, description: str(r.description), contentType: r.schema ? (op.produces ?? doc.produces ?? ['application/json'])[0] : '', schema: r.schema });
+          responses.push({
+            status,
+            description: str(r.description),
+            contentType: r.schema ? (op.produces ?? doc.produces ?? ['application/json'])[0] : '',
+            schema: r.schema,
+          });
         }
       }
-      const security = Array.isArray(op.security) ? op.security.flatMap((s: Json) => Object.keys(s ?? {})) : globalSecurity;
+      const security = Array.isArray(op.security)
+        ? op.security.flatMap((s: Json) => Object.keys(s ?? {}))
+        : globalSecurity;
       operations.push({
         key: `${method.toUpperCase()} ${path}`,
         method: method.toUpperCase(),
@@ -187,7 +246,13 @@ export function readApi(doc: Json): Api {
       });
     }
   }
-  const schemas: Record<string, Json> = isV3 ? (isObj(doc.components?.schemas) ? doc.components.schemas : {}) : (isObj(doc.definitions) ? doc.definitions : {});
+  const schemas: Record<string, Json> = isV3
+    ? isObj(doc.components?.schemas)
+      ? doc.components.schemas
+      : {}
+    : isObj(doc.definitions)
+      ? doc.definitions
+      : {};
   return {
     kind: isV3 ? 'openapi' : 'swagger',
     specVersion: isV3 ? `OpenAPI ${doc.openapi}` : 'Swagger 2.0',
@@ -226,7 +291,10 @@ export function typeOf(schema: Json, ctx: TypeCtx, depth = 0): string {
     return depth > 6 ? 'unknown' : typeOf(target, ctx, depth + 1);
   }
   let t: string;
-  const nullable = schema.nullable === true || schema['x-nullable'] === true || (Array.isArray(schema.type) && schema.type.includes('null'));
+  const nullable =
+    schema.nullable === true ||
+    schema['x-nullable'] === true ||
+    (Array.isArray(schema.type) && schema.type.includes('null'));
   if (Array.isArray(schema.allOf) && schema.allOf.length) {
     const parts = schema.allOf.map((s: Json) => typeOf(s, ctx, depth + 1));
     const own = schema.properties ? typeOf({ ...schema, allOf: undefined }, ctx, depth + 1) : null;
@@ -238,8 +306,14 @@ export function typeOf(schema: Json, ctx: TypeCtx, depth = 0): string {
   } else if (schema.const !== undefined) {
     t = JSON.stringify(schema.const);
   } else {
-    const types: string[] = Array.isArray(schema.type) ? schema.type.filter((x: string) => x !== 'null') : schema.type ? [schema.type] : [];
-    const type = types[0] ?? (schema.properties || schema.additionalProperties ? 'object' : schema.items ? 'array' : '');
+    const types: string[] = Array.isArray(schema.type)
+      ? schema.type.filter((x: string) => x !== 'null')
+      : schema.type
+        ? [schema.type]
+        : [];
+    const type =
+      types[0] ??
+      (schema.properties || schema.additionalProperties ? 'object' : schema.items ? 'array' : '');
     switch (type) {
       case 'array': {
         const inner = typeOf(schema.items, ctx, depth + 1);
@@ -251,8 +325,13 @@ export function typeOf(schema: Json, ctx: TypeCtx, depth = 0): string {
         const required = new Set<string>(Array.isArray(schema.required) ? schema.required : []);
         const extra = schema.additionalProperties;
         if (props.length && depth < 3) {
-          const fields = props.map(([k, v]) => `${safeKey(k)}${required.has(k) ? '' : '?'}: ${typeOf(v, ctx, depth + 1)}`);
-          if (extra && extra !== false) fields.push(`[key: string]: ${extra === true ? 'unknown' : typeOf(extra, ctx, depth + 1)}`);
+          const fields = props.map(
+            ([k, v]) => `${safeKey(k)}${required.has(k) ? '' : '?'}: ${typeOf(v, ctx, depth + 1)}`,
+          );
+          if (extra && extra !== false)
+            fields.push(
+              `[key: string]: ${extra === true ? 'unknown' : typeOf(extra, ctx, depth + 1)}`,
+            );
           t = `{ ${fields.join('; ')} }`;
         } else if (props.length) {
           t = 'object';
@@ -264,7 +343,12 @@ export function typeOf(schema: Json, ctx: TypeCtx, depth = 0): string {
         break;
       }
       case 'string':
-        t = schema.format === 'binary' ? 'binary' : schema.format ? `string<${schema.format}>` : 'string';
+        t =
+          schema.format === 'binary'
+            ? 'binary'
+            : schema.format
+              ? `string<${schema.format}>`
+              : 'string';
         break;
       case 'integer':
       case 'number':
@@ -279,7 +363,10 @@ export function typeOf(schema: Json, ctx: TypeCtx, depth = 0): string {
       default:
         t = 'unknown';
     }
-    if (types.length > 1) t = [t, ...types.slice(1).map((x) => typeOf({ ...schema, type: x }, ctx, depth + 1))].join(' | ');
+    if (types.length > 1)
+      t = [t, ...types.slice(1).map((x) => typeOf({ ...schema, type: x }, ctx, depth + 1))].join(
+        ' | ',
+      );
   }
   return nullable ? `${needsParens(t) ? `(${t})` : t} | null` : t;
 }
@@ -287,7 +374,8 @@ export function typeOf(schema: Json, ctx: TypeCtx, depth = 0): string {
 const safeKey = (k: string) => (/^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k));
 
 function propNote(s: Json, doc: Json): string {
-  const v = isObj(s) && typeof s.$ref === 'string' && !schemaRefName(s.$ref) ? pointer(doc, s.$ref) : s;
+  const v =
+    isObj(s) && typeof s.$ref === 'string' && !schemaRefName(s.$ref) ? pointer(doc, s.$ref) : s;
   if (!isObj(v)) return '';
   const bits: string[] = [];
   const d = str(v.description).trim().split('\n')[0];
@@ -297,7 +385,8 @@ function propNote(s: Json, doc: Json): string {
   if (v.deprecated) bits.push('deprecated');
   if (v.default !== undefined) bits.push(`default ${JSON.stringify(v.default)}`);
   if (v.maxLength !== undefined) bits.push(`max ${v.maxLength} chars`);
-  if (v.minimum !== undefined || v.maximum !== undefined) bits.push(`${v.minimum ?? ''}..${v.maximum ?? ''}`);
+  if (v.minimum !== undefined || v.maximum !== undefined)
+    bits.push(`${v.minimum ?? ''}..${v.maximum ?? ''}`);
   if (v.pattern) bits.push(`pattern ${v.pattern}`);
   return bits.join(' · ');
 }
@@ -308,8 +397,17 @@ export function renderSchema(api: Api, name: string, ctx: TypeCtx): string {
   if (!isObj(schema)) return `// ${name}: not found`;
   const lines: string[] = [];
   const desc = str(schema.description).trim();
-  if (desc) lines.push(...desc.split('\n').slice(0, 4).map((l) => `// ${l}`));
-  const objectLike = isObj(schema.properties) || (Array.isArray(schema.allOf) && schema.allOf.some((s: Json) => isObj(s) && (s.properties || s.$ref)));
+  if (desc)
+    lines.push(
+      ...desc
+        .split('\n')
+        .slice(0, 4)
+        .map((l) => `// ${l}`),
+    );
+  const objectLike =
+    isObj(schema.properties) ||
+    (Array.isArray(schema.allOf) &&
+      schema.allOf.some((s: Json) => isObj(s) && (s.properties || s.$ref)));
   if (!objectLike) {
     lines.push(`type ${name} = ${typeOf(schema, ctx)};`);
     return lines.join('\n');
@@ -329,10 +427,14 @@ export function renderSchema(api: Api, name: string, ctx: TypeCtx): string {
   lines.push(`interface ${name}${ext.length ? ` extends ${ext.join(', ')}` : ''} {`);
   for (const [k, v] of Object.entries(props)) {
     const note = propNote(v, api.doc);
-    lines.push(`  ${safeKey(k)}${required.has(k) ? '' : '?'}: ${typeOf(v, ctx, 1)};${note ? `  // ${note}` : ''}`);
+    lines.push(
+      `  ${safeKey(k)}${required.has(k) ? '' : '?'}: ${typeOf(v, ctx, 1)};${note ? `  // ${note}` : ''}`,
+    );
   }
   if (schema.additionalProperties && schema.additionalProperties !== false) {
-    lines.push(`  [key: string]: ${schema.additionalProperties === true ? 'unknown' : typeOf(schema.additionalProperties, ctx, 1)};`);
+    lines.push(
+      `  [key: string]: ${schema.additionalProperties === true ? 'unknown' : typeOf(schema.additionalProperties, ctx, 1)};`,
+    );
   }
   lines.push('}');
   return lines.join('\n');
@@ -343,8 +445,8 @@ function renderTypes(api: Api, start: Iterable<string>, limit = 40): string {
   const queue = [...start];
   const done = new Set<string>();
   const out: string[] = [];
-  while (queue.length && done.size < limit) {
-    const name = queue.shift()!;
+  let name: string | undefined;
+  while (done.size < limit && (name = queue.shift()) !== undefined) {
     if (done.has(name) || !(name in api.schemas)) continue;
     done.add(name);
     const ctx: TypeCtx = { doc: api.doc, refs: new Set() };
@@ -352,7 +454,8 @@ function renderTypes(api: Api, start: Iterable<string>, limit = 40): string {
     for (const r of ctx.refs) if (!done.has(r)) queue.push(r);
   }
   const left = queue.filter((n) => !done.has(n) && n in api.schemas);
-  if (left.length) out.push(`// …and ${new Set(left).size} more: ${[...new Set(left)].slice(0, 15).join(', ')}`);
+  if (left.length)
+    out.push(`// …and ${new Set(left).size} more: ${[...new Set(left)].slice(0, 15).join(', ')}`);
   return out.join('\n\n');
 }
 
@@ -361,7 +464,8 @@ function renderTypes(api: Api, start: Iterable<string>, limit = 40): string {
 const OK = /^2\d\d$/;
 
 function successType(op: ApiOperation, ctx: TypeCtx): string {
-  const ok = op.responses.find((r) => OK.test(r.status)) ?? op.responses.find((r) => r.status === 'default');
+  const ok =
+    op.responses.find((r) => OK.test(r.status)) ?? op.responses.find((r) => r.status === 'default');
   if (!ok) return '';
   const t = ok.schema ? typeOf(ok.schema, ctx) : '';
   const status = ok.status === '200' ? '' : `${ok.status} `;
@@ -384,7 +488,9 @@ export function matchOperations(api: Api, q: string): ApiOperation[] {
     const exact = api.operations.filter((o) => o.method === m[1].toUpperCase() && o.path === m[2]);
     if (exact.length) return exact;
   }
-  const byId = api.operations.filter((o) => o.operationId && o.operationId.toLowerCase() === query.toLowerCase());
+  const byId = api.operations.filter(
+    (o) => o.operationId !== '' && o.operationId.toLowerCase() === query.toLowerCase(),
+  );
   if (byId.length) return byId;
   const byPath = api.operations.filter((o) => o.path === query);
   if (byPath.length) return byPath;
@@ -402,19 +508,29 @@ export function searchOperations(api: Api, q: string, tag?: string): ApiOperatio
 
 export function renderOperation(api: Api, op: ApiOperation): string {
   const ctx: TypeCtx = { doc: api.doc, refs: new Set() };
-  const out: string[] = [`## \`${op.key}\`${op.operationId ? `  (${op.operationId})` : ''}${op.deprecated ? ' — deprecated' : ''}`];
+  const out: string[] = [
+    `## \`${op.key}\`${op.operationId ? `  (${op.operationId})` : ''}${op.deprecated ? ' — deprecated' : ''}`,
+  ];
   if (op.summary) out.push('', op.summary);
   if (op.description && op.description !== op.summary) out.push('', op.description);
-  const meta = [op.tags.length ? `Tags: ${op.tags.join(', ')}` : '', op.security.length ? `Auth: ${[...new Set(op.security)].join(', ')}` : ''].filter(Boolean);
+  const meta = [
+    op.tags.length ? `Tags: ${op.tags.join(', ')}` : '',
+    op.security.length ? `Auth: ${[...new Set(op.security)].join(', ')}` : '',
+  ].filter(Boolean);
   if (meta.length) out.push('', meta.join(' · '));
   if (op.params.length) {
     out.push('', '### Parameters');
     for (const p of op.params) {
-      out.push(`- \`${p.name}\` (${p.in}${p.required ? '' : ', optional'}): ${typeOf(p.schema, ctx)}${p.description ? ` — ${p.description.split('\n')[0]}` : ''}`);
+      out.push(
+        `- \`${p.name}\` (${p.in}${p.required ? '' : ', optional'}): ${typeOf(p.schema, ctx)}${p.description ? ` — ${p.description.split('\n')[0]}` : ''}`,
+      );
     }
   }
   if (op.body) {
-    out.push('', `### Request body (${op.body.contentType}${op.body.required ? '' : ', optional'})`);
+    out.push(
+      '',
+      `### Request body (${op.body.contentType}${op.body.required ? '' : ', optional'})`,
+    );
     if (op.body.description) out.push(op.body.description);
     out.push(op.body.schema ? `\`${typeOf(op.body.schema, ctx)}\`` : '_no schema_');
   }
@@ -422,7 +538,9 @@ export function renderOperation(api: Api, op: ApiOperation): string {
     out.push('', '### Responses');
     for (const r of op.responses) {
       const t = r.schema ? `\`${typeOf(r.schema, ctx)}\`` : '';
-      out.push(`- ${r.status}${r.description ? ` ${r.description.split('\n')[0]}` : ''}${t ? `: ${t}` : ''}`);
+      out.push(
+        `- ${r.status}${r.description ? ` ${r.description.split('\n')[0]}` : ''}${t ? `: ${t}` : ''}`,
+      );
     }
   }
   if (ctx.refs.size) out.push('', '### Types', '', '```ts', renderTypes(api, ctx.refs), '```');
@@ -430,7 +548,10 @@ export function renderOperation(api: Api, op: ApiOperation): string {
 }
 
 export function renderSchemaDetail(api: Api, name: string): string | null {
-  const exact = name in api.schemas ? name : Object.keys(api.schemas).find((k) => k.toLowerCase() === name.toLowerCase());
+  const exact =
+    name in api.schemas
+      ? name
+      : Object.keys(api.schemas).find((k) => k.toLowerCase() === name.toLowerCase());
   if (!exact) return null;
   const usedBy = api.operations.filter((op) => {
     const ctx: TypeCtx = { doc: api.doc, refs: new Set() };
@@ -439,28 +560,34 @@ export function renderSchemaDetail(api: Api, name: string): string | null {
     return ctx.refs.has(exact);
   });
   const out = [`## ${exact}`, '', '```ts', renderTypes(api, [exact]), '```'];
-  if (usedBy.length) out.push('', 'Used directly by:', ...usedBy.slice(0, 20).map((o) => `- \`${o.key}\``));
+  if (usedBy.length)
+    out.push('', 'Used directly by:', ...usedBy.slice(0, 20).map((o) => `- \`${o.key}\``));
   return out.join('\n');
 }
 
 /** Endpoints grouped by tag. Large APIs list their tags only, unless filtered. */
-export function renderOverview(api: Api, opts: { search?: string; tag?: string; max?: number } = {}): string {
+export function renderOverview(
+  api: Api,
+  opts: { search?: string; tag?: string; max?: number } = {},
+): string {
   const max = opts.max ?? 150;
-  const filtered = opts.search || opts.tag ? searchOperations(api, opts.search ?? '', opts.tag) : api.operations;
+  const filtered =
+    opts.search || opts.tag ? searchOperations(api, opts.search ?? '', opts.tag) : api.operations;
   const out: string[] = [];
   const groups = new Map<string, ApiOperation[]>();
   for (const op of filtered) {
     const tag = op.tags[0] ?? 'Other';
     groups.set(tag, [...(groups.get(tag) ?? []), op]);
   }
-  const heading = opts.search || opts.tag
-    ? `## Endpoints matching ${[opts.tag ? `tag "${opts.tag}"` : '', opts.search ? `"${opts.search}"` : ''].filter(Boolean).join(' and ')} (${filtered.length} of ${api.operations.length})`
-    : `## Endpoints (${api.operations.length})`;
+  const heading =
+    opts.search || opts.tag
+      ? `## Endpoints matching ${[opts.tag ? `tag "${opts.tag}"` : '', opts.search ? `"${opts.search}"` : ''].filter(Boolean).join(' and ')} (${filtered.length} of ${api.operations.length})`
+      : `## Endpoints (${api.operations.length})`;
   out.push(heading);
   if (!filtered.length) {
     out.push('', '_None._');
   } else if (filtered.length > max) {
-    out.push('', `Too many to list. Filter with \`tag\` or \`search\`. Tags:`, '');
+    out.push('', 'Too many to list. Filter with `tag` or `search`. Tags:', '');
     for (const [tag, ops] of groups) out.push(`- **${tag}** (${ops.length})`);
   } else {
     for (const [tag, ops] of groups) {
@@ -470,7 +597,13 @@ export function renderOverview(api: Api, opts: { search?: string; tag?: string; 
   }
   const names = Object.keys(api.schemas);
   if (names.length && !opts.search && !opts.tag) {
-    out.push('', `## Schemas (${names.length})`, '', names.slice(0, 200).join(', ') + (names.length > 200 ? `, …and ${names.length - 200} more` : ''));
+    out.push(
+      '',
+      `## Schemas (${names.length})`,
+      '',
+      names.slice(0, 200).join(', ') +
+      (names.length > 200 ? `, …and ${names.length - 200} more` : ''),
+    );
   }
   return out.join('\n');
 }

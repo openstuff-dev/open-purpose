@@ -25,9 +25,15 @@ export interface Config {
 }
 
 export interface ApiSpecConfig {
-  /** Whether the server may fetch spec URLs at all (OPENPURPOSE_API_FETCH=off disables it; uploads still work). */
+  /**
+   * Whether the server may fetch spec URLs at all (OPENPURPOSE_API_FETCH=off disables it; uploads
+   * still work).
+   */
   fetch: boolean;
-  /** Re-fetch a URL spec in the background when an agent reads it and it's older than this. 0 = only on demand. */
+  /**
+   * Re-fetch a URL spec in the background when an agent reads it and it's older than this. 0 = only
+   * on demand.
+   */
   refreshMinutes: number;
   /** Largest spec accepted, fetched or uploaded. */
   maxBytes: number;
@@ -39,7 +45,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     port,
     host: env.HOST ?? '0.0.0.0',
-    databaseUrl: env.DATABASE_URL ?? 'postgres://openpurpose:openpurpose@localhost:5432/openpurpose',
+    databaseUrl:
+      env.DATABASE_URL ?? 'postgres://openpurpose:openpurpose@localhost:5432/openpurpose',
     bootstrapToken: env.OPENPURPOSE_BOOTSTRAP_TOKEN || undefined,
     groupName: env.OPENPURPOSE_GROUP_NAME || env.OPENPURPOSE_ORG_NAME || 'Our company',
     orgName: env.OPENPURPOSE_ORG_NAME || env.OPENPURPOSE_GROUP_NAME || 'Our company',
