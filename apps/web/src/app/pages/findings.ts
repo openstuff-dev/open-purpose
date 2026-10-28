@@ -235,6 +235,7 @@ function lines(f: Finding): string {
     }
 
     @if (current(); as f) {
+      <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- Escape closes the drawer from the keyboard -->
       <div class="drawer-backdrop" (click)="close()"></div>
       <!-- Not modal, like before: notices and the command palette stay usable on top. -->
       <dialog
@@ -437,7 +438,7 @@ export class FindingsPage {
   private notices = inject(Notices);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
-  private drawer = viewChild('drawer', { read: ElementRef<HTMLElement> });
+  private readonly drawer = viewChild<unknown, ElementRef<HTMLElement>>('drawer', { read: ElementRef });
 
   readonly statuses = STATUSES;
   readonly label = STATUS;
@@ -445,7 +446,7 @@ export class FindingsPage {
   readonly hint = STATUS_HINT;
   readonly lines = lines;
   readonly ago = ago;
-  readonly columns: Array<{ key: SortKey; col: string; label: string }> = [
+  readonly columns: { key: SortKey; col: string; label: string }[] = [
     { key: 'title', col: 'change', label: 'Finding' },
     { key: 'file', col: 'file', label: 'File' },
     { key: 'where', col: 'where', label: 'Where' },
@@ -463,7 +464,7 @@ export class FindingsPage {
   note = '';
   remindAfter = '';
   /** A finding opened by link that the current filters leave out. */
-  private extra = signal<Finding | null>(null);
+  private readonly extra = signal<Finding | null>(null);
 
   private readonly params = toSignal(this.route.queryParamMap);
   readonly openId = computed(() => this.params()?.get('f') ?? null);
@@ -503,6 +504,7 @@ export class FindingsPage {
     if (!id) return null;
     return this.all().find((f) => f.id === id) ?? (this.extra()?.id === id ? this.extra() : null);
   });
+
   readonly index = computed(() => this.rows().findIndex((f) => f.id === this.openId()));
 
   constructor() {
@@ -520,8 +522,8 @@ export class FindingsPage {
           return;
         void this.api
           .finding(id)
-          .then((f) => this.extra.set(f))
-          .catch((e) => {
+          .then((f) => { this.extra.set(f); })
+          .catch((e: unknown) => {
             this.notices.error(e);
             this.close();
           });
@@ -533,7 +535,9 @@ export class FindingsPage {
         if (!id) return;
         this.note = '';
         this.remindAfter = this.current()?.remind_after ?? '';
-        queueMicrotask(() => this.drawer()?.nativeElement.focus({ preventScroll: true }));
+        queueMicrotask(() => {
+          this.drawer()?.nativeElement.focus({ preventScroll: true });
+        });
       });
     });
   }
@@ -604,7 +608,7 @@ export class FindingsPage {
   async setStatus(f: Finding, status: FindingStatus): Promise<void> {
     const rows = this.rows();
     const i = rows.findIndex((x) => x.id === f.id);
-    const next = rows[i + 1] ?? rows[i - 1];
+    const next = rows.at(i + 1) ?? (i > 0 ? rows.at(i - 1) : undefined);
     try {
       const updated = await this.api.setFindingStatus(f.id, {
         status,
@@ -637,7 +641,8 @@ export class FindingsPage {
   }
 
   step(delta: number): void {
-    const next = this.rows()[this.index() + delta];
+    const j = this.index() + delta;
+    const next = j >= 0 ? this.rows().at(j) : undefined;
     if (next) this.open(next.id);
   }
 

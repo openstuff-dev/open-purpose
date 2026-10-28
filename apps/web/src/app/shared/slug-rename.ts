@@ -200,7 +200,7 @@ export class SlugRenameField {
   readonly prefix = input('');
   readonly canEdit = input(true);
   /** After a rename or a removed alias: reload. */
-  readonly changed = output<void>();
+  readonly changed = output();
 
   private api = inject(Api);
   private readonly confirmDialog = inject(ConfirmDialog);
@@ -226,7 +226,7 @@ export class SlugRenameField {
       case 'organization':
         return `It's the first part of links to this organization's projects, like [[${s}/project]], and of every .openpurpose.json that names one of them.`;
       default:
-        return `Agents use it to ask for this scope explicitly and to file learnings under it.`;
+        return 'Agents use it to ask for this scope explicitly and to file learnings under it.';
     }
   });
 
@@ -301,7 +301,7 @@ export class SlugRenameField {
       this.changed.emit();
     } catch (e) {
       // Someone took the slug, or made it an old slug, since the preview.
-      if (aliasConflict(e)) void this.onDraft(this.draft());
+      if (aliasConflict(e)) this.onDraft(this.draft());
       this.notices.error(e);
     }
   }

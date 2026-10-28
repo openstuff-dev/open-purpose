@@ -158,8 +158,10 @@ export class PreviewPage {
   constructor() {
     void this.api
       .projects()
-      .then((p) => this.projects.set(p))
-      .catch((e) => this.notices.error(e));
+      .then((p) => { this.projects.set(p); })
+      .catch((e: unknown) => {
+        this.notices.error(e);
+      });
   }
 
   /** "~3,200 tokens of 16,000 · 4 sections shortened" */

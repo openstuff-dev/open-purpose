@@ -105,7 +105,10 @@ export class ActivityFigure {
   readonly count = input.required<number>();
   /** The same count for the period before; null hides the trend. */
   readonly previous = input<number | null>(null);
-  /** What `previous` is compared with, when that isn't `count` (e.g. this week vs an all-time count). */
+  /**
+   * What `previous` is compared with, when that isn't `count` (e.g. this week vs an
+   * all-time count).
+   */
   readonly current = input<number | null>(null);
   readonly daily = input<number[]>([]);
   /** YYYY-MM-DD for each value of `daily`. */
@@ -135,7 +138,9 @@ export class ActivityFigure {
 
   /** Empty cells before the first day, so each row is one weekday (Monday on top). */
   readonly pad = computed(() =>
-    this.size() === 'sm' || !this.days().length ? [] : Array(weekdayMonFirst(this.days()[0])),
+    this.size() === 'sm' || !this.days().length
+      ? []
+      : Array<undefined>(weekdayMonFirst(this.days()[0])),
   );
 
   readonly width = computed(() => Math.max(1, this.daily().length - 1));
@@ -144,14 +149,17 @@ export class ActivityFigure {
     const max = Math.max(1, ...values);
     return values.map((v, i) => [i, 22 - (v / max) * 20] as const);
   });
+
   readonly line = computed(() =>
     this.points()
       .map(([x, y], i) => `${i ? 'L' : 'M'}${x},${y.toFixed(2)}`)
       .join(''),
   );
+
   readonly area = computed(() => {
     const pts = this.points();
-    return pts.length ? `${this.line()}L${pts.at(-1)![0]},24L0,24Z` : '';
+    const last = pts.at(-1);
+    return last ? `${this.line()}L${last[0]},24L0,24Z` : '';
   });
 
   readonly trend = computed(() => {
@@ -174,12 +182,14 @@ export class ActivityFigure {
       const v = this.daily()[i];
       return !best || v > best.v ? { v, d: c.day } : best;
     }, null);
-    return `${this.count()} ${this.unit()}${busiest && busiest.v ? `, most on ${day(busiest.d)} (${busiest.v})` : ''}`;
+    return `${this.count()} ${this.unit()}${busiest?.v ? `, most on ${day(busiest.d)} (${busiest.v})` : ''}`;
   });
 
   constructor() {
     let frame = 0;
-    inject(DestroyRef).onDestroy(() => cancelAnimationFrame(frame));
+    inject(DestroyRef).onDestroy(() => {
+      cancelAnimationFrame(frame);
+    });
     // Count up from 0 whenever the number (or the style) changes.
     effect(() => {
       const target = this.count();

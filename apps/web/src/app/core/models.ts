@@ -1,4 +1,7 @@
-/** Shapes identical on server and web live in @openpurpose/contracts; the rest are API response shapes. */
+/**
+ * Shapes identical on server and web live in @openpurpose/contracts; the rest are API
+ * response shapes.
+ */
 import type {
   Actor,
   DocumentActivity,
@@ -194,7 +197,7 @@ export interface Section {
 }
 
 export interface DocDetail extends Omit<Doc, 'staleness'>, DocumentActivity {
-  sections: Array<Section & { activity: SectionActivity }>;
+  sections: (Section & { activity: SectionActivity })[];
   project: Project | null;
   scope: Scope | null;
   organization: OrgRef | null;
@@ -327,26 +330,24 @@ export interface ContextResult {
   resolution: {
     via: string | null;
     remote: { key: string } | null;
-    suggestions: Array<{ slug: string; name: string; organization_slug: string }>;
+    suggestions: { slug: string; name: string; organization_slug: string }[];
   };
   path: string;
   stacks: string[];
-  blocks: Array<{
+  blocks: {
     level: string;
     label: string;
     scope: { slug: string; name: string; reason: string } | null;
-    documents: Array<{
+    documents: {
       id: string;
       kind: DocKind;
       title: string;
-      sections: Array<Section & { shortened?: boolean }>;
-    }>;
-  }>;
+      sections: (Section & { shortened?: boolean })[];
+    }[];
+  }[];
   learning_target: { label: string };
-  related: Array<{ direction: 'uses' | 'used_by'; node: GraphNode }>;
-  apis: Array<
-    ApiSpec & { project_ref: string; project_name: string; relation: 'this' | 'uses' | 'used_by' }
-  >;
+  related: { direction: 'uses' | 'used_by'; node: GraphNode }[];
+  apis: (ApiSpec & { project_ref: string; project_name: string; relation: 'this' | 'uses' | 'used_by' })[];
   /** tokens are estimated as characters / 4. */
   budget: { max_tokens: number | null; tokens: number; shortened: number };
   markdown: string;
@@ -364,15 +365,15 @@ export interface TokenRow {
 export interface Member extends Actor {
   created_at: string;
   disabled_at: string | null;
-  memberships: Array<{ id: string; organization_id: string | null; role: Role }>;
-  tokens: Array<{
+  memberships: { id: string; organization_id: string | null; role: Role }[];
+  tokens: {
     id: string;
     prefix: string;
     label: string;
     created_at: string;
     last_used_at: string | null;
     revoked_at: string | null;
-  }>;
+  }[];
   manageable: boolean;
 }
 

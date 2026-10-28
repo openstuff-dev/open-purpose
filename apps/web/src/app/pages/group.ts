@@ -18,9 +18,7 @@ import { ScopeList } from '../shared/scope-list';
       <header class="os-page-header">
         <div>
           <div class="title-row">
-            <span class="badge group" style="width:2.25rem;height:2.25rem;font-size:0.8rem">{{
-              initials(g.name)
-            }}</span>
+            <span class="badge lg group">{{ initials(g.name) }}</span>
             <h1 class="os-page-title">{{ g.name }}</h1>
           </div>
           <p class="os-page-description">

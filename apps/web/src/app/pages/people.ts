@@ -307,7 +307,7 @@ const GROUP = 'group';
             </os-field>
           </div>
           <footer os-dialog-footer>
-            <button os-button os-dialog-close>Cancel</button>
+            <button os-button type="button" os-dialog-close>Cancel</button>
             <button os-button variant="primary" type="submit">Create token</button>
           </footer>
         </form>
@@ -332,13 +332,14 @@ export class PeoplePage {
   readonly adding = signal<string | null>(null);
   /** Levels this admin manages: the group (group admins) and each organization they administer. */
   readonly levels = computed(() => {
-    const out: Array<{ id: string; name: string }> = [];
+    const out: { id: string; name: string }[] = [];
     if (this.session.canAdmin(null))
       out.push({ id: GROUP, name: `${this.session.group()?.name} (every organization)` });
     for (const o of this.session.orgs())
       if (this.session.canAdmin(o.id)) out.push({ id: o.id, name: o.name });
     return out;
   });
+
   name = '';
   kind: 'human' | 'agent' = 'agent';
   role: Role = 'editor';
@@ -354,19 +355,19 @@ export class PeoplePage {
   fixLevel(): void {
     const options = this.levels().filter((l) => this.kind === 'human' || l.id !== GROUP);
     if (!options.some((l) => l.id === this.level)) {
-      this.level = options.find((l) => l.id === this.session.orgId())?.id ?? options[0]?.id ?? '';
+      this.level = options.find((l) => l.id === this.session.orgId())?.id ?? options.at(0)?.id ?? '';
     }
   }
 
   roleName(role: string): string {
-    return ROLE_LABEL[role as Role] ?? role;
+    return (ROLE_LABEL as Partial<Record<string, string>>)[role] ?? role;
   }
 
   private orgOf(level: string): string | null {
     return level === GROUP ? null : level;
   }
 
-  addable(m: Member): Array<{ id: string; name: string }> {
+  addable(m: Member): { id: string; name: string }[] {
     const have = new Set(m.memberships.map((x) => x.organization_id ?? GROUP));
     return this.levels().filter((l) => !have.has(l.id));
   }

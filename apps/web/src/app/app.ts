@@ -2,13 +2,13 @@ import {
   ChangeDetectionStrategy,
   Component,
   effect,
-  ElementRef,
+  type ElementRef,
   inject,
   signal,
   untracked,
   viewChild,
 } from '@angular/core';
-import { HttpErrorResponse } from '@angular/common/http';
+import { type HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
@@ -340,7 +340,7 @@ import { Palette } from './shared/palette';
           </div>
         </div>
         @if (session.palette() !== null) {
-          <app-palette (close)="session.palette.set(null)" />
+          <app-palette (closed)="session.palette.set(null)" />
         }
       }
     } @else if (loadError()) {
@@ -352,7 +352,7 @@ import { Palette } from './shared/palette';
         </div>
       </main>
     }
-    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <svg class="sprite" width="0" height="0" aria-hidden="true">
       <symbol id="openpurpose-mark" viewBox="0 0 40 40">
         <rect
           x="5"
@@ -402,7 +402,8 @@ export class App {
     effect(() =>
       document.documentElement.classList.toggle('agent-mode', !!this.session.me()?.agent_view),
     );
-    // Agent mode can also end without the switch (e.g. the organization went away): leave the console then.
+    // Agent mode can also end without the switch (e.g. the organization went away):
+    // leave the console then.
     effect(() => {
       const me = this.session.me();
       if (me && !me.agent_view && this.router.url.startsWith('/agent'))

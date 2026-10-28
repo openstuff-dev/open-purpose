@@ -93,7 +93,7 @@ import { Icon } from '../shared/icon';
 
     @if (adding()) {
       <form class="inline-form os-panel os-panel-body" (ngSubmit)="create()">
-        <p class="full" style="margin:0">
+        <p class="full form-title">
           <strong>New project in {{ session.org()?.name }}</strong>
         </p>
         <os-field label="Name" class="grow"
@@ -201,6 +201,7 @@ export class ProjectsPage {
   readonly visible = computed(() =>
     this.projects().filter((p) => !this.onlyReview() || !p.reviewed),
   );
+
   draft = { name: '', slug: '', remote_url: '', purpose: '' };
   private timer: ReturnType<typeof setTimeout> | undefined;
 

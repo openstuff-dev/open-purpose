@@ -1,7 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
+  type ElementRef,
   inject,
   input,
   model,
@@ -14,19 +14,19 @@ import { Icon } from './icon';
 import { MarkdownView } from './markdown';
 
 type Format =
-  | 'h2'
-  | 'h3'
-  | 'bold'
-  | 'italic'
-  | 'strike'
-  | 'code'
-  | 'link'
-  | 'wikilink'
-  | 'list-ul'
-  | 'list-ol'
-  | 'list-task'
-  | 'quote'
-  | 'code-block';
+  | 'h2' |
+  'h3' |
+  'bold' |
+  'italic' |
+  'strike' |
+  'code' |
+  'link' |
+  'wikilink' |
+  'list-ul' |
+  'list-ol' |
+  'list-task' |
+  'quote' |
+  'code-block';
 
 const MOD =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+';
@@ -175,7 +175,7 @@ export class MarkdownEditor {
   readonly tools = TOOLS;
   readonly mod = MOD;
   private api = inject(Api);
-  private ta = viewChild<ElementRef<HTMLTextAreaElement>>('ta');
+  private readonly ta = viewChild<ElementRef<HTMLTextAreaElement>>('ta');
   readonly preview = signal(false);
   readonly suggestions = signal<LinkTarget[]>([]);
   readonly active = signal(0);
@@ -312,9 +312,9 @@ export class MarkdownEditor {
       const to =
         end > start && value[end - 1] === '\n'
           ? end - 1
-          : value.indexOf('\n', end) < 0
-            ? value.length
-            : value.indexOf('\n', end);
+          : !value.includes('\n', end)
+              ? value.length
+              : value.indexOf('\n', end);
       const body = value.slice(from, to);
       const fenced = /^```[^\n]*\n([\s\S]*)\n```$/.exec(body);
       const insert = fenced ? fenced[1] : '```\n' + body + '\n```';
@@ -325,15 +325,19 @@ export class MarkdownEditor {
     }
   }
 
-  /** Adds a block prefix (heading, list, quote) to every selected line, or removes it if all have it. */
+  /**
+   * Adds a block prefix (heading, list, quote) to every selected line, or removes it if all
+   * have it.
+   */
   private toggleLines(format: Format): void {
-    const el = this.ta()!.nativeElement;
+    const el = this.ta()?.nativeElement;
+    if (!el) return;
     const { selectionStart: start, selectionEnd: end, value } = el;
     const from = value.lastIndexOf('\n', start - 1) + 1;
     const lastEnd = end > start && value[end - 1] === '\n' ? end - 1 : end;
-    const to = value.indexOf('\n', lastEnd) < 0 ? value.length : value.indexOf('\n', lastEnd);
+    const to = !value.includes('\n', lastEnd) ? value.length : value.indexOf('\n', lastEnd);
     const lines = value.slice(from, to).split('\n');
-    const prefixFor = (i: number) => (format === 'list-ol' ? `${i + 1}. ` : PREFIX[format]!);
+    const prefixFor = (i: number) => (format === 'list-ol' ? `${i + 1}. ` : (PREFIX[format] ?? ''));
     const has = (line: string, i: number) =>
       format === 'list-ol' ? /^\d+\. /.test(line) : line.startsWith(prefixFor(i));
     const off = lines.every((l, i) => has(l, i) || !l.trim());
@@ -378,19 +382,26 @@ export class MarkdownEditor {
     selStart: number,
     selEnd: number,
   ): void {
-    const el = this.ta()!.nativeElement;
+    const el = this.ta()?.nativeElement;
+    if (!el) return;
     el.focus();
     el.setSelectionRange(start, end);
+    // execCommand is deprecated, but it is still the only way to edit a textarea and keep
+    // the browser's undo history. setRangeText is the fallback.
+    /* eslint-disable @typescript-eslint/no-deprecated */
     const done = text
       ? document.execCommand('insertText', false, text)
       : document.execCommand('delete');
+    /* eslint-enable @typescript-eslint/no-deprecated */
     if (!done) el.setRangeText(text, start, end);
     el.setSelectionRange(selStart, selEnd);
     this.value.set(el.value);
   }
 
   closeSoon(): void {
-    setTimeout(() => this.close(), 150);
+    setTimeout(() => {
+      this.close();
+    }, 150);
   }
 
   private close(): void {

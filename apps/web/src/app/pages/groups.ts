@@ -48,7 +48,7 @@ import { initials } from '../core/theme';
     <ul class="group-list">
       @for (g of groups(); track g.id) {
         <li>
-          <span style="display:flex;align-items:center;gap:0.6rem"
+          <span class="group-name"
             ><span class="badge sm group">{{ initials(g.name) }}</span
             ><strong>{{ g.name }}</strong> <code class="quiet">{{ g.slug }}</code></span
           >
@@ -113,6 +113,7 @@ export class GroupsPage {
   readonly created = signal<{ id: string; name: string; admin: string; token?: string } | null>(
     null,
   );
+
   draft = { name: '', organization_name: '', admin_name: '' };
 
   constructor() {
@@ -161,7 +162,9 @@ export class GroupsPage {
       a.href = url;
       a.download = name;
       a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 1000);
     } catch (e) {
       this.notices.error(e);
     }

@@ -5,4 +5,6 @@ import { App } from './app/app';
 
 // Popovers, interestfor and anchor positioning where the browser lacks them.
 void loadPolyfills();
-bootstrapApplication(App, appConfig).catch((err) => console.error(err));
+bootstrapApplication(App, appConfig).catch((err: unknown) => {
+  console.error(err);
+});

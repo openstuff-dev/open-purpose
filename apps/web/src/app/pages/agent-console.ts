@@ -28,7 +28,7 @@ interface Call {
   text: string | null;
   error: boolean;
   /** Calls the output points to, offered as buttons. */
-  next: Array<{ name: string; args: Args }>;
+  next: { name: string; args: Args }[];
 }
 
 /** "get_context(project="x", path="y")": a tool call written the way it reads in a transcript. */
@@ -45,18 +45,18 @@ function followUps(call: {
   name: string;
   args: Args;
   text: string;
-}): Array<{ name: string; args: Args }> {
+}): { name: string; args: Args }[] {
   const text = call.text;
   const out = new Map<string, { name: string; args: Args }>();
   const add = (name: string, args: Args) => out.set(signature(name, args), { name, args });
   for (const m of text.matchAll(/\[s:([0-9a-f]{8})\b|"section_id": "([0-9a-f]{8})"/g))
-    add('read_section', { section_id: m[1] ?? m[2] });
+    add('read_section', { section_id: m[1] || m[2] });
   for (const m of text.matchAll(/get_api project="([^"]+)"(?: api="([^"]+)")?/g))
     add('get_api', m[2] ? { project: m[1], api: m[2] } : { project: m[1] });
   for (const m of text.matchAll(
     /\(`([a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)?)`\)|"ref": "([^"]+)"/g,
   )) {
-    const project = m[1] ?? m[2];
+    const project = m[1] || m[2];
     add('get_context', { project });
     add('get_related', { project });
   }
@@ -91,7 +91,16 @@ function followUps(call: {
  */
 @Component({
   selector: 'app-agent-console',
-  imports: [PageHeader, EmptyState, FormsModule, MarkdownView, Button, Field, Control, SegmentedControl],
+  imports: [
+    PageHeader,
+    EmptyState,
+    FormsModule,
+    MarkdownView,
+    Button,
+    Field,
+    Control,
+    SegmentedControl,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header
@@ -231,7 +240,7 @@ export class AgentConsolePage {
   readonly session = inject(Session);
   private api = inject(Api);
   private notices = inject(Notices);
-  private host = inject(ElementRef<HTMLElement>);
+  private host = inject<ElementRef<HTMLElement>>(ElementRef);
   readonly projects = signal<Project[]>([]);
   readonly calls = signal<Call[]>([]);
   readonly readable = signal(readStoredReadable());
@@ -239,6 +248,7 @@ export class AgentConsolePage {
     { value: 'raw', label: 'Exactly as sent' },
     { value: 'readable', label: 'Readable' },
   ] as const;
+
   private seq = 0;
   project = '';
   remote = '';
@@ -260,7 +270,9 @@ export class AgentConsolePage {
           void this.getContext();
         }
       })
-      .catch((e) => this.notices.error(e));
+      .catch((e: unknown) => {
+        this.notices.error(e);
+      });
   }
 
   ref(p: Project): string {
@@ -287,7 +299,10 @@ export class AgentConsolePage {
   /** Short button text: the tool and its most telling argument. */
   label(c: { name: string; args: Args }): string {
     const a = c.args;
-    return `${c.name} ${a['endpoint'] ?? a['tag'] ?? a['section_id'] ?? a['api'] ?? a['project'] ?? ''}`.trim();
+    const arg = ['endpoint', 'tag', 'section_id', 'api', 'project']
+      .map((k) => a[k])
+      .find((v) => typeof v === 'string');
+    return `${c.name} ${arg ?? ''}`.trim();
   }
 
   getContext(): Promise<void> {
@@ -337,10 +352,10 @@ export class AgentConsolePage {
   }
 
   private scrollToEnd(): void {
-    setTimeout(() =>
+    setTimeout(() => {
       this.host.nativeElement
         .querySelector('.call:last-of-type')
-        ?.scrollIntoView({ block: 'start', behavior: 'smooth' }),
-    );
+        ?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
   }
 }

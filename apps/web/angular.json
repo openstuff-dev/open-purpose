@@ -53,6 +53,7 @@
               "@fontsource-variable/geist/index.css",
               "@fontsource-variable/geist-mono/index.css",
               "src/styles.css",
+              "src/app.layout.css",
               "src/agent-mode.css"
             ],
             "allowedCommonJsDependencies": [
