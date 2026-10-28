@@ -100,7 +100,7 @@ import { ScopeList } from '../shared/scope-list';
         <app-doc-list
           [organizationId]="null"
           [canEdit]="g.can_edit"
-          emptyText="No group documents yet."
+          emptyTitle="No group documents yet"
         />
       </section>
 
@@ -117,7 +117,8 @@ import { ScopeList } from '../shared/scope-list';
         <app-scope-list
           [organizationId]="null"
           [canEdit]="g.can_edit"
-          emptyText="No group-wide scopes yet. A typical first one is “.NET services” with the stack tag dotnet."
+          emptyTitle="No group-wide scopes yet"
+          emptyText="A typical first one is “.NET services” with the stack tag dotnet."
         />
       </section>
     }

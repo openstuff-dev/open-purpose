@@ -18,6 +18,7 @@ import {
   Control,
   Field,
   SegmentedControl,
+  EmptyState,
 } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ApiSpec, ApiSpecDetail } from '../core/models';
@@ -43,6 +44,7 @@ function ago(iso: string | null): string {
 @Component({
   selector: 'app-api-specs',
   imports: [
+    EmptyState,
     FormsModule,
     DatePipe,
     Icon,
@@ -225,11 +227,10 @@ function ago(iso: string | null): string {
         }
       </ul>
     } @else {
-      <p class="empty">
-        No API spec yet. Add the project's <code>swagger.json</code> or
-        <code>openapi.yaml</code> and agents get its endpoints and DTOs, here and in every project
-        that uses this one.
-      </p>
+      <os-empty-state title="No API spec yet" bordered>
+        Add the project's <code>swagger.json</code> or <code>openapi.yaml</code> and agents get its
+        endpoints and DTOs, here and in every project that uses this one.
+      </os-empty-state>
     }
 
     @if (canEdit()) {

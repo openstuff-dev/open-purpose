@@ -10,6 +10,7 @@ import {
   ConfirmDialog,
   Control,
   Field,
+  EmptyState,
 } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Project } from '../core/models';
@@ -19,7 +20,19 @@ import { Icon } from '../shared/icon';
 
 @Component({
   selector: 'app-projects',
-  imports: [RouterLink, FormsModule, Icon, Button, Field, Control, Check, Checkbox, Badge, Chip],
+  imports: [
+    RouterLink,
+    FormsModule,
+    Icon,
+    Button,
+    Field,
+    Control,
+    Check,
+    Checkbox,
+    Badge,
+    Chip,
+    EmptyState,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="page-head">
@@ -164,14 +177,14 @@ import { Icon } from '../shared/icon';
         }
       </ul>
     } @else if (loaded()) {
-      <p class="empty">
-        @if (q() || onlyReview()) {
-          No projects match.
-        } @else {
-          No projects yet. Create the first one, or let an agent create it from a repository; it
-          will show up here for review.
-        }
-      </p>
+      @if (q() || onlyReview()) {
+        <os-empty-state title="No projects match" level="2" bordered />
+      } @else {
+        <os-empty-state title="No projects yet" level="2" bordered>
+          Create the first one, or let an agent create it from a repository. It will show up here
+          for review.
+        </os-empty-state>
+      }
     }
   `,
 })

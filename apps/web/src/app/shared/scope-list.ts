@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Button, Chip, ConfirmDialog, Control, Field } from '@openstuff-dev/ui-angular';
+import { Button, Chip, ConfirmDialog, Control, Field, EmptyState } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Repository, Scope } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -29,7 +29,7 @@ export const repoName = (key: string) => key.split('/').pop() || key;
 /** Scopes at the org level (projectId null) or inside a project. */
 @Component({
   selector: 'app-scope-list',
-  imports: [RouterLink, FormsModule, Icon, RepoPicker, Button, Field, Control, Chip],
+  imports: [EmptyState, RouterLink, FormsModule, Icon, RepoPicker, Button, Field, Control, Chip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (scopes().length) {
@@ -60,7 +60,7 @@ export const repoName = (key: string) => key.split('/').pop() || key;
         }
       </ul>
     } @else if (loaded()) {
-      <p class="empty">{{ emptyText() }}</p>
+      <os-empty-state [title]="emptyTitle()" bordered>{{ emptyText() }}</os-empty-state>
     }
     @if (canEdit()) {
       @if (adding()) {
@@ -138,7 +138,9 @@ export class ScopeList {
   readonly organizationId = input<string | null>(null);
   readonly projectId = input<string | null>(null);
   readonly canEdit = input(false);
-  readonly emptyText = input('No scopes yet.');
+  readonly emptyTitle = input('No scopes yet');
+  /** A sentence under the title, such as what to add first. */
+  readonly emptyText = input('');
   /** The project's repositories (project scopes only). */
   readonly repositories = input<Repository[]>([]);
   readonly repositoryAdded = output<Repository>();

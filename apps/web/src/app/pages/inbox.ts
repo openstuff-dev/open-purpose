@@ -297,7 +297,12 @@ function ago(iso: string): string {
                   />{{ p.created_by_name ?? 'Unknown' }}</span
                 >
               </td>
-              <td role="cell" class="col-when" data-label="When" [title]="p.created_at | date: 'd MMM y, HH:mm'">
+              <td
+                role="cell"
+                class="col-when"
+                data-label="When"
+                [title]="p.created_at | date: 'd MMM y, HH:mm'"
+              >
                 {{ ago(p.created_at) }}
               </td>
               <td role="cell" class="col-file" data-label="File">

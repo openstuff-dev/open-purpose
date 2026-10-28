@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Button, Check, Checkbox, Chip, ConfirmDialog } from '@openstuff-dev/ui-angular';
+import { Button, Check, Checkbox, Chip, ConfirmDialog, Callout } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { SlugAlias, SlugKind, SlugRename, SlugRenameRef } from '../core/models';
 import { aliasConflict, errorMessage } from '../core/session';
@@ -24,7 +24,7 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
  */
 @Component({
   selector: 'app-slug-rename',
-  imports: [FormsModule, RouterLink, Button, Check, Checkbox, Chip],
+  imports: [Callout, FormsModule, RouterLink, Button, Check, Checkbox, Chip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="slug-field">
@@ -62,7 +62,7 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
               </p>
             } @else if (preview(); as r) {
               @if (r.alias_of; as other) {
-                <div class="callout danger">
+                <os-callout tone="danger">
                   <p>
                     <strong
                       ><code>{{ r.to }}</code> is the old slug of {{ other.name }}</strong
@@ -75,9 +75,9 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
                     ><input os-checkbox type="checkbox" name="take" [(ngModel)]="take" /> Take
                     <code>{{ r.to }}</code> from {{ other.name }}</label
                   >
-                </div>
+                </os-callout>
               }
-              <div class="callout warn">
+              <os-callout tone="warning">
                 <p>
                   <strong
                     >What changes when <code>{{ r.from }}</code> becomes
@@ -165,7 +165,7 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
                     Update links I can edit</label
                   >
                 }
-              </div>
+              </os-callout>
             }
           </div>
           <div class="form-actions">

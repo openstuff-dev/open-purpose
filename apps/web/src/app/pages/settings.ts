@@ -10,7 +10,15 @@ import {
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
-import { Badge, Button, Checkbox, ConfirmDialog, Control, Field } from '@openstuff-dev/ui-angular';
+import {
+  Badge,
+  Button,
+  Checkbox,
+  ConfirmDialog,
+  Control,
+  Field,
+  Callout,
+} from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Organization, TokenRow } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -66,6 +74,7 @@ organization, the project and the part of the code you are in (a repository or a
 @Component({
   selector: 'app-settings',
   imports: [
+    Callout,
     FormsModule,
     DatePipe,
     RouterLink,
@@ -169,8 +178,11 @@ organization, the project and the part of the code you are in (a repository or a
                 that acts as you.
               </p>
               @if (freshToken(); as t) {
-                <div class="callout token-callout" role="alert">
-                  <strong>Copy your new token now. It is not shown again.</strong>
+                <os-callout
+                  tone="success"
+                  title="Copy your new token now. It is not shown again."
+                  role="alert"
+                >
                   <div class="copy-block" style="width:100%">
                     <pre><code>{{ t }}</code></pre>
                     <button os-button size="sm" type="button" (click)="copy(t)">
@@ -179,6 +191,7 @@ organization, the project and the part of the code you are in (a repository or a
                   </div>
                   <button
                     os-button
+                    os-actions
                     variant="link"
                     size="sm"
                     type="button"
@@ -186,7 +199,7 @@ organization, the project and the part of the code you are in (a repository or a
                   >
                     Done
                   </button>
-                </div>
+                </os-callout>
               }
               <div class="setting-card">
                 @for (t of tokens(); track t.id) {

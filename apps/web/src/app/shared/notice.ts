@@ -1,33 +1,20 @@
-import { Injectable, signal } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
+import { Toaster } from '@openstuff-dev/ui-angular';
 import { errorMessage } from '../core/session';
 
-export interface Notice {
-  id: number;
-  text: string;
-  tone: 'ok' | 'error';
-}
-
-/** Short confirmations and errors, shown bottom-left and announced to screen readers. */
+/** Short confirmations and errors, shown as toasts and announced to screen readers. */
 @Injectable({ providedIn: 'root' })
 export class Notices {
-  readonly list = signal<Notice[]>([]);
-  private next = 1;
+  private readonly toaster = inject(Toaster);
 
   ok(text: string): void {
-    this.push(text, 'ok');
+    this.toaster.show(text, { tone: 'success' });
   }
 
   error(err: unknown): void {
-    this.push(typeof err === 'string' ? err : errorMessage(err), 'error');
-  }
-
-  dismiss(id: number): void {
-    this.list.update((l) => l.filter((n) => n.id !== id));
-  }
-
-  private push(text: string, tone: Notice['tone']): void {
-    const id = this.next++;
-    this.list.update((l) => [...l.slice(-3), { id, text, tone }]);
-    setTimeout(() => this.dismiss(id), tone === 'error' ? 8000 : 3500);
+    this.toaster.show(typeof err === 'string' ? err : errorMessage(err), {
+      tone: 'danger',
+      duration: 8000,
+    });
   }
 }
