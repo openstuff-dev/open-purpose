@@ -27,6 +27,10 @@ const replaced = [
     message: 'Use <os-tabs> from @openstuff-dev/ui-angular (or .os-tab-list and .os-tab for link tabs and tab-styled filters) instead of .tabs.',
   },
   {
+    pattern: String.raw`class="([^"]*\s)?(data-table|cell-sub|empty-row)[\s"]`,
+    message: 'Use .os-data-table (or <os-data-table>) with .os-cell-sub and .os-data-table-empty from @openstuff-dev/ui instead of .data-table, .cell-sub or .empty-row.',
+  },
+  {
     pattern: String.raw`role="dialog"`,
     message: 'Use <dialog os-dialog> or <dialog os-drawer> from @openstuff-dev/ui-angular instead of an element with role="dialog".',
   },

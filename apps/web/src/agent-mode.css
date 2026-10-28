@@ -141,7 +141,7 @@ html.agent-mode .two-col h3,
 html.agent-mode .menu-label,
 html.agent-mode .nav-label,
 html.agent-mode .lp-kind,
-html.agent-mode .data-table th {
+html.agent-mode .os-data-table th {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 0.6875rem;
@@ -296,11 +296,11 @@ html.agent-mode .os-status-dot::before {
   color: var(--os-tone-default);
   font-size: 0.6rem;
 }
-html.agent-mode .data-table tbody tr:hover,
-html.agent-mode .data-table tr.selected {
+html.agent-mode .row-table tbody tr[tabindex]:hover,
+html.agent-mode .row-table tr[aria-current='true'] {
   background: var(--hover);
 }
-html.agent-mode .data-table tr.selected {
+html.agent-mode .row-table tr[aria-current='true'] {
   box-shadow: inset 2px 0 0 var(--agent);
 }
 html.agent-mode code {
