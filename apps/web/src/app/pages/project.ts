@@ -9,7 +9,16 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Badge, Button, Chip, ConfirmDialog, Control, Field } from '@openstuff-dev/ui-angular';
+import {
+  Badge,
+  Button,
+  Chip,
+  ConfirmDialog,
+  Control,
+  Field,
+  Callout,
+  EmptyState,
+} from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Graph, GraphNode, LinkRef, ProjectDetail } from '../core/models';
 import { Session, provideHere } from '../core/session';
@@ -41,6 +50,8 @@ const TABS: Tab[] = [
 @Component({
   selector: 'app-project',
   imports: [
+    EmptyState,
+    Callout,
     DocList,
     ScopeList,
     FormsModule,
@@ -87,14 +98,14 @@ const TABS: Tab[] = [
           <code>{{ p.organization.slug }}/{{ p.slug }}</code>
         </p>
         @if (!p.reviewed) {
-          <div class="callout">
+          <os-callout tone="brand">
             <p>An agent created this project. Check the name and purpose, then mark it reviewed.</p>
             @if (p.can_edit) {
-              <button os-button variant="primary" type="button" (click)="markReviewed()">
+              <button os-button os-actions variant="primary" type="button" (click)="markReviewed()">
                 Mark reviewed
               </button>
             }
-          </div>
+          </os-callout>
         }
       </header>
 
@@ -182,7 +193,7 @@ const TABS: Tab[] = [
               [canEdit]="p.can_edit"
               [repositories]="p.repositories"
               (repositoryAdded)="reload()"
-              emptyText="No scopes yet. Add one per part with its own conventions, such as Frontend (the Angular repository, or frontend/** in a monorepo) and API (src/Api/**)."
+              emptyText="Add one per part with its own conventions, such as Frontend (the Angular repository, or frontend/** in a monorepo) and API (src/Api/**)."
             />
           }
           @case ('apis') {
@@ -249,7 +260,7 @@ const TABS: Tab[] = [
                     <span class="quiet">in {{ refsText(c.refs) }}</span>
                   </p>
                 } @empty {
-                  <p class="empty">
+                  <p class="quiet">
                     Nothing yet. Link another project with [[its-slug]] in a document here.
                   </p>
                 }
@@ -267,7 +278,7 @@ const TABS: Tab[] = [
                     <span class="quiet">in {{ refsText(c.refs) }}</span>
                   </p>
                 } @empty {
-                  <p class="empty">No other project links here yet.</p>
+                  <p class="quiet">No other project links here yet.</p>
                 }
               </div>
             </div>
@@ -301,10 +312,9 @@ const TABS: Tab[] = [
                 }
               </ul>
             } @else {
-              <p class="empty">
-                No repositories mapped. Agents in an unknown repository ask the user and register it
-                here.
-              </p>
+              <os-empty-state title="No repositories mapped" bordered>
+                Agents in an unknown repository ask the user and register it here.
+              </os-empty-state>
             }
             @if (p.can_edit) {
               <form class="inline-form" (ngSubmit)="addRepo()">
@@ -397,9 +407,10 @@ const TABS: Tab[] = [
         }
       </div>
     } @else if (missing()) {
-      <p class="empty">
-        That project doesn't exist or you can't read it. <a routerLink="/projects">See projects</a>
-      </p>
+      <os-empty-state title="Project not found" level="1">
+        That project doesn't exist or you can't read it.
+        <a os-button os-actions routerLink="/projects">See projects</a>
+      </os-empty-state>
     }
   `,
 })

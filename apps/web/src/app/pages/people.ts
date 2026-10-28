@@ -14,6 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
   Field,
+  Callout,
+  EmptyState,
 } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import { ROLE_LABEL, type Member, type Role } from '../core/models';
@@ -33,6 +35,8 @@ const GROUP = 'group';
 @Component({
   selector: 'app-people',
   imports: [
+    EmptyState,
+    Callout,
     FormsModule,
     DatePipe,
     NgTemplateOutlet,
@@ -60,7 +64,7 @@ const GROUP = 'group';
     </section>
 
     @if (fresh(); as t) {
-      <section class="callout token-callout" role="alert">
+      <os-callout tone="success" role="alert">
         <h2>Token for {{ t.actor }}</h2>
         <p>Copy it now. It is not shown again.</p>
         <pre><code>{{ t.token }}</code></pre>
@@ -74,7 +78,7 @@ const GROUP = 'group';
           <button os-button type="button" (click)="copy(t.token)">Copy token</button>
           <button os-button type="button" (click)="fresh.set(null)">Done</button>
         </div>
-      </section>
+      </os-callout>
     }
 
     <section>
@@ -139,13 +143,17 @@ const GROUP = 'group';
         }
       </ul>
       <h3 class="list-label">Agents</h3>
-      <ul class="actor-list">
-        @for (m of agents(); track m.id) {
-          <ng-container *ngTemplateOutlet="row; context: { $implicit: m }" />
-        } @empty {
-          <p class="empty">No agents yet.</p>
-        }
-      </ul>
+      @if (agents().length) {
+        <ul class="actor-list">
+          @for (m of agents(); track m.id) {
+            <ng-container *ngTemplateOutlet="row; context: { $implicit: m }" />
+          }
+        </ul>
+      } @else {
+        <os-empty-state title="No agents yet" level="4" bordered>
+          Add one above to get a token for Claude Code or another MCP client.
+        </os-empty-state>
+      }
     </section>
 
     <ng-template #row let-m>

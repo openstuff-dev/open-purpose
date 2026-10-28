@@ -159,7 +159,7 @@ function samplePath(glob: string): string {
                 }
               </li>
             } @empty {
-              <li class="empty">No rules apply here yet.</li>
+              <li class="quiet">No rules apply here yet.</li>
             }
           </ol>
           @if (r.apis.length) {

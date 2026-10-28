@@ -35,6 +35,10 @@ const replaced = [
     message: 'Use os-menu with os-popover-trigger, os-menu-item, os-menu-label and os-menu-separator, or os-tooltip, from @openstuff-dev/ui-angular instead of .menu or .tip.',
   },
   {
+    pattern: String.raw`class="([^"]*\s)?(callout|token-callout|doc-notice|empty|notice|notices)[\s"]`,
+    message: 'Use <os-callout> or <os-empty-state> from @openstuff-dev/ui-angular, or Notices (shown with the Toaster), instead of .callout, .doc-notice, .empty or .notice.',
+  },
+  {
     pattern: String.raw`role="dialog"`,
     message: 'Use <dialog os-dialog> or <dialog os-drawer> from @openstuff-dev/ui-angular instead of an element with role="dialog".',
   },

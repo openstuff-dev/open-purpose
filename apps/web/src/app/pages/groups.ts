@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Badge, Button, Control, Field } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Control, Field, Callout } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { GroupRow } from '../core/models';
 import { Session } from '../core/session';
@@ -14,7 +14,7 @@ import { initials } from '../core/theme';
 /** Server admins: every group (tenant) on this OpenPurpose server. */
 @Component({
   selector: 'app-groups',
-  imports: [FormsModule, DatePipe, Icon, Button, Field, Control, Badge],
+  imports: [Callout, FormsModule, DatePipe, Icon, Button, Field, Control, Badge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -28,7 +28,7 @@ import { initials } from '../core/theme';
     </section>
 
     @if (created(); as c) {
-      <section class="callout token-callout" role="alert">
+      <os-callout tone="success" role="alert">
         <h2>{{ c.name }} is ready</h2>
         @if (c.token) {
           <p>Give this token to {{ c.admin }}, the group's first admin. It is not shown again.</p>
@@ -42,7 +42,7 @@ import { initials } from '../core/theme';
           </button>
           <button os-button type="button" (click)="created.set(null)">Done</button>
         </div>
-      </section>
+      </os-callout>
     }
 
     <ul class="group-list">

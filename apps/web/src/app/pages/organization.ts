@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Badge, Button, SegmentedControl } from '@openstuff-dev/ui-angular';
+import { Badge, Button, SegmentedControl, EmptyState } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type {
   ActivityFigure as Figure,
@@ -37,6 +37,7 @@ function readPeriod(): ActivityPeriod {
 @Component({
   selector: 'app-organization',
   imports: [
+    EmptyState,
     DocList,
     ScopeList,
     RouterLink,
@@ -97,9 +98,9 @@ function readPeriod(): ActivityPeriod {
         </div>
         @if (activity(); as a) {
           @if (!a.tracking_since) {
-            <p class="empty">
-              No agent requests yet. Counts start when an agent calls <code>get_context</code>.
-            </p>
+            <os-empty-state title="No agent requests yet" bordered>
+              Counts start when an agent calls <code>get_context</code>.
+            </os-empty-state>
           } @else {
             <div class="stat-tiles">
               <div class="stat-tile">
@@ -245,7 +246,7 @@ function readPeriod(): ActivityPeriod {
         <app-doc-list
           [organizationId]="org.id"
           [canEdit]="session.canEdit(org.id)"
-          emptyText="No organization documents yet."
+          emptyTitle="No organization documents yet"
         />
       </section>
 
@@ -261,7 +262,7 @@ function readPeriod(): ActivityPeriod {
         <app-scope-list
           [organizationId]="org.id"
           [canEdit]="session.canEdit(org.id)"
-          emptyText="No organization-wide scopes yet."
+          emptyTitle="No organization-wide scopes yet"
         />
       </section>
     } @else {

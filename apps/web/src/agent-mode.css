@@ -100,7 +100,7 @@ html.agent-mode textarea,
 html.agent-mode .drawer,
 html.agent-mode .os-menu,
 html.agent-mode .os-tooltip,
-html.agent-mode .notice,
+html.agent-mode .os-toast,
 html.agent-mode .composer {
   box-shadow: none !important;
 }
@@ -310,9 +310,7 @@ html.agent-mode code {
 html.agent-mode pre {
   background: var(--sunken);
 }
-html.agent-mode .notice {
-  background: var(--surface);
-  color: var(--ink);
+html.agent-mode .os-toast {
   border: 1px dashed var(--agent);
 }
 

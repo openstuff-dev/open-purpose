@@ -162,7 +162,7 @@ import { Palette } from './shared/palette';
                 }
                 <app-icon name="chevrons-up-down" />
               </button>
-            <div os-menu #wsMenu="osPopover" class="ws-menu" aria-label="Switch organization">
+              <div os-menu #wsMenu="osPopover" class="ws-menu" aria-label="Switch organization">
                 @if (session.groupShown() && session.readableOrgs().length) {
                   <div os-menu-label>Organizations in {{ me.group.name }}</div>
                   @for (o of session.readableOrgs(); track o.id) {
@@ -323,8 +323,7 @@ import { Palette } from './shared/palette';
                 aria-describedby="agent-tip"
                 #agentSwitch
               >
-                <app-icon name="bot" [size]="15" /><span class="agent-switch-label"
-                  >Agent mode</span
+                <app-icon name="bot" [size]="15" /><span class="agent-switch-label">Agent mode</span
                 ><span class="track" aria-hidden="true"><span class="thumb"></span></span>
               </button>
               <div class="os-tooltip agent-tip" popover="hint" id="agent-tip" #agentTip>
@@ -353,23 +352,6 @@ import { Palette } from './shared/palette';
         </div>
       </main>
     }
-    <div class="notices" aria-live="polite">
-      @for (n of notices.list(); track n.id) {
-        <div class="notice" [attr.data-tone]="n.tone" role="status">
-          <span>{{ n.text }}</span>
-          <button
-            type="button"
-            os-button
-            variant="link"
-            size="sm"
-            (click)="notices.dismiss(n.id)"
-            aria-label="Dismiss"
-          >
-            Dismiss
-          </button>
-        </div>
-      }
-    </div>
     <svg width="0" height="0" style="position:absolute" aria-hidden="true">
       <symbol id="openpurpose-mark" viewBox="0 0 40 40">
         <rect
@@ -403,7 +385,7 @@ import { Palette } from './shared/palette';
 })
 export class App {
   readonly session = inject(Session);
-  readonly notices = inject(Notices);
+  private notices = inject(Notices);
   private api = inject(Api);
   private router = inject(Router);
   private switcher = inject(ContextSwitch);

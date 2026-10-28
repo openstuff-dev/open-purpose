@@ -122,8 +122,16 @@ h3 {
   font-size: var(--fs-base);
   font-weight: 600;
 }
-p {
+/* Not the toolkit's own paragraphs: its components space them. */
+p:not(:where(.os-callout-title, .os-toast-message, .os-empty-state > p)) {
   margin: 0.5rem 0;
+}
+/* A callout's text starts and ends flush with its icon and actions. */
+.os-callout > div > div > :first-child {
+  margin-block-start: 0;
+}
+.os-callout > div > div > :last-child {
+  margin-block-end: 0;
 }
 ::selection {
   background: var(--accent-soft);
@@ -139,9 +147,9 @@ p {
 .quiet {
   color: var(--muted);
 }
-.empty {
-  color: var(--muted);
-  padding: 1.25rem 0;
+/* os-empty-state renders its text paragraph even when there is none. */
+.os-empty-state > p:empty {
+  display: none;
 }
 .icon {
   display: inline-flex;
@@ -702,25 +710,6 @@ kbd {
 .search {
   flex: 1 1 20rem;
 }
-.callout {
-  border: 1px var(--os-border-style) var(--line);
-  background: var(--surface);
-  padding: 0.9rem 1.1rem;
-  border-radius: var(--r-lg);
-  margin: 1rem 0;
-  display: grid;
-  gap: 0.5rem;
-  justify-items: start;
-  box-shadow: inset 3px 0 0 var(--accent);
-}
-.callout p {
-  margin: 0;
-}
-.callout.warn {
-  box-shadow: inset 3px 0 0 var(--propose);
-  background: var(--propose-soft);
-  border-color: transparent;
-}
 .danger-zone {
   border: 1px var(--os-border-style) color-mix(in srgb, var(--danger) 30%, var(--line));
   border-radius: var(--r-lg);
@@ -728,11 +717,6 @@ kbd {
 }
 .danger-zone h2 {
   color: var(--danger);
-}
-.callout.danger {
-  box-shadow: inset 3px 0 0 var(--danger);
-  background: var(--danger-soft);
-  border-color: transparent;
 }
 .slug-field {
   display: grid;
@@ -760,9 +744,6 @@ kbd {
   display: grid;
   gap: 0.75rem;
   margin-top: 0.25rem;
-}
-.slug-rename .callout {
-  margin: 0;
 }
 .impact {
   margin: 0;
@@ -1629,12 +1610,6 @@ mark {
   text-decoration: line-through;
   opacity: 0.7;
 }
-.token-callout {
-  box-shadow: inset 3px 0 0 var(--open);
-}
-.token-callout pre {
-  width: 100%;
-}
 .memberships {
   display: flex;
   flex-wrap: wrap;
@@ -2053,45 +2028,6 @@ mark {
   background: var(--ground);
 }
 
-/* ─── Notices ─── */
-.notices {
-  position: fixed;
-  right: 1.25rem;
-  bottom: 1.25rem;
-  z-index: 120;
-  display: grid;
-  gap: 0.5rem;
-  max-width: min(26rem, calc(100vw - 2rem));
-}
-.notice {
-  display: flex;
-  gap: 1rem;
-  align-items: start;
-  justify-content: space-between;
-  padding: 0.75rem 0.95rem;
-  border-radius: var(--r-md);
-  background: var(--ink);
-  color: var(--ground);
-  box-shadow: var(--shadow-pop);
-  font-size: var(--fs-sm);
-  animation: notice-in 0.18s ease-out;
-}
-.notice .os-button[data-variant='link'] {
-  color: inherit;
-  opacity: 0.7;
-  font-size: var(--fs-xs);
-}
-.notice[data-tone='error'] {
-  background: var(--danger);
-  color: #fff;
-}
-@keyframes notice-in {
-  from {
-    transform: translateY(6px);
-    opacity: 0;
-  }
-}
-
 /* ─── Map: the one loud thing ─── */
 .map-page {
   display: grid;
@@ -2378,10 +2314,6 @@ mark {
 }
 .settings-body > section:first-child > h2 + .quiet {
   margin-bottom: 0;
-}
-.two-col .empty {
-  padding: 0.25rem 0;
-  font-size: var(--fs-sm);
 }
 .settings-body :is(app-people, app-groups) > section {
   margin-bottom: 1.25rem;
@@ -4520,7 +4452,7 @@ ul.stat-rest {
 
 /* The tiny number / dots / chart switcher. */
 
-/* Document page: requests per section, and the stale / disabled notice. */
+/* Document page: requests per section. */
 .sections-head {
   display: flex;
   align-items: center;
@@ -4535,38 +4467,6 @@ ul.stat-rest {
   align-items: center;
   flex-wrap: wrap;
   gap: 0.3rem;
-}
-.doc-notice {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 1rem;
-  padding: 0.7rem 0.9rem;
-  border-radius: var(--r-md);
-  font-size: var(--fs-sm);
-  border: 1px var(--os-border-style) var(--line);
-}
-.doc-notice p {
-  margin: 0;
-  flex: 1;
-  min-width: 12rem;
-}
-.doc-notice.stale {
-  background: var(--propose-soft);
-  border-color: color-mix(in oklab, var(--propose) 30%, var(--line));
-  color: var(--ink);
-}
-.doc-notice.stale > .icon {
-  color: var(--propose);
-}
-.doc-notice.disabled {
-  background: var(--sunken);
-  color: var(--muted);
-}
-@media (max-width: 40rem) {
-  .doc-notice {
-    flex-wrap: wrap;
-  }
 }
 .doc-list li.disabled a {
   opacity: 0.6;

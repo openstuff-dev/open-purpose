@@ -7,7 +7,7 @@ import { Session } from '../core/session';
 import { ModeBadge } from './mode';
 import { Icon } from './icon';
 import { DatePipe } from '@angular/common';
-import { Badge, Button, Control, Field } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Control, Field, EmptyState } from '@openstuff-dev/ui-angular';
 
 const GLYPH: Record<DocKind, string> = {
   purpose: 'book',
@@ -31,7 +31,18 @@ const KIND_HINT: Record<DocKind, string> = {
 /** Documents at one level (organization, project or scope), with a form to add one. */
 @Component({
   selector: 'app-doc-list',
-  imports: [RouterLink, FormsModule, ModeBadge, Icon, DatePipe, Button, Field, Control, Badge],
+  imports: [
+    RouterLink,
+    FormsModule,
+    ModeBadge,
+    Icon,
+    DatePipe,
+    Button,
+    Field,
+    Control,
+    Badge,
+    EmptyState,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (docs().length) {
@@ -63,7 +74,7 @@ const KIND_HINT: Record<DocKind, string> = {
         }
       </ul>
     } @else if (loaded()) {
-      <p class="empty">{{ emptyText() }}</p>
+      <os-empty-state [title]="emptyTitle()" bordered>{{ emptyText() }}</os-empty-state>
     }
     @if (canEdit()) {
       @if (adding()) {
@@ -100,7 +111,9 @@ export class DocList {
   readonly projectId = input<string | null>(null);
   readonly scopeId = input<string | null>(null);
   readonly canEdit = input(false);
-  readonly emptyText = input('No documents yet.');
+  readonly emptyTitle = input('No documents yet');
+  /** A sentence under the title, such as what to add first. */
+  readonly emptyText = input('');
   readonly session = inject(Session);
   private api = inject(Api);
   private router = inject(Router);

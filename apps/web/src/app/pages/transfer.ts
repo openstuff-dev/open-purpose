@@ -10,6 +10,7 @@ import {
   Field,
   Radio,
   SegmentedControl,
+  Callout,
 } from '@openstuff-dev/ui-angular';
 import { Api, type ImportUpload } from '../core/api';
 import type {
@@ -82,6 +83,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
 @Component({
   selector: 'app-transfer',
   imports: [
+    Callout,
     FormsModule,
     Icon,
     DiffView,
@@ -196,8 +198,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
       </p>
 
       @if (done(); as d) {
-        <div class="callout" role="status">
-          <h3>Imported</h3>
+        <os-callout tone="success" title="Imported" role="status">
           <p>{{ summary(d) }}</p>
           <div class="form-actions">
             @if (d.group?.id) {
@@ -215,7 +216,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
             }
             <button os-button type="button" (click)="done.set(null)">Done</button>
           </div>
-        </div>
+        </os-callout>
       }
 
       <div class="setting-card">

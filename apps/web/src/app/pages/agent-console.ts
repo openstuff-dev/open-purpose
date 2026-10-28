@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { Button, Control, Field, SegmentedControl } from '@openstuff-dev/ui-angular';
+import { Button, Control, Field, SegmentedControl, EmptyState } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Project } from '../core/models';
 import { Session } from '../core/session';
@@ -91,7 +91,7 @@ function followUps(call: {
  */
 @Component({
   selector: 'app-agent-console',
-  imports: [FormsModule, MarkdownView, Button, Field, Control, SegmentedControl],
+  imports: [EmptyState, FormsModule, MarkdownView, Button, Field, Control, SegmentedControl],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="page-head">
@@ -216,10 +216,10 @@ function followUps(call: {
           }
         </article>
       } @empty {
-        <p class="empty">
+        <os-empty-state title="No calls yet" bordered>
           Pick a project or paste a git remote, then run <code>get_context</code>. That's the first
           call an agent makes.
-        </p>
+        </os-empty-state>
       }
       @if (calls().length) {
         <button type="button" os-button variant="link" size="sm" (click)="calls.set([])">

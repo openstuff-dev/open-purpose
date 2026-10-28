@@ -188,7 +188,12 @@ function lines(f: Finding): string {
                 >
                 <span class="os-cell-sub">{{ f.scope_name ?? 'Whole project' }}</span>
               </td>
-              <td role="cell" class="col-when" data-label="Reported" [title]="f.created_at | date: 'd MMM y, HH:mm'">
+              <td
+                role="cell"
+                class="col-when"
+                data-label="Reported"
+                [title]="f.created_at | date: 'd MMM y, HH:mm'"
+              >
                 {{ ago(f.created_at) }}
               </td>
               <td role="cell" class="col-from" data-label="Reported by">

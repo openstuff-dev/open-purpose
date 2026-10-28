@@ -10,7 +10,16 @@ import {
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Badge, Button, Chip, ConfirmDialog, Control, Field } from '@openstuff-dev/ui-angular';
+import {
+  Badge,
+  Button,
+  Chip,
+  ConfirmDialog,
+  Control,
+  Field,
+  Callout,
+  EmptyState,
+} from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import {
   KIND_LABEL,
@@ -41,6 +50,8 @@ interface Draft {
 @Component({
   selector: 'app-document',
   imports: [
+    EmptyState,
+    Callout,
     FormsModule,
     RouterLink,
     DatePipe,
@@ -137,30 +148,28 @@ interface Draft {
           <span class="quiet">{{ modeHelp[d.mode] }}</span>
         </div>
         @if (d.disabled_at) {
-          <div class="doc-notice disabled" role="status">
-            <app-icon name="eye-off" />
-            <p>
-              <strong>Disabled:</strong> agents don't get this document, so it costs no tokens.
-              People can still read and edit it.
-            </p>
+          <os-callout tone="neutral" title="Disabled" role="status">
+            Agents don't get this document, so it costs no tokens. People can still read and edit
+            it.
             @if (d.can_edit) {
-              <button os-button type="button" (click)="setDisabled(false)">Enable</button>
+              <button os-button os-actions type="button" (click)="setDisabled(false)">
+                Enable
+              </button>
             }
-          </div>
+          </os-callout>
         } @else if (d.staleness) {
-          <div class="doc-notice stale" role="status">
-            <app-icon name="history" />
+          <os-callout tone="warning" role="status">
             <p>
               Agents haven't requested this document in the last
               {{ d.staleness === 'month' ? 'month' : 'week' }}. Disable it to stop sending it to
               agents and save tokens. You can turn it back on at any time.
             </p>
             @if (d.can_edit) {
-              <button os-button type="button" (click)="setDisabled(true)">
+              <button os-button os-actions type="button" (click)="setDisabled(true)">
                 <app-icon name="eye-off" />Disable document
               </button>
             }
-          </div>
+          </os-callout>
         }
       </header>
 
@@ -364,14 +373,14 @@ interface Draft {
                       <span class="quiet">in {{ refText(r.refs) }}</span>
                     </p>
                   } @empty {
-                    <p class="empty">Nothing links to this term yet.</p>
+                    <p class="quiet">Nothing links to this term yet.</p>
                   }
                 </div>
               }
             }
           </article>
         } @empty {
-          <p class="empty">This document has no sections yet.</p>
+          <os-empty-state title="No sections yet" bordered />
         }
       </div>
 

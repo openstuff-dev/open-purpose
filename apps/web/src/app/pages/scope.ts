@@ -152,7 +152,7 @@ import { SlugRenameField } from '../shared/slug-rename';
           [projectId]="s.project_id"
           [scopeId]="s.id"
           [canEdit]="s.can_edit"
-          emptyText="No documents yet. Approved learnings for this scope will appear in a Learnings document here."
+          emptyText="Approved learnings for this scope will appear in a Learnings document here."
         />
       </section>
     }
