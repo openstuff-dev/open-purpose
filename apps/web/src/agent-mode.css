@@ -230,13 +230,13 @@ html.agent-mode .page-tabs {
   background: var(--ground);
   border-bottom-style: dashed;
 }
-html.agent-mode .page-tabs a.active {
+html.agent-mode .page-tabs .os-tab[aria-current='page'] {
   background: var(--ink);
   color: var(--ground);
   border-bottom-color: var(--ink);
 }
-html.agent-mode .page-tabs a.active .icon,
-html.agent-mode .page-tabs a.active .tab-count {
+html.agent-mode .page-tabs .os-tab[aria-current='page'] .icon,
+html.agent-mode .page-tabs .os-tab[aria-current='page'] .tab-count {
   color: var(--ground);
   background: transparent;
 }
@@ -253,7 +253,7 @@ html.agent-mode .tab-count {
   min-width: 0;
   height: auto;
 }
-html.agent-mode .tabs [role='tab'][aria-selected='true'] {
+html.agent-mode .os-tab[aria-selected='true'] {
   background: var(--ink);
   color: var(--ground);
 }

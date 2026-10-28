@@ -22,6 +22,10 @@ const replaced = [
     pattern: String.raw`class="([^"]*\s)?segmented[\s"]`,
     message: 'Use <os-segmented-control> from @openstuff-dev/ui-angular (or .os-segmented with radios when options need icons or counts) instead of .segmented.',
   },
+  {
+    pattern: String.raw`class="([^"]*\s)?tabs[\s"]`,
+    message: 'Use <os-tabs> from @openstuff-dev/ui-angular (or .os-tab-list and .os-tab for link tabs and tab-styled filters) instead of .tabs.',
+  },
 ];
 
 export default [
