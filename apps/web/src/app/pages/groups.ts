@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { GroupRow } from '../core/models';
 import { Session } from '../core/session';
@@ -13,7 +14,7 @@ import { initials } from '../core/theme';
 /** Server admins: every group (tenant) on this OpenPurpose server. */
 @Component({
   selector: 'app-groups',
-  imports: [FormsModule, DatePipe, Icon],
+  imports: [FormsModule, DatePipe, Icon, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -36,8 +37,10 @@ import { initials } from '../core/theme';
           <p>You are its first admin. Switch to it to add organizations, people and agents.</p>
         }
         <div class="form-actions">
-          <button class="btn primary" type="button" (click)="open(c.id)">Open {{ c.name }}</button>
-          <button class="btn" type="button" (click)="created.set(null)">Done</button>
+          <button os-button variant="primary" type="button" (click)="open(c.id)">
+            Open {{ c.name }}
+          </button>
+          <button os-button type="button" (click)="created.set(null)">Done</button>
         </div>
       </section>
     }
@@ -49,11 +52,11 @@ import { initials } from '../core/theme';
             ><span class="badge sm group">{{ initials(g.name) }}</span
             ><strong>{{ g.name }}</strong> <code class="quiet">{{ g.slug }}</code></span
           >
-          <button class="btn sm" type="button" (click)="exportGroup(g)">
+          <button os-button size="sm" type="button" (click)="exportGroup(g)">
             <app-icon name="download" />Export
           </button>
           @if (g.id !== session.group()?.id) {
-            <button class="btn sm" type="button" (click)="open(g.id)">Switch to it</button>
+            <button os-button size="sm" type="button" (click)="open(g.id)">Switch to it</button>
           } @else {
             <span class="flag muted">Current</span>
           }
@@ -88,7 +91,7 @@ import { initials } from '../core/theme';
             placeholder="Name of the person who will run it"
         /></label>
         <div class="form-actions full">
-          <button class="btn primary" type="submit" [disabled]="!draft.name.trim()">
+          <button os-button variant="primary" type="submit" [disabled]="!draft.name.trim()">
             <app-icon name="plus" />Create group
           </button>
         </div>

@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Graph, GraphNode, LinkRef, ProjectDetail } from '../core/models';
 import { Session, provideHere } from '../core/session';
@@ -48,6 +49,7 @@ const TABS: Tab[] = [
     AgentView,
     ApiSpecs,
     SlugRenameField,
+    Button,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -67,11 +69,11 @@ const TABS: Tab[] = [
           @if (p.archived_at) {
             <span class="flag muted">Archived</span>
           }
-          <a class="btn" [routerLink]="['/map']" [queryParams]="{ focus: p.id }"
+          <a os-button [routerLink]="['/map']" [queryParams]="{ focus: p.id }"
             ><app-icon name="map" />Map</a
           >
           @if (p.can_edit) {
-            <a class="btn" [routerLink]="[]" [queryParams]="{ tab: 'settings' }" replaceUrl
+            <a os-button [routerLink]="[]" [queryParams]="{ tab: 'settings' }" replaceUrl
               ><app-icon name="pencil" />Edit</a
             >
           }
@@ -84,7 +86,7 @@ const TABS: Tab[] = [
           <div class="callout">
             <p>An agent created this project. Check the name and purpose, then mark it reviewed.</p>
             @if (p.can_edit) {
-              <button class="btn primary" type="button" (click)="markReviewed()">
+              <button os-button variant="primary" type="button" (click)="markReviewed()">
                 Mark reviewed
               </button>
             }
@@ -215,7 +217,7 @@ const TABS: Tab[] = [
                   projects.
                 </p>
               </div>
-              <a class="btn sm" [routerLink]="['/map']" [queryParams]="{ focus: p.id }"
+              <a os-button size="sm" [routerLink]="['/map']" [queryParams]="{ focus: p.id }"
                 ><app-icon name="map" [size]="14" />Open on the map</a
               >
             </div>
@@ -280,7 +282,14 @@ const TABS: Tab[] = [
                   <li>
                     <app-icon name="branch" /><code>{{ r.remote_key }}</code>
                     @if (p.can_edit) {
-                      <button class="link-btn danger" type="button" (click)="removeRepo(r.id)">
+                      <button
+                        os-button
+                        variant="link"
+                        size="sm"
+                        class="danger"
+                        type="button"
+                        (click)="removeRepo(r.id)"
+                      >
                         Remove
                       </button>
                     }
@@ -304,7 +313,7 @@ const TABS: Tab[] = [
                     placeholder="git@ssh.dev.azure.com:v3/org/project/repo"
                 /></label>
                 <div class="form-actions">
-                  <button class="btn" type="submit" [disabled]="!remote.trim()">
+                  <button os-button type="submit" [disabled]="!remote.trim()">
                     <app-icon name="plus" />Add repository
                   </button>
                 </div>
@@ -346,8 +355,8 @@ const TABS: Tab[] = [
                 </label>
               }
               <div class="form-actions full">
-                <button class="btn primary" type="submit">Save</button>
-                <button class="btn" type="button" (click)="resetDraft()">Reset</button>
+                <button os-button variant="primary" type="submit">Save</button>
+                <button os-button type="button" (click)="resetDraft()">Reset</button>
               </div>
             </form>
             <section class="slug-section">
@@ -368,10 +377,12 @@ const TABS: Tab[] = [
                 removes every document, scope and learning in the project.
               </p>
               <div class="form-actions">
-                <button class="btn" type="button" (click)="toggleArchive()">
+                <button os-button type="button" (click)="toggleArchive()">
                   {{ p.archived_at ? 'Restore project' : 'Archive project' }}
                 </button>
-                <button class="btn danger" type="button" (click)="remove()">Delete project</button>
+                <button os-button variant="danger" type="button" (click)="remove()">
+                  Delete project
+                </button>
               </div>
             </section>
           }

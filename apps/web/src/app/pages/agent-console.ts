@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Project } from '../core/models';
 import { Session } from '../core/session';
@@ -90,7 +91,7 @@ function followUps(call: {
  */
 @Component({
   selector: 'app-agent-console',
-  imports: [FormsModule, MarkdownView],
+  imports: [FormsModule, MarkdownView, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="page-head">
@@ -149,15 +150,15 @@ function followUps(call: {
         </div>
       </details>
       <div class="form-actions full">
-        <button class="btn primary" type="submit">get_context</button>
-        <button class="btn" type="button" (click)="call('list_projects', {})">list_projects</button>
-        <button class="btn" type="button" (click)="call('list_organizations', {})">
+        <button os-button variant="primary" type="submit">get_context</button>
+        <button os-button type="button" (click)="call('list_projects', {})">list_projects</button>
+        <button os-button type="button" (click)="call('list_organizations', {})">
           list_organizations
         </button>
-        <button class="btn" type="button" (click)="call('list_scopes', project ? { project } : {})">
+        <button os-button type="button" (click)="call('list_scopes', project ? { project } : {})">
           list_scopes
         </button>
-        <button class="btn" type="button" (click)="listFindings()">list_findings</button>
+        <button os-button type="button" (click)="listFindings()">list_findings</button>
       </div>
     </form>
 
@@ -168,7 +169,7 @@ function followUps(call: {
         placeholder="search: words an agent would look for"
         aria-label="Search as the agent"
       />
-      <button class="btn" type="submit" [disabled]="!query.trim()">search</button>
+      <button os-button type="submit" [disabled]="!query.trim()">search</button>
     </form>
 
     @if (calls().length) {
@@ -212,7 +213,7 @@ function followUps(call: {
               <div class="call-next">
                 <span class="quiet">Next:</span>
                 @for (f of c.next; track sig(f)) {
-                  <button type="button" class="btn sm" (click)="call(f.name, f.args)">
+                  <button type="button" os-button size="sm" (click)="call(f.name, f.args)">
                     {{ label(f) }}
                   </button>
                 }
@@ -227,7 +228,9 @@ function followUps(call: {
         </p>
       }
       @if (calls().length) {
-        <button type="button" class="link-btn" (click)="calls.set([])">Clear transcript</button>
+        <button type="button" os-button variant="link" size="sm" (click)="calls.set([])">
+          Clear transcript
+        </button>
       }
     </section>
   `,

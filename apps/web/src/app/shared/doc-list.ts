@@ -7,6 +7,7 @@ import { Session } from '../core/session';
 import { ModeBadge } from './mode';
 import { Icon } from './icon';
 import { DatePipe } from '@angular/common';
+import { Button } from '@openstuff-dev/ui-angular';
 
 const GLYPH: Record<DocKind, string> = {
   purpose: 'book',
@@ -30,7 +31,7 @@ const KIND_HINT: Record<DocKind, string> = {
 /** Documents at one level (organization, project or scope), with a form to add one. */
 @Component({
   selector: 'app-doc-list',
-  imports: [RouterLink, FormsModule, ModeBadge, Icon, DatePipe],
+  imports: [RouterLink, FormsModule, ModeBadge, Icon, DatePipe, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (docs().length) {
@@ -75,14 +76,14 @@ const KIND_HINT: Record<DocKind, string> = {
           <label class="grow">Title <input name="title" [(ngModel)]="title" required /></label>
           <p class="quiet full">{{ hint[kind] }}</p>
           <div class="form-actions full">
-            <button class="btn primary" type="submit" [disabled]="!title.trim()">
+            <button os-button variant="primary" type="submit" [disabled]="!title.trim()">
               Create document
             </button>
-            <button class="btn" type="button" (click)="adding.set(false)">Cancel</button>
+            <button os-button type="button" (click)="adding.set(false)">Cancel</button>
           </div>
         </form>
       } @else {
-        <button class="btn" type="button" (click)="adding.set(true); suggestTitle()">
+        <button os-button type="button" (click)="adding.set(true); suggestTitle()">
           <app-icon name="plus" />New document
         </button>
       }

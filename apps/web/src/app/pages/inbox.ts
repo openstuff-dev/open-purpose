@@ -13,6 +13,7 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { Button, IconButton } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import {
   MODE_LABEL,
@@ -109,6 +110,8 @@ function ago(iso: string): string {
     ModePicker,
     ModeBadge,
     Icon,
+    Button,
+    IconButton,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)', class: 'wide-page' },
@@ -316,33 +319,36 @@ function ago(iso: string): string {
           <span class="status" [attr.data-status]="p.status">{{ statusLabel[p.status] }}</span>
           <span class="drawer-nav">
             <button
-              class="icon-btn"
+              os-icon-button
+              variant="ghost"
               type="button"
               (click)="step(-1)"
               [disabled]="index() <= 0"
-              aria-label="Previous change"
+              label="Previous change"
             >
               <app-icon name="chevron-down" [size]="16" class="flip" />
             </button>
             <button
-              class="icon-btn"
+              os-icon-button
+              variant="ghost"
               type="button"
               (click)="step(1)"
               [disabled]="index() < 0 || index() >= rows().length - 1"
-              aria-label="Next change"
+              label="Next change"
             >
               <app-icon name="chevron-down" [size]="16" />
             </button>
             <button
-              class="icon-btn"
+              os-icon-button
+              variant="ghost"
               type="button"
               (click)="copyLink()"
-              aria-label="Copy link to this change"
+              label="Copy link to this change"
               title="Copy link"
             >
               <app-icon name="link" />
             </button>
-            <button class="icon-btn" type="button" (click)="close()" aria-label="Close">
+            <button os-icon-button variant="ghost" type="button" (click)="close()" label="Close">
               <app-icon name="x" [size]="18" />
             </button>
           </span>
@@ -661,7 +667,8 @@ function ago(iso: string): string {
                 ></textarea>
                 <div class="form-actions">
                   <button
-                    class="btn sm"
+                    os-button
+                    size="sm"
                     type="button"
                     (click)="comment(p)"
                     [disabled]="!r.comment.trim()"
@@ -670,7 +677,8 @@ function ago(iso: string): string {
                   </button>
                   @if (p.can_review) {
                     <button
-                      class="btn sm"
+                      os-button
+                      size="sm"
                       type="button"
                       (click)="requestChanges(p)"
                       title="Send this comment and hand the change back to its author"
@@ -699,7 +707,8 @@ function ago(iso: string): string {
               }
               @if (p.status === 'approved' && p.result_document_id && p.result_section_id) {
                 <a
-                  class="btn sm"
+                  os-button
+                  size="sm"
                   [routerLink]="['/documents', p.result_document_id]"
                   [fragment]="'s-' + p.result_section_id.slice(0, 8)"
                   >Open the rule</a
@@ -751,25 +760,25 @@ function ago(iso: string): string {
                 </p>
               }
               <div class="form-actions">
-                <button class="btn primary" type="button" (click)="approve(p)">
+                <button os-button variant="primary" type="button" (click)="approve(p)">
                   <app-icon name="check" />Approve
                 </button>
                 @if (r.editing) {
-                  <button class="btn" type="button" (click)="saveRevision(p)">
+                  <button os-button type="button" (click)="saveRevision(p)">
                     Save as revision
                   </button>
-                  <button class="btn ghost" type="button" (click)="stopEditing(p)">
+                  <button os-button variant="ghost" type="button" (click)="stopEditing(p)">
                     Discard edits
                   </button>
                 } @else {
-                  <button class="btn" type="button" (click)="r.editing = true; touch()">
+                  <button os-button type="button" (click)="r.editing = true; touch()">
                     <app-icon name="pencil" />Edit
                   </button>
-                  <button class="btn" type="button" (click)="requestChanges(p)">
+                  <button os-button type="button" (click)="requestChanges(p)">
                     Request changes
                   </button>
                 }
-                <button class="btn danger" type="button" (click)="reject(p)">Reject</button>
+                <button os-button variant="danger" type="button" (click)="reject(p)">Reject</button>
                 @if (p.kind !== 'edit_section') {
                   <span class="quiet foot-hint">{{ modeLabel[r.mode] }} after approval</span>
                 }
@@ -795,17 +804,19 @@ function ago(iso: string): string {
               }
               <div class="form-actions">
                 @if (r.editing) {
-                  <button class="btn primary" type="button" (click)="saveRevision(p)">
+                  <button os-button variant="primary" type="button" (click)="saveRevision(p)">
                     Save revision
                   </button>
-                  <button class="btn ghost" type="button" (click)="stopEditing(p)">
+                  <button os-button variant="ghost" type="button" (click)="stopEditing(p)">
                     Discard edits
                   </button>
                 } @else {
-                  <button class="btn" type="button" (click)="r.editing = true; touch()">
+                  <button os-button type="button" (click)="r.editing = true; touch()">
                     <app-icon name="pencil" />Edit
                   </button>
-                  <button class="btn ghost" type="button" (click)="withdraw(p)">Withdraw</button>
+                  <button os-button variant="ghost" type="button" (click)="withdraw(p)">
+                    Withdraw
+                  </button>
                 }
               </div>
             </footer>

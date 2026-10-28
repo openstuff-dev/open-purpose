@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, input, model, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Repository } from '../core/models';
 import { Notices } from './notice';
@@ -8,7 +9,7 @@ import { Icon } from './icon';
 /** Which of a project's repositories a scope is bound to, with a shortcut to register another one. */
 @Component({
   selector: 'app-repo-picker',
-  imports: [FormsModule, Icon],
+  imports: [FormsModule, Icon, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <fieldset class="repo-picker">
@@ -33,7 +34,7 @@ import { Icon } from './icon';
           placeholder="Add a git remote URL"
           (keydown.enter)="$event.preventDefault(); add()"
         />
-        <button class="btn sm" type="button" [disabled]="!remote.trim()" (click)="add()">
+        <button os-button size="sm" type="button" [disabled]="!remote.trim()" (click)="add()">
           <app-icon name="plus" />Add
         </button>
       </div>

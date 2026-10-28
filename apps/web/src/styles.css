@@ -4,6 +4,9 @@
  *   each organization has its own identity colour.
  */
 
+@import '@openstuff-dev/ui/ui.css';
+@import './tokens/tokens.css' layer(os.tokens);
+
 /*
  * The old names, kept so the rules below read the same. Every value comes from
  * @openstuff-dev/tokens (tokens.css), generated from primaryColor #2d5bff in
@@ -81,11 +84,12 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
-a {
+/* Not on buttons: unlayered rules win over @openstuff-dev/ui's layers. */
+a:not(:where(.os-button)) {
   color: var(--accent-text);
   text-decoration: none;
 }
-a:hover {
+a:not(:where(.os-button)):hover {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -230,96 +234,9 @@ label.check input {
   margin: 0;
 }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  height: 2.125rem;
-  padding: 0 0.85rem;
-  font: 500 var(--fs-sm)/1 var(--sans);
-  border-radius: var(--r-sm);
-  border: 1px var(--os-border-style) var(--line-strong);
-  background: var(--surface);
-  color: var(--ink);
-  cursor: pointer;
-  text-decoration: none;
-  white-space: nowrap;
-  transition:
-    background 0.12s,
-    border-color 0.12s;
-}
-.btn:hover {
-  background: var(--hover);
-  text-decoration: none;
-}
-.btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
-}
-.btn.primary:hover {
-  background: color-mix(in srgb, var(--accent) 88%, black);
-}
-.btn.danger {
-  color: var(--danger);
-}
-.btn.danger:hover {
-  background: var(--danger-soft);
-  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
-}
-.btn.ghost {
-  border-color: transparent;
-  background: transparent;
-}
-.btn.ghost:hover {
-  background: var(--hover);
-}
-.btn.sm {
-  height: 1.75rem;
-  padding: 0 0.6rem;
-  font-size: var(--fs-xs);
-}
-.btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-.link-btn {
-  background: none;
-  border: 0;
-  padding: 0;
-  font: inherit;
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  color: var(--accent-text);
-  cursor: pointer;
-}
-.link-btn:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.link-btn.danger {
-  color: var(--danger);
-}
-.link-btn:disabled {
-  color: var(--faint);
-  text-decoration: none;
-  cursor: default;
-}
-.icon-btn {
-  display: inline-grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: var(--r-sm);
-  background: none;
-  border: 0;
-  color: var(--muted);
-  cursor: pointer;
-}
-.icon-btn:hover {
-  background: var(--hover);
-  color: var(--ink);
+/* A destructive link (Revoke, Delete). @openstuff-dev/ui has no danger link yet. */
+.os-button[data-variant='link'].danger {
+  --os-button-fg: var(--danger);
 }
 kbd {
   font: 500 0.6875rem/1 var(--sans);
@@ -663,7 +580,7 @@ kbd {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.me-row .icon-btn {
+.me-row .os-button[data-icon-only] {
   margin-left: auto;
 }
 
@@ -766,7 +683,7 @@ kbd {
   gap: 0.35rem;
   justify-items: start;
 }
-.page-head h1 + .link-btn {
+.page-head h1 + .os-button[data-variant='link'] {
   margin-top: -0.1rem;
 }
 .title-row {
@@ -1121,7 +1038,7 @@ kbd {
   color: var(--ink);
   border-bottom-color: var(--ink);
 }
-.tabs .link-btn {
+.tabs .os-button[data-variant='link'] {
   margin-left: auto;
 }
 details.snippet {
@@ -1471,14 +1388,14 @@ pre {
   gap: 0.85rem;
   flex-wrap: wrap;
 }
-.section-actions .link-btn {
+.section-actions .os-button[data-variant='link'] {
   font-size: var(--fs-xs);
   color: var(--muted);
 }
-.section-actions .link-btn:hover {
+.section-actions .os-button[data-variant='link']:hover {
   color: var(--ink);
 }
-.section-actions .link-btn.danger:hover {
+.section-actions .os-button[data-variant='link'].danger:hover {
   color: var(--danger);
 }
 .sid {
@@ -2015,7 +1932,7 @@ mark {
   height: 1.4rem;
   box-shadow: none;
 }
-.membership .link-btn {
+.membership .os-button[data-variant='link'] {
   font-size: var(--fs-xs);
   padding: 0 0.3rem;
 }
@@ -2037,7 +1954,7 @@ mark {
   font-weight: 600;
   font-size: var(--fs-md);
 }
-.org-name.link-btn {
+.org-name.os-button[data-variant='link'] {
   font-size: var(--fs-md);
   font-weight: 600;
   color: var(--ink);
@@ -2242,7 +2159,7 @@ mark {
 .copy-block {
   position: relative;
 }
-.copy-block .btn {
+.copy-block .os-button {
   position: absolute;
   top: 0.45rem;
   right: 0.45rem;
@@ -2496,7 +2413,7 @@ mark {
   font-size: var(--fs-sm);
   animation: notice-in 0.18s ease-out;
 }
-.notice .link-btn {
+.notice .os-button[data-variant='link'] {
   color: inherit;
   opacity: 0.7;
   font-size: var(--fs-xs);
@@ -2816,7 +2733,7 @@ mark {
 .settings-body .panel {
   margin-top: 0.5rem;
 }
-.setting-row > .btn {
+.setting-row > .os-button {
   justify-self: start;
 }
 .setting-row h3 code,
@@ -2850,7 +2767,7 @@ mark {
     background: none;
   }
 }
-.tokens .link-btn {
+.tokens .os-button[data-variant='link'] {
   font-size: var(--fs-xs);
 }
 .membership .dot {
@@ -3204,7 +3121,7 @@ mark {
   display: flex;
   gap: 0.15rem;
 }
-.drawer-nav .icon-btn:disabled {
+.drawer-nav .os-button[data-icon-only]:disabled {
   opacity: 0.35;
   cursor: default;
   background: none;
@@ -3929,7 +3846,7 @@ mark {
   border-top: 1px var(--os-border-style) var(--line);
   background: var(--ground);
 }
-.thread-foot .btn {
+.thread-foot .os-button {
   margin-left: auto;
 }
 .thread-foot .reply {
@@ -4532,7 +4449,7 @@ mark {
   border-top: 1px var(--os-border-style) var(--line);
   font-size: var(--fs-sm);
 }
-.transcript > .link-btn {
+.transcript > .os-button[data-variant='link'] {
   justify-self: start;
 }
 .console-view {

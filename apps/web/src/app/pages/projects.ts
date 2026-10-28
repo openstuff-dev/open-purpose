@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Project } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -9,14 +10,14 @@ import { Icon } from '../shared/icon';
 
 @Component({
   selector: 'app-projects',
-  imports: [RouterLink, FormsModule, Icon],
+  imports: [RouterLink, FormsModule, Icon, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="page-head">
       <div class="title-row">
         <h1>Projects</h1>
         @if (session.org() && session.canEdit(session.orgId())) {
-          <button class="btn primary" type="button" (click)="adding.set(!adding())">
+          <button os-button variant="primary" type="button" (click)="adding.set(!adding())">
             <app-icon name="plus" />New project
           </button>
         }
@@ -88,10 +89,10 @@ import { Icon } from '../shared/icon';
           ></textarea>
         </label>
         <div class="form-actions full">
-          <button class="btn primary" type="submit" [disabled]="!draft.name.trim()">
+          <button os-button variant="primary" type="submit" [disabled]="!draft.name.trim()">
             Create project
           </button>
-          <button class="btn" type="button" (click)="adding.set(false)">Cancel</button>
+          <button os-button type="button" (click)="adding.set(false)">Cancel</button>
         </div>
       </form>
     }

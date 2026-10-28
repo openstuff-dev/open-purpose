@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { Button } from '@openstuff-dev/ui-angular';
 import { ROLE_LABEL, type Organization } from '../core/models';
 import { Session } from '../core/session';
 import { ContextSwitch } from '../core/switch';
@@ -10,7 +11,7 @@ import { ScopeList } from '../shared/scope-list';
 
 @Component({
   selector: 'app-group',
-  imports: [DocList, ScopeList, RouterLink, Icon],
+  imports: [DocList, ScopeList, RouterLink, Icon, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (session.group(); as g) {
@@ -21,7 +22,7 @@ import { ScopeList } from '../shared/scope-list';
           }}</span>
           <h1>{{ g.name }}</h1>
           @if (g.can_admin) {
-            <a class="btn" routerLink="/settings/group"><app-icon name="settings" />Manage</a>
+            <a os-button routerLink="/settings/group"><app-icon name="settings" />Manage</a>
           }
         </div>
         <p class="lede">
@@ -50,7 +51,14 @@ import { ScopeList } from '../shared/scope-list';
                   >{{ initials(o.name) }}</span
                 >
                 @if (o.readable) {
-                  <button type="button" class="org-name link-btn" (click)="open(o)">
+                  <button
+                    type="button"
+                    os-button
+                    variant="link"
+                    size="sm"
+                    class="org-name"
+                    (click)="open(o)"
+                  >
                     {{ o.name }}
                   </button>
                 } @else {

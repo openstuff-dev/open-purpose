@@ -13,6 +13,7 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { Button, IconButton } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Finding, FindingCounts, FindingStatus } from '../core/models';
 import { Session } from '../core/session';
@@ -62,7 +63,7 @@ function lines(f: Finding): string {
 
 @Component({
   selector: 'app-findings',
-  imports: [FormsModule, RouterLink, DatePipe, MarkdownView, Icon],
+  imports: [FormsModule, RouterLink, DatePipe, MarkdownView, Icon, Button, IconButton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)', class: 'wide-page' },
   template: `
@@ -219,33 +220,36 @@ function lines(f: Finding): string {
           <span class="status" [attr.data-finding]="f.status">{{ label[f.status] }}</span>
           <span class="drawer-nav">
             <button
-              class="icon-btn"
+              os-icon-button
+              variant="ghost"
               type="button"
               (click)="step(-1)"
               [disabled]="index() <= 0"
-              aria-label="Previous finding"
+              label="Previous finding"
             >
               <app-icon name="chevron-down" [size]="16" class="flip" />
             </button>
             <button
-              class="icon-btn"
+              os-icon-button
+              variant="ghost"
               type="button"
               (click)="step(1)"
               [disabled]="index() < 0 || index() >= rows().length - 1"
-              aria-label="Next finding"
+              label="Next finding"
             >
               <app-icon name="chevron-down" [size]="16" />
             </button>
             <button
-              class="icon-btn"
+              os-icon-button
+              variant="ghost"
               type="button"
               (click)="copyLink()"
-              aria-label="Copy link to this finding"
+              label="Copy link to this finding"
               title="Copy link"
             >
               <app-icon name="link" />
             </button>
-            <button class="icon-btn" type="button" (click)="close()" aria-label="Close">
+            <button os-icon-button variant="ghost" type="button" (click)="close()" label="Close">
               <app-icon name="x" [size]="18" />
             </button>
           </span>
@@ -331,7 +335,7 @@ function lines(f: Finding): string {
           <section class="drawer-section">
             <div class="drawer-section-head">
               <h3>Proposed fix</h3>
-              <button class="btn ghost sm" type="button" (click)="copyAsIssue(f)">
+              <button os-button variant="ghost" size="sm" type="button" (click)="copyAsIssue(f)">
                 <app-icon name="copy" [size]="14" />Copy as issue
               </button>
             </div>
@@ -376,7 +380,8 @@ function lines(f: Finding): string {
               @for (s of nextStatuses(f); track s) {
                 <button
                   type="button"
-                  [class]="s === 'todo' ? 'btn primary' : s === 'dismissed' ? 'btn ghost' : 'btn'"
+                  os-button
+                  [variant]="s === 'todo' ? 'primary' : s === 'dismissed' ? 'ghost' : 'default'"
                   [title]="hint[s]"
                   (click)="setStatus(f, s)"
                 >

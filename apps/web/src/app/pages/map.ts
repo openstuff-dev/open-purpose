@@ -27,6 +27,7 @@ import { select, type Selection } from 'd3-selection';
 import { zoom, zoomIdentity, type ZoomBehavior } from 'd3-zoom';
 import 'd3-transition';
 import { drag } from 'd3-drag';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Graph, GraphEdge, GraphNode, LinkRef, Project } from '../core/models';
 import { Notices } from '../shared/notice';
@@ -50,7 +51,7 @@ const RADIUS: Record<GraphNode['type'], number> = {
 
 @Component({
   selector: 'app-map',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'map-page' },
   template: `
@@ -115,7 +116,10 @@ const RADIUS: Record<GraphNode['type'], number> = {
       @if (selected(); as n) {
         <aside class="map-panel" aria-live="polite">
           <button
-            class="link-btn close"
+            os-button
+            variant="link"
+            size="sm"
+            class="close"
             type="button"
             (click)="select(null)"
             aria-label="Close details"
@@ -134,23 +138,23 @@ const RADIUS: Record<GraphNode['type'], number> = {
           }
           <div class="form-actions">
             @if (n.type === 'project' && !n.restricted) {
-              <a class="btn" [routerLink]="['/projects', n.project_id]">Open project</a>
+              <a os-button [routerLink]="['/projects', n.project_id]">Open project</a>
               @if (focus() !== n.project_id) {
-                <button class="btn" type="button" (click)="setFocus(n.project_id!)">
+                <button os-button type="button" (click)="setFocus(n.project_id!)">
                   Focus here
                 </button>
               }
             } @else if (n.type === 'term' && !n.restricted) {
               <a
-                class="btn"
+                os-button
                 [routerLink]="['/go', 'term:' + n.label]"
                 [queryParams]="n.organization_id ? { org: n.organization_id } : {}"
                 >Open term</a
               >
             } @else if (n.type === 'group') {
-              <a class="btn" routerLink="/group">Open {{ n.label }}</a>
+              <a os-button routerLink="/group">Open {{ n.label }}</a>
             } @else if (n.type === 'organization' && !n.restricted) {
-              <button class="btn" type="button" (click)="openOrg(n.organization_id!)">
+              <button os-button type="button" (click)="openOrg(n.organization_id!)">
                 Open {{ n.label }}
               </button>
             }
@@ -160,7 +164,13 @@ const RADIUS: Record<GraphNode['type'], number> = {
             <ul>
               @for (c of outgoing(); track c.node.id) {
                 <li>
-                  <button class="link-btn" type="button" (click)="select(c.node.id)">
+                  <button
+                    os-button
+                    variant="link"
+                    size="sm"
+                    type="button"
+                    (click)="select(c.node.id)"
+                  >
                     {{ c.node.label }}
                   </button>
                   <span class="quiet">{{ refText(c.refs) }}</span>
@@ -173,7 +183,13 @@ const RADIUS: Record<GraphNode['type'], number> = {
             <ul>
               @for (c of incoming(); track c.node.id) {
                 <li>
-                  <button class="link-btn" type="button" (click)="select(c.node.id)">
+                  <button
+                    os-button
+                    variant="link"
+                    size="sm"
+                    type="button"
+                    (click)="select(c.node.id)"
+                  >
                     {{ c.node.label }}
                   </button>
                   <span class="quiet">{{ refText(c.refs) }}</span>

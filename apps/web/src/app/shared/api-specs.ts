@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ApiSpec, ApiSpecDetail } from '../core/models';
 import { Icon } from './icon';
@@ -34,7 +35,7 @@ function ago(iso: string | null): string {
  */
 @Component({
   selector: 'app-api-specs',
-  imports: [FormsModule, DatePipe, Icon, MarkdownView],
+  imports: [FormsModule, DatePipe, Icon, MarkdownView, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (specs().length) {
@@ -87,23 +88,35 @@ function ago(iso: string | null): string {
                   }
                   <span class="api-actions-btns">
                     @if (canEdit() && s.source_url) {
-                      <button class="btn sm" type="button" (click)="refresh(s)" [disabled]="busy()">
+                      <button
+                        os-button
+                        size="sm"
+                        type="button"
+                        (click)="refresh(s)"
+                        [disabled]="busy()"
+                      >
                         Fetch now
                       </button>
                     }
                     @if (canEdit()) {
-                      <label class="btn sm file-btn"
+                      <label class="os-button file-btn" data-size="sm"
                         >Replace with file<input
                           type="file"
                           accept=".json,.yaml,.yml,application/json,application/yaml"
                           (change)="replace(s, $event)"
                       /></label>
                     }
-                    <button class="btn sm" type="button" (click)="download(s)">
+                    <button os-button size="sm" type="button" (click)="download(s)">
                       <app-icon name="copy" [size]="13" />Download
                     </button>
                     @if (canEdit()) {
-                      <button class="btn sm danger" type="button" (click)="remove(s)">
+                      <button
+                        os-button
+                        variant="danger"
+                        size="sm"
+                        type="button"
+                        (click)="remove(s)"
+                      >
                         Remove
                       </button>
                     }
@@ -251,7 +264,8 @@ function ago(iso: string | null): string {
           /></label>
           <div class="form-actions">
             <button
-              class="btn primary"
+              os-button
+              variant="primary"
               type="submit"
               [disabled]="busy() || (mode() === 'url' ? !url.trim() : !file())"
             >

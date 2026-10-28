@@ -9,6 +9,7 @@ import {
   untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ContextResult, Scope } from '../core/models';
 import { Session } from '../core/session';
@@ -42,7 +43,7 @@ function samplePath(glob: string): string {
  */
 @Component({
   selector: 'app-agent-view',
-  imports: [FormsModule, Icon, MarkdownView, ModeBadge],
+  imports: [FormsModule, Icon, MarkdownView, ModeBadge, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="agent-view">
@@ -90,7 +91,7 @@ function samplePath(glob: string): string {
               placeholder="Stacks, e.g. dotnet, angular"
               aria-label="Stacks"
             />
-            <button class="btn" type="submit">Show</button>
+            <button os-button type="submit">Show</button>
           </form>
         }
       </div>
@@ -124,7 +125,7 @@ function samplePath(glob: string): string {
                 Exactly as sent
               </button>
             </div>
-            <button class="btn sm" type="button" (click)="copy(r.markdown)">
+            <button os-button size="sm" type="button" (click)="copy(r.markdown)">
               <app-icon name="copy" [size]="13" />Copy
             </button>
           </span>

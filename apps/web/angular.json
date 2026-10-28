@@ -52,7 +52,6 @@
             "styles": [
               "@fontsource-variable/geist/index.css",
               "@fontsource-variable/geist-mono/index.css",
-              "src/tokens/tokens.css",
               "src/styles.css",
               "src/agent-mode.css"
             ],

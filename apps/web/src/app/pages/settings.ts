@@ -10,6 +10,7 @@ import {
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Organization, TokenRow } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -74,6 +75,7 @@ organization, the project and the part of the code you are in (a repository or a
     PreviewPage,
     SlugRenameField,
     TransferPage,
+    Button,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -132,7 +134,7 @@ organization, the project and the part of the code you are in (a repository or a
                   <form (ngSubmit)="saveName()">
                     <input name="name" [(ngModel)]="name" aria-label="Your name" required />
                     <button
-                      class="btn"
+                      os-button
                       type="submit"
                       [disabled]="!name.trim() || name.trim() === session.me()?.actor?.name"
                     >
@@ -160,11 +162,17 @@ organization, the project and the part of the code you are in (a repository or a
                   <strong>Copy your new token now. It is not shown again.</strong>
                   <div class="copy-block" style="width:100%">
                     <pre><code>{{ t }}</code></pre>
-                    <button class="btn sm" type="button" (click)="copy(t)">
+                    <button os-button size="sm" type="button" (click)="copy(t)">
                       <app-icon name="copy" [size]="13" />Copy
                     </button>
                   </div>
-                  <button class="link-btn" type="button" (click)="freshToken.set(null)">
+                  <button
+                    os-button
+                    variant="link"
+                    size="sm"
+                    type="button"
+                    (click)="freshToken.set(null)"
+                  >
                     Done
                   </button>
                 </div>
@@ -192,7 +200,13 @@ organization, the project and the part of the code you are in (a repository or a
                       </p>
                     </div>
                     @if (!t.revoked_at) {
-                      <button class="btn danger sm" type="button" (click)="revoke(t)">
+                      <button
+                        os-button
+                        variant="danger"
+                        size="sm"
+                        type="button"
+                        (click)="revoke(t)"
+                      >
                         Revoke
                       </button>
                     }
@@ -206,7 +220,7 @@ organization, the project and the part of the code you are in (a repository or a
                       placeholder="Label, e.g. work laptop"
                       aria-label="Token label"
                     />
-                    <button class="btn" type="submit"><app-icon name="plus" />Create token</button>
+                    <button os-button type="submit"><app-icon name="plus" />Create token</button>
                   </form>
                 </div>
               </div>
@@ -272,14 +286,14 @@ organization, the project and the part of the code you are in (a repository or a
                     <p>Claude Code:</p>
                     <div class="copy-block">
                       <pre><code>{{ claudeCommand }}</code></pre>
-                      <button class="btn sm" type="button" (click)="copy(claudeCommand)">
+                      <button os-button size="sm" type="button" (click)="copy(claudeCommand)">
                         <app-icon name="copy" [size]="13" />Copy
                       </button>
                     </div>
                     <p>Other clients (mcp.json):</p>
                     <div class="copy-block">
                       <pre><code>{{ mcpJson }}</code></pre>
-                      <button class="btn sm" type="button" (click)="copy(mcpJson)">
+                      <button os-button size="sm" type="button" (click)="copy(mcpJson)">
                         <app-icon name="copy" [size]="13" />Copy
                       </button>
                     </div>
@@ -294,7 +308,7 @@ organization, the project and the part of the code you are in (a repository or a
                     </p>
                     <div class="copy-block">
                       <pre><code>{{ agentsSnippet }}</code></pre>
-                      <button class="btn sm" type="button" (click)="copy(agentsSnippet)">
+                      <button os-button size="sm" type="button" (click)="copy(agentsSnippet)">
                         <app-icon name="copy" [size]="13" />Copy
                       </button>
                     </div>
@@ -340,7 +354,7 @@ organization, the project and the part of the code you are in (a repository or a
                         required
                       />
                       <button
-                        class="btn"
+                        os-button
                         type="submit"
                         [disabled]="!groupName.trim() || groupName.trim() === session.group()?.name"
                       >
@@ -370,9 +384,11 @@ organization, the project and the part of the code you are in (a repository or a
                         aria-label="Context budget in tokens"
                       />
                       <button
-                        class="btn"
+                        os-button
                         type="submit"
-                        [disabled]="budgetValue(groupBudget) === session.group()?.context_max_tokens"
+                        [disabled]="
+                          budgetValue(groupBudget) === session.group()?.context_max_tokens
+                        "
                       >
                         Save
                       </button>
@@ -430,8 +446,8 @@ organization, the project and the part of the code you are in (a repository or a
                           </label>
                         }
                         <div class="form-actions full">
-                          <button class="btn primary" type="submit">Save</button>
-                          <button class="btn" type="button" (click)="editingOrg.set(null)">
+                          <button os-button variant="primary" type="submit">Save</button>
+                          <button os-button type="button" (click)="editingOrg.set(null)">
                             Cancel
                           </button>
                         </div>
@@ -474,11 +490,17 @@ organization, the project and the part of the code you are in (a repository or a
                         </div>
                       </div>
                       <div class="form-actions">
-                        <button class="btn sm" type="button" (click)="editOrg(o)">
+                        <button os-button size="sm" type="button" (click)="editOrg(o)">
                           <app-icon name="pencil" [size]="13" />Edit
                         </button>
                         @if (session.canAdmin(null)) {
-                          <button class="btn sm ghost" type="button" (click)="toggleArchive(o)">
+                          <button
+                            os-button
+                            variant="ghost"
+                            size="sm"
+                            type="button"
+                            (click)="toggleArchive(o)"
+                          >
                             {{ o.archived_at ? 'Restore' : 'Archive' }}
                           </button>
                         }
@@ -535,19 +557,20 @@ organization, the project and the part of the code you are in (a repository or a
                         </p>
                         <div class="form-actions full">
                           <button
-                            class="btn primary"
+                            os-button
+                            variant="primary"
                             type="submit"
                             [disabled]="!newOrg.name.trim() || !groupName.trim()"
                           >
                             Create organization
                           </button>
-                          <button class="btn" type="button" (click)="addingOrg.set(false)">
+                          <button os-button type="button" (click)="addingOrg.set(false)">
                             Cancel
                           </button>
                         </div>
                       </form>
                     } @else {
-                      <button class="btn" type="button" (click)="addingOrg.set(true)">
+                      <button os-button type="button" (click)="addingOrg.set(true)">
                         <app-icon name="plus" />{{
                           session.groupShown() ? 'New organization' : 'Add a second organization'
                         }}

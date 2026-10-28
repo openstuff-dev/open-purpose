@@ -267,7 +267,7 @@ apps/server/          Fastify + TypeScript 7 + pg. REST API, MCP endpoint, migra
 apps/web/             Angular 22 + TypeScript 6 (standalone components, signals)
 packages/contracts/   Types the server sends and the web reads, defined once (declarations only)
 agent/                Instruction snippet and .openpurpose.json example for repos
-vendor/               The OpenStuff packages (@openstuff-dev/tokens, @openstuff-dev/lint) until they are on npm
+vendor/               The OpenStuff packages (tokens, lint, ui, ui-angular) until they are on npm
 ```
 
 The repository is an Nx workspace. The projects are `server`, `web` and `contracts`:

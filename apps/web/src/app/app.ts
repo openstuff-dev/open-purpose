@@ -10,6 +10,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
+import { Button, IconButton } from '@openstuff-dev/ui-angular';
 import { Api } from './core/api';
 import { ROLE_LABEL } from './core/models';
 import { Session, errorMessage } from './core/session';
@@ -21,7 +22,16 @@ import { Palette } from './shared/palette';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule, Icon, Palette],
+  imports: [
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    FormsModule,
+    Icon,
+    Palette,
+    Button,
+    IconButton,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)', '(document:click)': 'wsOpen.set(false)' },
   template: `
@@ -46,7 +56,9 @@ import { Palette } from './shared/palette';
           @if (signinError()) {
             <p class="field-error" role="alert">{{ signinError() }}</p>
           }
-          <button class="btn primary" type="submit" [disabled]="!tokenInput.trim()">Sign in</button>
+          <button os-button variant="primary" type="submit" [disabled]="!tokenInput.trim()">
+            Sign in
+          </button>
           <p class="quiet">
             An admin creates tokens under Settings. The first admin token is printed in the server
             log on first start.
@@ -83,7 +95,8 @@ import { Palette } from './shared/palette';
               >
             }
             <button
-              class="btn sm"
+              os-button
+              size="sm"
               type="button"
               (click)="toggleAgentMode()"
               [disabled]="switching()"
@@ -249,10 +262,11 @@ import { Palette } from './shared/palette';
                   >{{ me.actor.name }}<small>{{ roleLine() }}</small></span
                 >
                 <button
-                  class="icon-btn"
+                  os-icon-button
+                  variant="ghost"
                   type="button"
                   (click)="signOut()"
-                  aria-label="Sign out"
+                  label="Sign out"
                   title="Sign out"
                 >
                   <app-icon name="logout" />
@@ -264,12 +278,14 @@ import { Palette } from './shared/palette';
           <div class="content">
             <header class="topbar">
               <button
-                class="icon-btn menu-btn"
+                os-icon-button
+                variant="ghost"
+                class="menu-btn"
                 type="button"
                 (click)="railOpen.set(!railOpen())"
                 [attr.aria-expanded]="railOpen()"
                 aria-controls="rail"
-                aria-label="Menu"
+                label="Menu"
               >
                 <app-icon name="menu" [size]="18" />
               </button>
@@ -321,7 +337,7 @@ import { Palette } from './shared/palette';
         <div class="signin-card">
           <h1>OpenPurpose</h1>
           <p role="alert">{{ loadError() }}</p>
-          <button class="btn" type="button" (click)="signOut()">Sign out</button>
+          <button os-button type="button" (click)="signOut()">Sign out</button>
         </div>
       </main>
     }
@@ -331,7 +347,9 @@ import { Palette } from './shared/palette';
           <span>{{ n.text }}</span>
           <button
             type="button"
-            class="link-btn"
+            os-button
+            variant="link"
+            size="sm"
             (click)="notices.dismiss(n.id)"
             aria-label="Dismiss"
           >

@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { SlugAlias, SlugKind, SlugRename, SlugRenameRef } from '../core/models';
 import { aliasConflict, errorMessage } from '../core/session';
@@ -23,7 +24,7 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
  */
 @Component({
   selector: 'app-slug-rename',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="slug-field">
@@ -31,7 +32,7 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
         <span class="slug-label">Slug</span>
         <code>{{ prefix() }}{{ slug() }}</code>
         @if (canEdit() && !open()) {
-          <button class="btn sm" type="button" (click)="start()">Rename slug…</button>
+          <button os-button size="sm" type="button" (click)="start()">Rename slug…</button>
         }
       </div>
       <p class="quiet">{{ usedFor() }}</p>
@@ -168,10 +169,10 @@ const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? o
             }
           </div>
           <div class="form-actions">
-            <button class="btn primary" type="submit" [disabled]="!ready()">
+            <button os-button variant="primary" type="submit" [disabled]="!ready()">
               Rename to {{ preview()?.to ?? '…' }}
             </button>
-            <button class="btn" type="button" (click)="cancel()">Cancel</button>
+            <button os-button type="button" (click)="cancel()">Cancel</button>
           </div>
         </form>
       }
