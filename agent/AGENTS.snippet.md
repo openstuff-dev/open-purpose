@@ -32,4 +32,5 @@ organization, the project and the part of the code you are in (a repository or a
    `report_finding` with the file, a one-line title, what's wrong and how you
    would fix it. Say in one line that you did. If `get_context` lists known
    findings, don't report them again, and ask me before fixing one. After fixing
-   one, call `resolve_finding` with the commit or PR.
+   one, call `resolve_finding` with the commit or PR. If you got a detail of
+   your own finding wrong, correct it with `update_finding`.

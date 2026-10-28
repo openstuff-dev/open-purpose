@@ -958,6 +958,25 @@ definitions:`);
     const solved = (await api('GET', `/findings?project_id=${projectId}&status=solved`)).data;
     expect(solved[0]).toMatchObject({ title: 'Cart total ignores discounts', solved_ref: 'abc1234', status_note: 'Discounts first', status_by_name: 'Agent Jonas' });
     expect((await ctx()).text).not.toContain('Cart total ignores discounts');
+
+    // The reporter corrects an open finding; a new file means a new scope. Solved ones stay as they are.
+    const backendId = /Finding `([0-9a-f]{8})`/.exec(backend.text)![1];
+    const fixed = await jonas.call('update_finding', {
+      id: backendId, commit_sha: 'fedcba9876543210', title: 'Order export times out for large months and years',
+      file: 'frontend/src/app/export.ts', line_start: 12, remote_url: SSH_REMOTE,
+    });
+    expect(fixed.text).toContain('is updated');
+    expect(fixed.text).toContain('reported at commit `fedcba987654`');
+    const moved = (await api('GET', `/findings?project_id=${projectId}`)).data.find((f: any) => f.id.startsWith(backendId));
+    expect(moved).toMatchObject({
+      title: 'Order export times out for large months and years', file: 'frontend/src/app/export.ts', line_start: 12, line_end: 12,
+      scope_name: 'Frontend', problem: 'The total is summed before discounts apply.', status: 'new',
+    });
+    expect((await jonas.call('update_finding', { id: firstId, title: 'Too late' })).isError).toBe(true);
+    expect((await jonas.call('update_finding', { id: backendId, title: ' ' })).isError).toBe(true);
+    const otherAgent = await mcp(t.lars);
+    expect((await otherAgent.call('update_finding', { id: backendId, title: 'Not mine' })).text).toContain('Only whoever reported');
+    await otherAgent.client.close();
     expect((await api('GET', `/findings/counts?project_id=${projectId}`)).data).toEqual({ new: 1, todo: 0, ask_later: 1, dismissed: 0, solved: 1 });
     // Row-level security: another group's transaction sees none of them, even without a WHERE clause.
     const count = (scope: { groupId: string | null; bypass?: boolean }) => withScope(pool, scope, async (c) =>

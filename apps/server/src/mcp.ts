@@ -15,7 +15,7 @@ import { relatedTo } from './service/graph.js';
 import { tryParseRemote } from './domain/remote.js';
 import { addRepository, createProject, getProject, listProjects, listRepositories, resolveProject } from './service/projects.js';
 import { addSection, editSection, getProposalDetail, listProposals, proposeLearning } from './service/proposals.js';
-import { folderOf, listFindings, reportFinding, setFindingStatus, FINDING_STATUSES, OPEN_FINDING_STATUSES, type Finding } from './service/findings.js';
+import { folderOf, getFindingByRef, listFindings, reportFinding, setFindingStatus, updateFinding, FINDING_STATUSES, OPEN_FINDING_STATUSES, type Finding } from './service/findings.js';
 import { addComment, applySuggestion, getReview, renderReviewForAgent, reviseProposal, setResolved, waitingOn } from './service/review.js';
 import type { Level, Scope } from './service/types.js';
 
@@ -50,7 +50,8 @@ Workflow:
 7. When you notice a real problem outside your task (a bug, a security risk, broken behaviour), don't fix it
    and don't let it get lost: call report_finding with the file, a one-line title, what's wrong and how you
    would fix it. Style preferences aren't findings. get_context lists known findings around your path: don't
-   report those again, and ask the user before fixing one. When you fix one, call resolve_finding.`;
+   report those again, and ask the user before fixing one. When you fix one, call resolve_finding. If you got a
+   detail of your own finding wrong (commit, file, lines, wording), correct it with update_finding.`;
 
 const manifestSchema = z.object({
   path: z.string().describe('Repo-relative path of the manifest, e.g. "frontend/package.json" or "src/Api/Api.csproj"'),
@@ -73,7 +74,7 @@ const json = (v: unknown): ToolResult => text(JSON.stringify(v, null, 2));
 /** Tools that change something; the activity overview counts them as writes, every other tool as a read. */
 const WRITE_TOOLS = [
   'update_section', 'add_section', 'propose_learning', 'reply_to_review', 'revise_proposal', 'apply_suggestion',
-  'register_repository', 'create_project', 'report_finding', 'resolve_finding',
+  'register_repository', 'create_project', 'report_finding', 'update_finding', 'resolve_finding',
 ];
 
 /** Tools that only read. Agent mode in the UI may call these, and nothing else. */
@@ -480,6 +481,40 @@ export function createMcpServer(pool: Pool, a: Access, version: string, apiConfi
     return text([`# ${found.length} ${label} finding${found.length === 1 ? '' : 's'} in ${r.project.name}`, '',
       ...found.map(findingInFull), '',
       'The proposed fix was written at the commit shown; check the code again before you follow it. After fixing one, call `resolve_finding`.'].join('\n\n').replace(/\n{3,}/g, '\n\n'));
+  }));
+
+  server.registerTool('update_finding', {
+    title: 'Update finding',
+    description: 'Correct a finding you reported while it is still open: a wrong commit, file or lines, a clearer title, problem or fix. '
+      + 'Send only what changes. A person still decides what happens to it.',
+    inputSchema: {
+      id: z.string().describe('The finding\'s id, or its first 8 characters as listed'),
+      file: z.string().optional().describe('Repo-relative path of the file with the problem'),
+      line_start: z.number().int().min(1).optional(),
+      line_end: z.number().int().min(1).optional(),
+      title: z.string().optional(),
+      problem: z.string().optional(),
+      proposed_fix: z.string().optional(),
+      commit_sha: z.string().optional().describe('Output of `git rev-parse HEAD` at the time you noticed the problem'),
+      remote_url: locate.remote_url,
+      stacks: locate.stacks,
+      manifests: locate.manifests,
+    },
+  }, (x) => run('update_finding', async (db, track) => {
+    const before = await getFindingByRef(db, a, x.id);
+    track.projectId = before.project_id;
+    let scopeId: string | null | undefined;
+    if (x.file !== undefined) {
+      // The file decides the scope, as when reporting.
+      const { project } = await resolveProject(db, a, { project: `${before.organization_slug}/${before.project_slug}`, remote_url: x.remote_url });
+      if (!project) throw new AppError('not_found', 'The finding\'s project is gone.');
+      scopeId = (await resolveTarget(db, a, project.organization_id, project, { ...x, path: x.file })).target.scope_id;
+    }
+    const f = await updateFinding(db, a, before.id, {
+      file: x.file, scope_id: scopeId, line_start: x.line_start, line_end: x.line_end, title: x.title,
+      problem: x.problem, proposed_fix: x.proposed_fix, commit_sha: x.commit_sha,
+    });
+    return text(`Finding \`${f.id.slice(0, 8)}\` is updated.\n\n${findingInFull(f)}`);
   }));
 
   server.registerTool('resolve_finding', {

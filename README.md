@@ -92,7 +92,8 @@ second organization under Settings › Organizations.
   path an agent works in, so it doesn't report them again and asks before fixing one; ask
   an agent "anything you could fix here?" and it calls `list_findings`. An agent that fixes
   one calls `resolve_finding` with the commit or PR, and it's hidden until you turn on
-  **Solved**. Findings stay out of the team's issue tracker; **Copy as issue** gives you
+  **Solved**. An agent that got a detail of its own finding wrong (the commit, file or
+  wording) corrects it with `update_finding` while it's still open. Findings stay out of the team's issue tracker; **Copy as issue** gives you
   Markdown for the rare one that belongs there.
 - **API specs per project.** Attach a project's `swagger.json` / `openapi.yaml`
   (OpenAPI 3 or Swagger 2, JSON or YAML) from a link or as a file. Linked specs are
@@ -258,7 +259,7 @@ into your repo's `AGENTS.md` or `CLAUDE.md`.
 | `get_api` | Endpoints and DTOs from a project's OpenAPI/Swagger spec: all endpoints, one endpoint in detail, or one DTO |
 | `list_my_proposals`, `get_review` | The agent's own proposals and the review feedback on one, with numbered lines |
 | `reply_to_review`, `apply_suggestion`, `revise_proposal` | Answer a thread (and resolve it), accept a reviewer's suggestion, push a new revision |
-| `report_finding`, `list_findings`, `resolve_finding` | Record a problem found outside the task, list findings with their proposed fix, mark one solved |
+| `report_finding`, `list_findings`, `update_finding`, `resolve_finding` | Record a problem found outside the task, list findings with their proposed fix, correct one you reported while it's open, mark one solved |
 
 ## Layout
 
