@@ -26,6 +26,10 @@ const replaced = [
     pattern: String.raw`class="([^"]*\s)?tabs[\s"]`,
     message: 'Use <os-tabs> from @openstuff-dev/ui-angular (or .os-tab-list and .os-tab for link tabs and tab-styled filters) instead of .tabs.',
   },
+  {
+    pattern: String.raw`role="dialog"`,
+    message: 'Use <dialog os-drawer> or <dialog os-dialog> from @openstuff-dev/ui-angular instead of an element with role="dialog".',
+  },
 ];
 
 export default [
