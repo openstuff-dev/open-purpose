@@ -69,7 +69,7 @@ const TABS: Tab[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (project(); as p) {
-      <header class="os-page-header project-head">
+      <header class="os-page-header project-head" data-align="start">
         <div>
           <nav os-breadcrumbs>
             <ol>
@@ -319,7 +319,7 @@ const TABS: Tab[] = [
                         os-button
                         variant="link"
                         size="sm"
-                        class="danger"
+                        tone="danger"
                         type="button"
                         (click)="removeRepo(r.id)"
                       >

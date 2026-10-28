@@ -64,8 +64,7 @@ const GROUP = 'group';
     </section>
 
     @if (fresh(); as t) {
-      <os-callout tone="success" role="alert">
-        <h2>Token for {{ t.actor }}</h2>
+      <os-callout tone="success" role="alert" title="Token for {{ t.actor }}" level="2">
         <p>Copy it now. It is not shown again.</p>
         <pre><code>{{ t.token }}</code></pre>
         @if (t.kind === 'agent') {
@@ -218,7 +217,7 @@ const GROUP = 'group';
                     os-button
                     variant="link"
                     size="sm"
-                    class="danger"
+                    tone="danger"
                     type="button"
                     (click)="removeRole(m, ms)"
                     [attr.aria-label]="
@@ -279,7 +278,7 @@ const GROUP = 'group';
                     os-button
                     variant="link"
                     size="sm"
-                    class="danger"
+                    tone="danger"
                     type="button"
                     (click)="revoke(t.id)"
                   >

@@ -71,7 +71,7 @@ interface Draft {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (doc(); as d) {
-      <header class="os-page-header doc-head">
+      <header class="os-page-header doc-head" data-align="start">
         <div>
           <nav os-breadcrumbs>
             <ol>
@@ -331,7 +331,7 @@ interface Draft {
                       os-button
                       variant="link"
                       size="sm"
-                      class="danger"
+                      tone="danger"
                       type="button"
                       (click)="removeSection(s)"
                     >
