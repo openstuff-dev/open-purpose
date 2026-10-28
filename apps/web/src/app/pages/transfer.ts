@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Button, Check, Checkbox, Control, Field, Radio } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Check, Checkbox, Control, Field, Radio } from '@openstuff-dev/ui-angular';
 import { Api, type ImportUpload } from '../core/api';
 import type {
   ExportIncludes,
@@ -72,7 +72,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
 /** Settings › Export and import: download a group or organization, and import such a file. */
 @Component({
   selector: 'app-transfer',
-  imports: [FormsModule, Icon, DiffView, Button, Field, Control, Check, Checkbox, Radio],
+  imports: [FormsModule, Icon, DiffView, Button, Field, Control, Check, Checkbox, Radio, Badge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -433,7 +433,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
               <li>
                 <details>
                   <summary>
-                    <span class="flag" [class.muted]="c.status === 'only_in_target'">{{
+                    <span os-badge [tone]="c.status === 'only_in_target' ? 'neutral' : 'warning'">{{
                       status[c.status]
                     }}</span>
                     <span class="transfer-place quiet">{{ c.place }} ›</span>

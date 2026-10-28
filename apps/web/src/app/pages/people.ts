@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Button, Control, Field } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Chip, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import { ROLE_LABEL, type Member, type Role } from '../core/models';
 import { Session } from '../core/session';
@@ -19,7 +19,7 @@ const GROUP = 'group';
 
 @Component({
   selector: 'app-people',
-  imports: [FormsModule, DatePipe, NgTemplateOutlet, Icon, Button, Field, Control],
+  imports: [FormsModule, DatePipe, NgTemplateOutlet, Icon, Button, Field, Control, Badge, Chip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -127,10 +127,10 @@ const GROUP = 'group';
           /></span>
           <strong>{{ m.name }}</strong>
           @if (m.is_superadmin) {
-            <span class="chip">Server admin</span>
+            <span os-chip>Server admin</span>
           }
           @if (m.disabled_at) {
-            <span class="flag">Disabled</span>
+            <span os-badge tone="warning">Disabled</span>
           }
           @if (m.manageable) {
             <span class="actor-actions">

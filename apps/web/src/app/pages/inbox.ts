@@ -13,7 +13,18 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { Button, Check, Checkbox, Control, Field, IconButton } from '@openstuff-dev/ui-angular';
+import {
+  Badge,
+  Button,
+  Check,
+  Checkbox,
+  Chip,
+  Control,
+  Field,
+  IconButton,
+  StatusDot,
+  type Tone,
+} from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import {
   MODE_LABEL,
@@ -66,6 +77,13 @@ const KIND: Record<Proposal['kind'], { label: string; icon: string }> = {
   new_section: { label: 'New section', icon: 'plus' },
 };
 
+const STATUS_TONE: Record<ProposalStatus, Tone> = {
+  pending: 'brand',
+  changes_requested: 'warning',
+  approved: 'success',
+  rejected: 'danger',
+};
+
 const STATUS: Record<ProposalStatus, string> = {
   pending: 'Needs review',
   changes_requested: 'Waiting on author',
@@ -116,6 +134,9 @@ function ago(iso: string): string {
     Control,
     Check,
     Checkbox,
+    StatusDot,
+    Badge,
+    Chip,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)', class: 'wide-page' },
@@ -279,9 +300,7 @@ function ago(iso: string): string {
                 }
               </td>
               <td class="col-status">
-                <span class="status" [attr.data-status]="p.status">{{
-                  statusLabel[p.status]
-                }}</span>
+                <span os-status-dot [tone]="statusTone[p.status]">{{ statusLabel[p.status] }}</span>
                 @if (p.awaiting === 'author') {
                   <span
                     class="awaiting"
@@ -331,7 +350,7 @@ function ago(iso: string): string {
           <span class="kind-tag" [attr.data-kind]="p.kind"
             ><app-icon [name]="kind[p.kind].icon" [size]="13" />{{ kind[p.kind].label }}</span
           >
-          <span class="status" [attr.data-status]="p.status">{{ statusLabel[p.status] }}</span>
+          <span os-status-dot [tone]="statusTone[p.status]">{{ statusLabel[p.status] }}</span>
           <span class="drawer-nav">
             <button
               os-icon-button
@@ -439,7 +458,7 @@ function ago(iso: string): string {
                 @if (isOpen(p.status)) {
                   , now at {{ p.current_version }}
                   @if (p.current_version !== p.base_version) {
-                    <span class="flag">Changed since</span>
+                    <span os-badge tone="warning">Changed since</span>
                   }
                 }
               </dd>
@@ -460,7 +479,7 @@ function ago(iso: string): string {
               <dt>Stacks</dt>
               <dd>
                 @for (t of p.context.stacks; track t) {
-                  <span class="chip stack">{{ t }}</span>
+                  <span os-chip>{{ t }}</span>
                 }
               </dd>
             }
@@ -491,7 +510,7 @@ function ago(iso: string): string {
                       : 'The new section'
                 }}
                 @if (p.revision > 1) {
-                  <span class="chip">Revision {{ p.revision }}</span>
+                  <span os-chip>Revision {{ p.revision }}</span>
                 }
               </h3>
               <div class="segmented sm" role="tablist" aria-label="View">
@@ -642,7 +661,7 @@ function ago(iso: string): string {
                       <p>
                         <strong>{{ e.actor_name ?? 'Someone' }}</strong>
                         @if (e.actor_kind === 'agent') {
-                          <span class="chip">Agent</span>
+                          <span os-chip>Agent</span>
                         }
                         {{ eventInfo[e.kind].verb }}
                         @if (e.kind === 'revised') {
@@ -865,6 +884,7 @@ export class InboxPage {
 
   readonly kind = KIND;
   readonly statusLabel = STATUS;
+  readonly statusTone = STATUS_TONE;
   readonly modeLabel = MODE_LABEL;
   readonly ago = ago;
   readonly tabs: Array<{ value: StatusTab; label: string }> = [

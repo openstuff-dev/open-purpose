@@ -10,7 +10,7 @@ import {
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
-import { Button, Checkbox, Control, Field } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Checkbox, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Organization, TokenRow } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -79,6 +79,7 @@ organization, the project and the part of the code you are in (a repository or a
     Field,
     Control,
     Checkbox,
+    Badge,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -489,7 +490,7 @@ organization, the project and the part of the code you are in (a repository or a
                           <h3>
                             {{ o.name }} <code class="quiet">{{ o.slug }}</code>
                             @if (o.archived_at) {
-                              <span class="flag muted">Archived</span>
+                              <span os-badge>Archived</span>
                             }
                           </h3>
                           <p class="multiline">{{ o.summary || 'No summary' }}</p>

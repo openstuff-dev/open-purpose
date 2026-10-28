@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Button, Control, Field } from '@openstuff-dev/ui-angular';
+import { Button, Chip, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ReviewComment, ReviewThread } from '../core/models';
 import { diffLines } from './diff';
@@ -28,7 +28,7 @@ interface Row {
 /** One conversation: comments, suggestions with "Apply", reply box, resolve. */
 @Component({
   selector: 'app-thread',
-  imports: [FormsModule, DatePipe, Icon, MarkdownView, Button, Control],
+  imports: [FormsModule, DatePipe, Icon, MarkdownView, Button, Control, Chip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
@@ -62,7 +62,7 @@ interface Row {
               <div class="comment-head">
                 <strong>{{ c.actor_name ?? 'Unknown' }}</strong>
                 @if (c.actor_kind === 'agent') {
-                  <span class="chip">Agent</span>
+                  <span os-chip>Agent</span>
                 }
                 <span class="quiet" [title]="c.created_at | date: 'd MMM y, HH:mm'">{{
                   c.created_at | date: 'd MMM, HH:mm'

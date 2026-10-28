@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Button, Control, Field } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { GroupRow } from '../core/models';
 import { Session } from '../core/session';
@@ -14,7 +14,7 @@ import { initials } from '../core/theme';
 /** Server admins: every group (tenant) on this OpenPurpose server. */
 @Component({
   selector: 'app-groups',
-  imports: [FormsModule, DatePipe, Icon, Button, Field, Control],
+  imports: [FormsModule, DatePipe, Icon, Button, Field, Control, Badge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -58,7 +58,7 @@ import { initials } from '../core/theme';
           @if (g.id !== session.group()?.id) {
             <button os-button size="sm" type="button" (click)="open(g.id)">Switch to it</button>
           } @else {
-            <span class="flag muted">Current</span>
+            <span os-badge>Current</span>
           }
           <span class="quiet"
             >{{ g.organizations }} {{ g.organizations === 1 ? 'organization' : 'organizations' }},

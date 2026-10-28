@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Button, Control, Field } from '@openstuff-dev/ui-angular';
+import { Button, Chip, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ContextResult, Project } from '../core/models';
 import { MarkdownView } from '../shared/markdown';
@@ -11,7 +11,7 @@ import { splitList } from '../shared/scope-list';
 
 @Component({
   selector: 'app-preview',
-  imports: [FormsModule, RouterLink, MarkdownView, Button, Field, Control],
+  imports: [FormsModule, RouterLink, MarkdownView, Button, Field, Control, Chip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -105,7 +105,7 @@ import { splitList } from '../shared/scope-list';
           <dt>Stacks</dt>
           <dd>
             @for (t of r.stacks; track t) {
-              <span class="chip stack">{{ t }}</span>
+              <span os-chip>{{ t }}</span>
             } @empty {
               <span class="quiet">None</span>
             }
@@ -113,7 +113,7 @@ import { splitList } from '../shared/scope-list';
           <dt>Scopes</dt>
           <dd>
             @for (b of scoped(r); track b.label) {
-              <span class="chip">{{ b.label }}</span>
+              <span os-chip>{{ b.label }}</span>
               <span class="quiet">{{ b.scope?.reason }}</span
               ><br />
             } @empty {

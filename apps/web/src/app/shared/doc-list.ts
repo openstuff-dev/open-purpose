@@ -7,7 +7,7 @@ import { Session } from '../core/session';
 import { ModeBadge } from './mode';
 import { Icon } from './icon';
 import { DatePipe } from '@angular/common';
-import { Button, Control, Field } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Control, Field } from '@openstuff-dev/ui-angular';
 
 const GLYPH: Record<DocKind, string> = {
   purpose: 'book',
@@ -31,7 +31,7 @@ const KIND_HINT: Record<DocKind, string> = {
 /** Documents at one level (organization, project or scope), with a form to add one. */
 @Component({
   selector: 'app-doc-list',
-  imports: [RouterLink, FormsModule, ModeBadge, Icon, DatePipe, Button, Field, Control],
+  imports: [RouterLink, FormsModule, ModeBadge, Icon, DatePipe, Button, Field, Control, Badge],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (docs().length) {
@@ -47,9 +47,12 @@ const KIND_HINT: Record<DocKind, string> = {
                 <span class="doc-kind">{{ kindLabel[d.kind] }}</span>
               </span>
               @if (d.disabled_at) {
-                <span class="flag muted" title="Agents don't get this document">Disabled</span>
+                <span os-badge title="Agents don't get this document">Disabled</span>
               } @else if (d.staleness) {
-                <span class="flag stale" title="Agents haven't requested it. Consider disabling it."
+                <span
+                  os-badge
+                  tone="warning"
+                  title="Agents haven't requested it. Consider disabling it."
                   >Not requested in a {{ d.staleness }}</span
                 >
               }

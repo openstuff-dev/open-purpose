@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Button, Check, Checkbox, Control, Field } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Check, Checkbox, Chip, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Project } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -10,7 +10,7 @@ import { Icon } from '../shared/icon';
 
 @Component({
   selector: 'app-projects',
-  imports: [RouterLink, FormsModule, Icon, Button, Field, Control, Check, Checkbox],
+  imports: [RouterLink, FormsModule, Icon, Button, Field, Control, Check, Checkbox, Badge, Chip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="page-head">
@@ -123,13 +123,13 @@ import { Icon } from '../shared/icon';
                 <span class="project-name"
                   >{{ p.name }}
                   @if (showOrg()) {
-                    <span class="chip"
+                    <span os-chip
                       ><i class="dot" [style.background]="session.orgColor(p.organization_id)"></i
                       >{{ p.organization_name }}</span
                     >
                   }
                   @if (!p.reviewed) {
-                    <span class="flag">Needs review</span>
+                    <span os-badge tone="warning">Needs review</span>
                   }
                 </span>
                 <code class="project-slug">{{ p.organization_slug }}/{{ p.slug }}</code>

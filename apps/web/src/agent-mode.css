@@ -283,29 +283,18 @@ html.agent-mode .layer-path li + li::before {
   background: none;
   color: var(--line-strong);
 }
-html.agent-mode .chip,
-html.agent-mode .flag,
-html.agent-mode .status {
+html.agent-mode .os-chip,
+html.agent-mode .os-badge,
+html.agent-mode .os-status-dot {
   font-family: var(--mono);
 }
-html.agent-mode .status::before {
+html.agent-mode .os-status-dot::before {
   content: '●';
   width: auto;
   height: auto;
   background: none !important;
+  color: var(--os-tone-default);
   font-size: 0.6rem;
-}
-html.agent-mode .status[data-status='pending']::before {
-  color: var(--accent);
-}
-html.agent-mode .status[data-status='approved']::before {
-  color: var(--open);
-}
-html.agent-mode .status[data-status='rejected']::before {
-  color: var(--danger);
-}
-html.agent-mode .status[data-status='changes_requested']::before {
-  color: var(--propose);
 }
 html.agent-mode .data-table tbody tr:hover,
 html.agent-mode .data-table tr.selected {
