@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import { ROLE_LABEL, type Member, type Role } from '../core/models';
 import { Session } from '../core/session';
@@ -19,7 +19,7 @@ const GROUP = 'group';
 
 @Component({
   selector: 'app-people',
-  imports: [FormsModule, DatePipe, NgTemplateOutlet, Icon, Button],
+  imports: [FormsModule, DatePipe, NgTemplateOutlet, Icon, Button, Field, Control],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -50,24 +50,23 @@ const GROUP = 'group';
 
     <section>
       <form class="inline-form panel" (ngSubmit)="create()">
-        <label class="grow"
-          >Name
-          <input
+        <os-field label="Name" class="grow"
+          ><input
+            os-input
             name="name"
             [(ngModel)]="name"
             required
             [placeholder]="kind === 'agent' ? 'Claude Code, Jonas' : 'Jonas Hansen'"
-        /></label>
-        <label
-          >Kind
-          <select name="kind" [(ngModel)]="kind" (ngModelChange)="fixLevel()">
+        /></os-field>
+        <os-field label="Kind"
+          ><select os-select name="kind" [(ngModel)]="kind" (ngModelChange)="fixLevel()">
             <option value="human">Person</option>
             <option value="agent">Agent</option>
-          </select>
-        </label>
-        <label
-          >{{ kind === 'agent' ? 'Works in' : 'Role in' }}
-          <select name="level" [(ngModel)]="level">
+          </select></os-field
+        >
+        <label class="os-field"
+          ><span class="os-label">{{ kind === 'agent' ? 'Works in' : 'Role in' }}</span
+          ><select os-select name="level" [(ngModel)]="level">
             @for (l of levels(); track l.id) {
               @if (kind === 'human' || l.id !== GROUP) {
                 <option [value]="l.id">{{ l.name }}</option>
@@ -76,14 +75,13 @@ const GROUP = 'group';
           </select>
         </label>
         @if (kind === 'human') {
-          <label
-            >Role
-            <select name="role" [(ngModel)]="role">
+          <os-field label="Role"
+            ><select os-select name="role" [(ngModel)]="role">
               <option value="editor">Editor</option>
               <option value="viewer">Viewer</option>
               <option value="admin">Admin</option>
-            </select>
-          </label>
+            </select></os-field
+          >
         }
         <p class="quiet full">
           @if (kind === 'agent') {
@@ -167,6 +165,7 @@ const GROUP = 'group';
                 <span class="quiet">agent</span>
               } @else if (session.canAdmin(ms.organization_id)) {
                 <select
+                  os-select
                   [ngModel]="ms.role"
                   (ngModelChange)="setRole(ms.id, $event)"
                   [attr.aria-label]="
@@ -200,12 +199,12 @@ const GROUP = 'group';
           @if (m.kind === 'human' && addable(m).length) {
             @if (adding() === m.id) {
               <span class="membership">
-                <select [(ngModel)]="addLevel" aria-label="Where">
+                <select os-select [(ngModel)]="addLevel" aria-label="Where">
                   @for (l of addable(m); track l.id) {
                     <option [value]="l.id">{{ l.name }}</option>
                   }
                 </select>
-                <select [(ngModel)]="addRole" aria-label="Role">
+                <select os-select [(ngModel)]="addRole" aria-label="Role">
                   <option value="viewer">Viewer</option>
                   <option value="editor">Editor</option>
                   <option value="admin">Admin</option>

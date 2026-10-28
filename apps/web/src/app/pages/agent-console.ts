@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Project } from '../core/models';
 import { Session } from '../core/session';
@@ -91,7 +91,7 @@ function followUps(call: {
  */
 @Component({
   selector: 'app-agent-console',
-  imports: [FormsModule, MarkdownView, Button],
+  imports: [FormsModule, MarkdownView, Button, Field, Control],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="page-head">
@@ -103,50 +103,54 @@ function followUps(call: {
     </header>
 
     <form class="inline-form panel console-form" (ngSubmit)="getContext()">
-      <label
-        >Project
-        <select name="project" [(ngModel)]="project">
+      <os-field label="Project"
+        ><select os-select name="project" [(ngModel)]="project">
           <option value="">Find it from the git remote</option>
           @for (p of projects(); track p.id) {
             <option [value]="ref(p)">{{ p.name }} ({{ ref(p) }})</option>
           }
-        </select>
-      </label>
+        </select></os-field
+      >
       @if (!project) {
-        <label class="grow"
-          >Git remote URL
-          <input
+        <os-field label="Git remote URL" class="grow"
+          ><input
+            os-input
             name="remote"
             class="mono"
             [(ngModel)]="remote"
             placeholder="git@ssh.dev.azure.com:v3/org/project/repo"
-        /></label>
+        /></os-field>
       }
-      <label class="grow"
-        >Path <span class="quiet">(file or folder)</span
-        ><input name="path" class="mono" [(ngModel)]="path" placeholder="frontend/src/app"
+      <label class="os-field grow"
+        ><span class="os-label">Path <span class="quiet">(file or folder)</span></span
+        ><input os-input name="path" class="mono" [(ngModel)]="path" placeholder="frontend/src/app"
       /></label>
-      <label
-        >Stacks <span class="quiet">(optional)</span
-        ><input name="stacks" [(ngModel)]="stacks" placeholder="angular"
+      <label class="os-field"
+        ><span class="os-label">Stacks <span class="quiet">(optional)</span></span
+        ><input os-input name="stacks" [(ngModel)]="stacks" placeholder="angular"
       /></label>
       <details class="full console-manifest">
         <summary>
           Manifest <span class="quiet">(optional: package.json, *.csproj… to detect stacks)</span>
         </summary>
         <div class="inline-form">
-          <label
-            >File name
-            <input
+          <os-field label="File name"
+            ><input
+              os-input
               name="mpath"
               class="mono"
               [(ngModel)]="manifestPath"
               placeholder="frontend/package.json"
-          /></label>
-          <label class="full"
-            >Content
-            <textarea name="manifest" class="mono" rows="4" [(ngModel)]="manifest"></textarea>
-          </label>
+          /></os-field>
+          <os-field label="Content" class="full">
+            <textarea
+              os-textarea
+              name="manifest"
+              class="mono"
+              rows="4"
+              [(ngModel)]="manifest"
+            ></textarea>
+          </os-field>
         </div>
       </details>
       <div class="form-actions full">
@@ -164,6 +168,7 @@ function followUps(call: {
 
     <form class="console-search" (ngSubmit)="search()" role="search">
       <input
+        os-input
         name="q"
         [(ngModel)]="query"
         placeholder="search: words an agent would look for"

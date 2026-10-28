@@ -157,81 +157,15 @@ p {
 }
 
 /* ─── Controls ─── */
-input,
-select,
-textarea {
-  font: inherit;
-  color: var(--ink);
-  background: var(--surface);
-  border: 1px var(--os-border-style) var(--line-strong);
-  border-radius: var(--r-sm);
-  padding: 0.5rem 0.65rem;
-  width: 100%;
-  min-width: 0;
-  transition:
-    border-color 0.12s,
-    box-shadow 0.12s;
-}
-input::placeholder,
-textarea::placeholder {
-  color: var(--faint);
-}
-textarea {
-  resize: vertical;
-  line-height: 1.55;
-}
-input:hover,
-select:hover,
-textarea:hover {
-  border-color: var(--faint);
-}
-input:focus,
-select:focus,
-textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
-}
-input:disabled {
-  opacity: 0.5;
-}
-select {
-  appearance: none;
-  padding-right: 2rem;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.55rem center;
-}
-input[type='checkbox'] {
-  width: 1rem;
-  height: 1rem;
-  accent-color: var(--accent);
-  padding: 0;
-}
-label {
+/* Labels that aren't toolkit fields, checks or buttons: unlayered rules win over its layers. */
+label:not(:where(.os-field, .os-check, .os-button)) {
   display: block;
   font-weight: 500;
   font-size: var(--fs-sm);
   color: var(--ink-2);
 }
-label > :is(input, select, textarea),
-label > app-md-editor {
-  display: block;
-  margin-top: 0.35rem;
-}
-label > .quiet {
+:is(label, .os-label) > .quiet {
   font-weight: 400;
-}
-label.check {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 400;
-  font-size: var(--fs-base);
-  color: var(--ink);
-}
-label.check input {
-  margin: 0;
 }
 
 /* A destructive link (Revoke, Delete). @openstuff-dev/ui has no danger link yet. */
@@ -255,7 +189,7 @@ kbd {
   align-items: end;
   margin: 0.85rem 0;
 }
-.inline-form > label {
+.inline-form > :is(label, os-field) {
   flex: 1 1 10rem;
 }
 .inline-form > .grow {
@@ -290,10 +224,6 @@ kbd {
 .title-form input {
   font-size: var(--fs-lg);
   font-weight: 600;
-}
-.field-error {
-  color: var(--danger);
-  font-size: var(--fs-sm);
 }
 
 /* ─── Sign in ─── */
@@ -974,7 +904,7 @@ kbd {
   padding: 0 0.35rem;
   color: var(--ink-2);
 }
-.repo-picker label.check code {
+.repo-picker .os-check code {
   overflow-wrap: anywhere;
 }
 .repo-picker p {
@@ -1615,6 +1545,13 @@ a.wikilink:hover {
   position: relative;
 }
 .editor textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  line-height: 1.55;
+  background: var(--surface);
+  color: var(--ink);
+  outline: none;
   border: 0;
   border-radius: 0;
   font-family: var(--mono);
@@ -1750,7 +1687,7 @@ a.wikilink:hover {
   border-top: 1px var(--os-border-style) var(--line);
   padding-top: 0.95rem;
 }
-.review > label {
+.review > :is(label, os-field) {
   flex: 1 1 14rem;
 }
 .review .doc-mode {
@@ -1812,9 +1749,6 @@ a.wikilink:hover {
 .inline-select select {
   width: auto;
   margin: 0;
-  height: 2rem;
-  padding-top: 0;
-  padding-bottom: 0;
 }
 .toolbar .tabs {
   margin: 0;
@@ -1922,6 +1856,8 @@ mark {
   background: var(--ground);
 }
 .membership select {
+  min-block-size: 0;
+  line-height: 1.4rem;
   width: auto;
   border: 0;
   padding: 0 1.2rem 0 0.2rem;
@@ -2283,6 +2219,9 @@ mark {
   color: var(--muted);
 }
 .palette-input input {
+  width: 100%;
+  color: var(--ink);
+  outline: none;
   border: 0;
   box-shadow: none;
   padding: 0.95rem 0;
@@ -2450,20 +2389,17 @@ mark {
   font-size: var(--fs-lg);
   margin-right: 0.5rem;
 }
-.map-bar label:not(.check) {
+.map-bar label:not(.os-check) {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   color: var(--muted);
   font-weight: 400;
 }
-.map-bar label:not(.check) select {
+.map-bar label:not(.os-check) select {
   margin: 0;
   width: auto;
   min-width: 12rem;
-  height: 2rem;
-  padding-top: 0;
-  padding-bottom: 0;
 }
 .legend {
   display: flex;
@@ -2799,9 +2735,6 @@ mark {
 }
 .inbox-filters select {
   width: auto;
-  height: 2.125rem;
-  padding-top: 0;
-  padding-bottom: 0;
 }
 .search-field {
   position: relative;
@@ -3580,6 +3513,7 @@ mark {
   font-weight: 400;
 }
 .compare-bar select {
+  min-block-size: 0;
   width: auto;
   padding-block: 0.25rem;
   font-size: var(--fs-sm);
@@ -4375,6 +4309,7 @@ mark {
   font-size: var(--fs-sm);
 }
 .agent-org select {
+  min-block-size: 0;
   width: auto;
   padding-block: 0.2rem;
   font-size: var(--fs-sm);
@@ -4777,16 +4712,16 @@ mark {
   display: grid;
   gap: 0.5rem;
 }
-.transfer-policies label.check,
-.setting-row label.check {
+.transfer-policies .os-check,
+.setting-row .os-check {
   align-items: flex-start;
 }
-.transfer-policies label.check input,
-.setting-row label.check input[type='checkbox'] {
+.transfer-policies .os-check input,
+.setting-row .os-check input[type='checkbox'] {
   margin-top: 0.3rem;
 }
 .transfer-policies .quiet,
-.setting-row label.check .quiet {
+.setting-row .os-check .quiet {
   display: block;
   font-size: var(--fs-sm);
 }
@@ -4816,7 +4751,7 @@ mark {
   flex: 1 1 12rem;
   min-width: 0;
 }
-.transfer-orgs .field-error {
+.transfer-orgs .os-error {
   flex-basis: 100%;
   margin: 0;
 }

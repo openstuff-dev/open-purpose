@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Check, Checkbox, Control, Field, Radio } from '@openstuff-dev/ui-angular';
 import { Api, type ImportUpload } from '../core/api';
 import type {
   ExportIncludes,
@@ -72,7 +72,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
 /** Settings › Export and import: download a group or organization, and import such a file. */
 @Component({
   selector: 'app-transfer',
-  imports: [FormsModule, Icon, DiffView, Button],
+  imports: [FormsModule, Icon, DiffView, Button, Field, Control, Check, Checkbox, Radio],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -86,7 +86,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
           <div>
             <h3>What to export</h3>
           </div>
-          <select name="what" [(ngModel)]="what" aria-label="What to export">
+          <select os-select name="what" [(ngModel)]="what" aria-label="What to export">
             @if (session.canAdmin(null)) {
               <option value="">
                 {{ session.groupShown() ? 'The whole group' : 'Everything' }} ({{
@@ -136,25 +136,31 @@ async function readUpload(file: File): Promise<ImportUpload> {
             <h3>Include</h3>
           </div>
           <div class="transfer-includes">
-            <label class="check"
-              ><input type="checkbox" name="history" [(ngModel)]="includes.history" /> Earlier
-              versions of every section</label
+            <label os-check
+              ><input os-checkbox type="checkbox" name="history" [(ngModel)]="includes.history" />
+              Earlier versions of every section</label
             >
-            <label class="check"
-              ><input type="checkbox" name="proposals" [(ngModel)]="includes.proposals" /> Proposals
-              and their reviews</label
+            <label os-check
+              ><input
+                os-checkbox
+                type="checkbox"
+                name="proposals"
+                [(ngModel)]="includes.proposals"
+              />
+              Proposals and their reviews</label
             >
-            <label class="check"
-              ><input type="checkbox" name="apis" [(ngModel)]="includes.api_specs" /> API
-              specs</label
+            <label os-check
+              ><input os-checkbox type="checkbox" name="apis" [(ngModel)]="includes.api_specs" />
+              API specs</label
             >
-            <label class="check"
-              ><input type="checkbox" name="findings" [(ngModel)]="includes.findings" /> Findings,
-              solved and dismissed ones too</label
+            <label os-check
+              ><input os-checkbox type="checkbox" name="findings" [(ngModel)]="includes.findings" />
+              Findings, solved and dismissed ones too</label
             >
-            <label class="check"
-              ><input type="checkbox" name="people" [(ngModel)]="includes.people" /> Names and roles
-              of people and agents <span class="quiet">(never their tokens)</span></label
+            <label os-check
+              ><input os-checkbox type="checkbox" name="people" [(ngModel)]="includes.people" />
+              Names and roles of people and agents
+              <span class="quiet">(never their tokens)</span></label
             >
           </div>
         </div>
@@ -271,15 +277,19 @@ async function readUpload(file: File): Promise<ImportUpload> {
 
         @if (asGroup() && r.group) {
           <form class="inline-form panel" (ngSubmit)="refresh()">
-            <label class="grow"
-              >Group name <input name="gname" [(ngModel)]="groupName" (change)="refresh()"
-            /></label>
-            <label class="grow"
-              >Slug
-              <input name="gslug" class="mono" [(ngModel)]="groupSlug" (change)="refresh()" />
-            </label>
+            <os-field label="Group name" class="grow"
+              ><input os-input name="gname" [(ngModel)]="groupName" (change)="refresh()"
+            /></os-field>
+            <os-field label="Slug" class="grow"
+              ><input
+                os-input
+                name="gslug"
+                class="mono"
+                [(ngModel)]="groupSlug"
+                (change)="refresh()"
+            /></os-field>
             @if (r.group.conflict) {
-              <p class="full field-error" role="alert">
+              <p class="full os-error" role="alert">
                 {{ r.group.conflict }}
                 <button
                   type="button"
@@ -302,6 +312,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
                   <strong>{{ o.name }}</strong> <code class="quiet">{{ o.slug }}</code>
                 </div>
                 <select
+                  os-select
                   [ngModel]="choiceValue(o.key)"
                   (ngModelChange)="choose(o.key, $event)"
                   [attr.aria-label]="'What to do with ' + o.name"
@@ -315,16 +326,16 @@ async function readUpload(file: File): Promise<ImportUpload> {
                   <option value="skip">Leave out</option>
                 </select>
                 @if (choices()[o.key]?.action === 'new') {
-                  <label class="transfer-slug"
-                    >Slug
-                    <input
+                  <os-field label="Slug" class="transfer-slug"
+                    ><input
+                      os-input
                       class="mono"
                       [ngModel]="o.new_slug"
                       (change)="setSlug(o.key, $any($event.target).value)"
-                  /></label>
+                  /></os-field>
                 }
                 @if (o.conflict) {
-                  <p class="field-error" role="alert">
+                  <p class="os-error" role="alert">
                     {{ o.conflict }}
                     @if (o.suggested_slug) {
                       <button
@@ -355,8 +366,9 @@ async function readUpload(file: File): Promise<ImportUpload> {
                   aria-label="When a section differs"
                 >
                   @for (p of policies; track p.value) {
-                    <label class="check"
+                    <label os-check
                       ><input
+                        os-radio
                         type="radio"
                         name="policy"
                         [value]="p.value"
@@ -372,8 +384,9 @@ async function readUpload(file: File): Promise<ImportUpload> {
                 </div>
               </div>
               <div class="setting-row stack">
-                <label class="check"
+                <label os-check
                   ><input
+                    os-checkbox
                     type="checkbox"
                     [ngModel]="removeMissing()"
                     (ngModelChange)="removeMissing.set($event); refresh()"
@@ -390,8 +403,9 @@ async function readUpload(file: File): Promise<ImportUpload> {
             </div>
           }
           @if (hasGroupContent(r) && session.canAdmin(null)) {
-            <label class="check transfer-group-content"
+            <label os-check class="transfer-group-content"
               ><input
+                os-checkbox
                 type="checkbox"
                 [ngModel]="groupContent()"
                 (ngModelChange)="groupContent.set($event); refresh()"
@@ -430,17 +444,17 @@ async function readUpload(file: File): Promise<ImportUpload> {
                     <p class="quiet">{{ c.reason }}</p>
                   }
                   @if (c.status === 'changed' && c.key) {
-                    <label class="transfer-override"
-                      >For this section
-                      <select
+                    <os-field label="For this section" class="transfer-override"
+                      ><select
+                        os-select
                         [ngModel]="sectionChanges()[c.key] ?? changes()"
                         (ngModelChange)="setSectionChange(c.key, $event)"
                       >
                         @for (p of policies; track p.value) {
                           <option [value]="p.value">{{ p.label }}</option>
                         }
-                      </select>
-                    </label>
+                      </select></os-field
+                    >
                   }
                   <app-diff [before]="c.before?.body ?? ''" [after]="c.after?.body ?? ''" />
                 </details>

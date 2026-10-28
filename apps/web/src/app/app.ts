@@ -10,7 +10,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
-import { Button, IconButton } from '@openstuff-dev/ui-angular';
+import { Button, Control, Field, IconButton } from '@openstuff-dev/ui-angular';
 import { Api } from './core/api';
 import { ROLE_LABEL } from './core/models';
 import { Session, errorMessage } from './core/session';
@@ -31,6 +31,8 @@ import { Palette } from './shared/palette';
     Palette,
     Button,
     IconButton,
+    Field,
+    Control,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)', '(document:click)': 'wsOpen.set(false)' },
@@ -45,6 +47,7 @@ import { Palette } from './shared/palette';
           <p>The shared rules, purpose and learnings your people and coding agents work from.</p>
           <label for="token">Access token</label>
           <input
+            os-input
             id="token"
             name="token"
             type="password"
@@ -54,7 +57,7 @@ import { Palette } from './shared/palette';
             required
           />
           @if (signinError()) {
-            <p class="field-error" role="alert">{{ signinError() }}</p>
+            <p class="os-error" role="alert">{{ signinError() }}</p>
           }
           <button os-button variant="primary" type="submit" [disabled]="!tokenInput.trim()">
             Sign in
@@ -77,9 +80,9 @@ import { Palette } from './shared/palette';
               OpenPurpose
             </span>
             @if (session.agentOrgs().length > 1) {
-              <label class="agent-org"
-                >Agent in
-                <select
+              <os-field label="Agent in" class="agent-org"
+                ><select
+                  os-select
                   [ngModel]="session.orgId()"
                   (ngModelChange)="pickOrg($event)"
                   aria-label="View as an agent in"
@@ -87,8 +90,8 @@ import { Palette } from './shared/palette';
                   @for (o of session.agentOrgs(); track o.id) {
                     <option [value]="o.id">{{ o.name }}</option>
                   }
-                </select>
-              </label>
+                </select></os-field
+              >
             } @else {
               <span class="agent-org"
                 >Agent in <strong>{{ session.org()?.name }}</strong></span

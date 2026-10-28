@@ -9,7 +9,7 @@ import {
   untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Control } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ContextResult, Scope } from '../core/models';
 import { Session } from '../core/session';
@@ -43,7 +43,7 @@ function samplePath(glob: string): string {
  */
 @Component({
   selector: 'app-agent-view',
-  imports: [FormsModule, Icon, MarkdownView, ModeBadge, Button],
+  imports: [FormsModule, Icon, MarkdownView, ModeBadge, Button, Control],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="agent-view">
@@ -79,6 +79,7 @@ function samplePath(glob: string): string {
         @if (choice() === 'custom') {
           <form class="av-custom" (ngSubmit)="run()">
             <input
+              os-input
               name="path"
               class="mono"
               [(ngModel)]="path"
@@ -86,6 +87,7 @@ function samplePath(glob: string): string {
               aria-label="File or folder"
             />
             <input
+              os-input
               name="stacks"
               [(ngModel)]="stacks"
               placeholder="Stacks, e.g. dotnet, angular"

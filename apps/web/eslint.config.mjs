@@ -10,6 +10,10 @@ const replaced = [
     pattern: String.raw`class="([^"]*\s)?(btn|link-btn|icon-btn)[\s"]`,
     message: 'Use <button os-button> (or os-icon-button) from @openstuff-dev/ui-angular instead of .btn, .link-btn or .icon-btn.',
   },
+  {
+    pattern: String.raw`class="([^"]*\s)?(check|field-error)[\s"]`,
+    message: 'Use <label os-check> with os-checkbox or os-radio, and <os-field [error]> or .os-error, from @openstuff-dev/ui-angular instead of .check or .field-error.',
+  },
 ];
 
 export default [

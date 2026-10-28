@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ApiSpec, ApiSpecDetail } from '../core/models';
 import { Icon } from './icon';
@@ -35,7 +35,7 @@ function ago(iso: string | null): string {
  */
 @Component({
   selector: 'app-api-specs',
-  imports: [FormsModule, DatePipe, Icon, MarkdownView, Button],
+  imports: [FormsModule, DatePipe, Icon, MarkdownView, Button, Field, Control],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (specs().length) {
@@ -129,6 +129,7 @@ function ago(iso: string | null): string {
                       <label class="search-field"
                         ><app-icon name="search" />
                         <input
+                          os-input
                           type="search"
                           placeholder="Filter endpoints and schemas"
                           aria-label="Filter"
@@ -239,15 +240,15 @@ function ago(iso: string | null): string {
         </div>
         <div class="inline-form">
           @if (mode() === 'url') {
-            <label class="grow"
-              >URL of swagger.json or openapi.yaml
-              <input
+            <os-field label="URL of swagger.json or openapi.yaml" class="grow"
+              ><input
+                os-input
                 name="url"
                 class="mono"
                 type="url"
                 [(ngModel)]="url"
                 placeholder="https://orders.acme.internal/swagger/v1/swagger.json"
-            /></label>
+            /></os-field>
           } @else {
             <label class="grow"
               >File (JSON or YAML)
@@ -258,9 +259,13 @@ function ago(iso: string | null): string {
                 (change)="pickFile($event)"
             /></label>
           }
-          <label
-            >Name <span class="quiet">(optional)</span
-            ><input name="name" [(ngModel)]="name" placeholder="Defaults to the spec's title"
+          <label class="os-field"
+            ><span class="os-label">Name <span class="quiet">(optional)</span></span
+            ><input
+              os-input
+              name="name"
+              [(ngModel)]="name"
+              placeholder="Defaults to the spec's title"
           /></label>
           <div class="form-actions">
             <button

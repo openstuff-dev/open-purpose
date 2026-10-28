@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Graph, GraphNode, LinkRef, ProjectDetail } from '../core/models';
 import { Session, provideHere } from '../core/session';
@@ -50,6 +50,8 @@ const TABS: Tab[] = [
     ApiSpecs,
     SlugRenameField,
     Button,
+    Field,
+    Control,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -304,14 +306,14 @@ const TABS: Tab[] = [
             }
             @if (p.can_edit) {
               <form class="inline-form" (ngSubmit)="addRepo()">
-                <label class="grow"
-                  >Git remote URL
-                  <input
+                <os-field label="Git remote URL" class="grow"
+                  ><input
+                    os-input
                     name="remote"
                     class="mono"
                     [(ngModel)]="remote"
                     placeholder="git@ssh.dev.azure.com:v3/org/project/repo"
-                /></label>
+                /></os-field>
                 <div class="form-actions">
                   <button os-button type="submit" [disabled]="!remote.trim()">
                     <app-icon name="plus" />Add repository
@@ -337,22 +339,26 @@ const TABS: Tab[] = [
               </p>
             </div>
             <form class="inline-form settings-form" (ngSubmit)="save()">
-              <label class="grow"
-                >Name <input name="name" [(ngModel)]="draft.name" required
-              /></label>
-              <label class="full"
-                >Summary <textarea name="summary" rows="3" [(ngModel)]="draft.summary"></textarea>
-              </label>
+              <os-field label="Name" class="grow"
+                ><input os-input name="name" [(ngModel)]="draft.name" required
+              /></os-field>
+              <os-field label="Summary" class="full">
+                <textarea
+                  os-textarea
+                  name="summary"
+                  rows="3"
+                  [(ngModel)]="draft.summary"
+                ></textarea>
+              </os-field>
               @if (movableTo().length) {
-                <label class="full"
-                  >Organization
-                  <select name="org" [(ngModel)]="draft.organization_id">
+                <os-field label="Organization" class="full"
+                  ><select os-select name="org" [(ngModel)]="draft.organization_id">
                     <option [value]="p.organization_id">{{ p.organization.name }}</option>
                     @for (o of movableTo(); track o.id) {
                       <option [value]="o.id">Move to {{ o.name }}</option>
                     }
-                  </select>
-                </label>
+                  </select></os-field
+                >
               }
               <div class="form-actions full">
                 <button os-button variant="primary" type="submit">Save</button>

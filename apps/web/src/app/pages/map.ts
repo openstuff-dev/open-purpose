@@ -27,7 +27,7 @@ import { select, type Selection } from 'd3-selection';
 import { zoom, zoomIdentity, type ZoomBehavior } from 'd3-zoom';
 import 'd3-transition';
 import { drag } from 'd3-drag';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Check, Checkbox, Control } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Graph, GraphEdge, GraphNode, LinkRef, Project } from '../core/models';
 import { Notices } from '../shared/notice';
@@ -51,7 +51,7 @@ const RADIUS: Record<GraphNode['type'], number> = {
 
 @Component({
   selector: 'app-map',
-  imports: [FormsModule, RouterLink, Button],
+  imports: [FormsModule, RouterLink, Button, Control, Check, Checkbox],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'map-page' },
   template: `
@@ -59,7 +59,7 @@ const RADIUS: Record<GraphNode['type'], number> = {
       <h1>Map</h1>
       <label
         >Focus
-        <select [ngModel]="focus()" (ngModelChange)="setFocus($event)">
+        <select os-select [ngModel]="focus()" (ngModelChange)="setFocus($event)">
           <option value="">
             Everything {{ session.agentView() ? 'the agent' : 'I' }} can read
           </option>
@@ -71,23 +71,25 @@ const RADIUS: Record<GraphNode['type'], number> = {
       @if (focus()) {
         <label
           >Reach
-          <select [ngModel]="depth()" (ngModelChange)="depth.set(+$event); reload()">
+          <select os-select [ngModel]="depth()" (ngModelChange)="depth.set(+$event); reload()">
             <option [value]="1">Direct links</option>
             <option [value]="2">Two steps</option>
             <option [value]="3">Three steps</option>
           </select>
         </label>
       }
-      <label class="check"
+      <label os-check
         ><input
+          os-checkbox
           type="checkbox"
           [ngModel]="showTerms()"
           (ngModelChange)="showTerms.set($event); draw()"
         />
         Terms</label
       >
-      <label class="check"
+      <label os-check
         ><input
+          os-checkbox
           type="checkbox"
           [ngModel]="showMissing()"
           (ngModelChange)="showMissing.set($event); reload()"

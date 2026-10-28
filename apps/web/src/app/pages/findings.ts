@@ -13,7 +13,7 @@ import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { Button, IconButton } from '@openstuff-dev/ui-angular';
+import { Button, Control, IconButton } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Finding, FindingCounts, FindingStatus } from '../core/models';
 import { Session } from '../core/session';
@@ -63,7 +63,7 @@ function lines(f: Finding): string {
 
 @Component({
   selector: 'app-findings',
-  imports: [FormsModule, RouterLink, DatePipe, MarkdownView, Icon, Button, IconButton],
+  imports: [FormsModule, RouterLink, DatePipe, MarkdownView, Icon, Button, IconButton, Control],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)', class: 'wide-page' },
   template: `
@@ -96,6 +96,7 @@ function lines(f: Finding): string {
         <label class="search-field"
           ><app-icon name="search" />
           <input
+            os-input
             type="search"
             placeholder="Filter by text, file, project or person"
             aria-label="Filter"
@@ -103,7 +104,7 @@ function lines(f: Finding): string {
             (ngModelChange)="q.set($event)"
           />
         </label>
-        <select aria-label="Where" [ngModel]="org()" (ngModelChange)="setOrg($event)">
+        <select os-select aria-label="Where" [ngModel]="org()" (ngModelChange)="setOrg($event)">
           <option value="">Everywhere I can see</option>
           @for (o of session.readableOrgs(); track o.id) {
             <option [value]="o.id">{{ o.name }}</option>
@@ -361,15 +362,17 @@ function lines(f: Finding): string {
           <footer class="drawer-foot">
             <div class="foot-row">
               <input
+                os-input
                 class="note"
                 [(ngModel)]="note"
                 name="note"
                 placeholder="Note for the record (optional)"
                 aria-label="Note"
               />
-              <label class="remind"
-                >Remind after
-                <input
+              <label class="os-field remind"
+                ><span class="os-label">Remind after</span
+                ><input
+                  class="os-input"
                   type="date"
                   [(ngModel)]="remindAfter"
                   name="remind"

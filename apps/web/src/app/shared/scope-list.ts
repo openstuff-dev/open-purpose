@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Button } from '@openstuff-dev/ui-angular';
+import { Button, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Repository, Scope } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -29,7 +29,7 @@ export const repoName = (key: string) => key.split('/').pop() || key;
 /** Scopes at the org level (projectId null) or inside a project. */
 @Component({
   selector: 'app-scope-list',
-  imports: [RouterLink, FormsModule, Icon, RepoPicker, Button],
+  imports: [RouterLink, FormsModule, Icon, RepoPicker, Button, Field, Control],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (scopes().length) {
@@ -65,16 +65,16 @@ export const repoName = (key: string) => key.split('/').pop() || key;
     @if (canEdit()) {
       @if (adding()) {
         <form class="inline-form" (ngSubmit)="create()">
-          <label class="grow"
-            >Name
-            <input
+          <os-field label="Name" class="grow"
+            ><input
+              os-input
               name="name"
               [(ngModel)]="name"
               required
               [placeholder]="
                 projectId() ? 'Frontend' : organizationId() ? 'Angular apps' : 'All .NET code'
               "
-          /></label>
+          /></os-field>
           @if (projectId(); as pid) {
             <app-repo-picker
               class="full"
@@ -84,23 +84,29 @@ export const repoName = (key: string) => key.split('/').pop() || key;
               (added)="repositoryAdded.emit($event)"
             />
           }
-          <label class="full"
-            >Paths
-            <span class="quiet"
-              >(globs relative to the repo root, comma separated{{
-                projectId() ? '; optional with a repository' : ''
-              }})</span
-            >
-            <input
+          <label class="os-field full"
+            ><span class="os-label"
+              >Paths
+              <span class="quiet"
+                >(globs relative to the repo root, comma separated{{
+                  projectId() ? '; optional with a repository' : ''
+                }})</span
+              ></span
+            ><input
+              os-input
               name="globs"
               [(ngModel)]="globs"
               class="mono"
               [placeholder]="projectId() ? 'frontend/**, apps/web/**' : ''"
           /></label>
-          <label class="full"
-            >Stacks
-            <span class="quiet">(tags detected from package.json, .csproj and similar)</span>
-            <input
+          <label class="os-field full"
+            ><span class="os-label"
+              >Stacks
+              <span class="quiet"
+                >(tags detected from package.json, .csproj and similar)</span
+              ></span
+            ><input
+              os-input
               name="stacks"
               [(ngModel)]="stacks"
               [placeholder]="projectId() ? 'angular' : organizationId() ? 'angular' : 'dotnet'"
