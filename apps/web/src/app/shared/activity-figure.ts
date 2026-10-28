@@ -204,29 +204,40 @@ export class ActivityFigure {
   }
 }
 
+let nextSwitch = 0;
+
 /** The tiny switcher between number, dots and chart. One choice per person, everywhere. */
 @Component({
   selector: 'app-stat-style-switch',
   imports: [Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <span class="stat-switch" role="group" aria-label="Show activity as">
+    <span
+      class="os-segmented stat-switch"
+      data-size="sm"
+      role="radiogroup"
+      aria-label="Show activity as"
+    >
       @for (o of options; track o.value) {
-        <button
-          type="button"
-          [title]="o.label"
-          [attr.aria-label]="o.label"
-          [attr.aria-pressed]="style.choice() === o.value"
-          (click)="style.set(o.value)"
-        >
-          <app-icon [name]="o.icon" [size]="12" />
-        </button>
+        <label [title]="o.label">
+          <input
+            type="radio"
+            [name]="name"
+            [value]="o.value"
+            [checked]="style.choice() === o.value"
+            (change)="style.set(o.value)"
+          />
+          <app-icon [name]="o.icon" [size]="12" /><span class="os-visually-hidden">{{
+            o.label
+          }}</span>
+        </label>
       }
     </span>
   `,
 })
 export class StatStyleSwitch {
   readonly style = inject(StatStyle);
+  readonly name = `stat-style-${nextSwitch++}`;
   readonly options = [
     { value: 'number', icon: 'hash', label: 'Show as animated numbers' },
     { value: 'dots', icon: 'dots', label: 'Show as dots, one per day' },

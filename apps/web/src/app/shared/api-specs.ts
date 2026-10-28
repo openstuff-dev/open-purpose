@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Button, Chip, Control, Field } from '@openstuff-dev/ui-angular';
+import { Button, Chip, Control, Field, SegmentedControl } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ApiSpec, ApiSpecDetail } from '../core/models';
 import { Icon } from './icon';
@@ -35,7 +35,17 @@ function ago(iso: string | null): string {
  */
 @Component({
   selector: 'app-api-specs',
-  imports: [FormsModule, DatePipe, Icon, MarkdownView, Button, Field, Control, Chip],
+  imports: [
+    FormsModule,
+    DatePipe,
+    Icon,
+    MarkdownView,
+    Button,
+    Field,
+    Control,
+    Chip,
+    SegmentedControl,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (specs().length) {
@@ -219,24 +229,7 @@ function ago(iso: string | null): string {
       <form class="api-add" (ngSubmit)="add()">
         <div class="api-add-head">
           <h3>Add an API spec</h3>
-          <div class="segmented sm" role="tablist" aria-label="Source">
-            <button
-              type="button"
-              role="tab"
-              [attr.aria-selected]="mode() === 'url'"
-              (click)="mode.set('url')"
-            >
-              From a link
-            </button>
-            <button
-              type="button"
-              role="tab"
-              [attr.aria-selected]="mode() === 'file'"
-              (click)="mode.set('file')"
-            >
-              Upload a file
-            </button>
-          </div>
+          <os-segmented-control label="Source" size="sm" [options]="sources" [(value)]="mode" />
         </div>
         <div class="inline-form">
           @if (mode() === 'url') {
@@ -306,6 +299,10 @@ export class ApiSpecs {
   readonly filter = signal('');
   readonly busy = signal(false);
   readonly mode = signal<'url' | 'file'>('url');
+  readonly sources = [
+    { value: 'url', label: 'From a link' },
+    { value: 'file', label: 'Upload a file' },
+  ] as const;
   readonly file = signal<File | null>(null);
   url = '';
   name = '';
