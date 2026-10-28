@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ContextResult, Project } from '../core/models';
 import { MarkdownView } from '../shared/markdown';
@@ -10,7 +11,7 @@ import { splitList } from '../shared/scope-list';
 
 @Component({
   selector: 'app-preview',
-  imports: [FormsModule, RouterLink, MarkdownView],
+  imports: [FormsModule, RouterLink, MarkdownView, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -69,7 +70,7 @@ import { splitList } from '../shared/scope-list';
         <textarea name="manifest" class="mono" rows="4" [(ngModel)]="manifest"></textarea>
       </label>
       <div class="form-actions full">
-        <button class="btn primary" type="submit">Show context</button>
+        <button os-button variant="primary" type="submit">Show context</button>
       </div>
     </form>
 
@@ -125,7 +126,9 @@ import { splitList } from '../shared/scope-list';
           <button type="button" role="tab" [attr.aria-selected]="raw()" (click)="raw.set(true)">
             Exactly as sent
           </button>
-          <button type="button" class="link-btn" (click)="copy(r.markdown)">Copy</button>
+          <button type="button" os-button variant="link" size="sm" (click)="copy(r.markdown)">
+            Copy
+          </button>
         </div>
         @if (raw()) {
           <pre class="raw"><code>{{ r.markdown }}</code></pre>

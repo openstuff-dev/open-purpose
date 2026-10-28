@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type {
   ActivityFigure as Figure,
@@ -35,7 +36,7 @@ function readPeriod(): ActivityPeriod {
 
 @Component({
   selector: 'app-organization',
-  imports: [DocList, ScopeList, RouterLink, Icon, ActivityFigure, StatStyleSwitch],
+  imports: [DocList, ScopeList, RouterLink, Icon, ActivityFigure, StatStyleSwitch, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (session.org(); as org) {
@@ -54,10 +55,12 @@ function readPeriod(): ActivityPeriod {
           >
           <h1>{{ org.name }}</h1>
           @if (session.canAdmin(org.id)) {
-            <a class="btn" routerLink="/settings/group"><app-icon name="settings" />Manage</a>
+            <a os-button routerLink="/settings/group"><app-icon name="settings" />Manage</a>
           }
           @if (session.canEdit(org.id)) {
-            <a class="btn primary" routerLink="/projects"><app-icon name="plus" />New project</a>
+            <a os-button variant="primary" routerLink="/projects"
+              ><app-icon name="plus" />New project</a
+            >
           }
         </div>
         <p class="lede">
@@ -199,7 +202,9 @@ function readPeriod(): ActivityPeriod {
         <section class="block">
           <div class="block-head">
             <div><h2>Projects</h2></div>
-            <a routerLink="/projects" class="link-btn">All {{ org.projects }} projects</a>
+            <a routerLink="/projects" os-button variant="link" size="sm"
+              >All {{ org.projects }} projects</a
+            >
           </div>
           <ul class="project-list">
             @for (p of recent(); track p.id) {
@@ -289,9 +294,7 @@ export class OrganizationPage {
   );
 
   /** The "most …" tiles: one leader, with the runners-up below it. */
-  tops(
-    a: OrgActivity,
-  ): Array<{
+  tops(a: OrgActivity): Array<{
     label: string;
     unit: string;
     items: Array<Figure & { name: string; where?: string; link: unknown[] | null }>;

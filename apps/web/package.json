@@ -12,6 +12,8 @@
   },
   "private": true,
   "dependencies": {
+    "@angular/aria": "~22.2.4",
+    "@angular/cdk": "~22.2.4",
     "@angular/common": "^22.2.3",
     "@angular/compiler": "^22.2.3",
     "@angular/core": "^22.2.3",
@@ -21,6 +23,8 @@
     "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/geist-mono": "^5.3.0",
     "@openstuff-dev/tokens": "file:../../vendor/openstuff-dev-tokens-0.0.1.tgz",
+    "@openstuff-dev/ui": "file:../../vendor/openstuff-dev-ui-0.0.1.tgz",
+    "@openstuff-dev/ui-angular": "file:../../vendor/openstuff-dev-ui-angular-0.0.1.tgz",
     "d3-drag": "^3.0.0",
     "d3-force": "^3.0.0",
     "d3-selection": "^3.0.0",

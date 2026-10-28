@@ -93,7 +93,7 @@ html.agent-mode body::after {
 }
 
 /* No soft shadows; everything is drawn with rules. */
-html.agent-mode .btn,
+html.agent-mode .os-button,
 html.agent-mode input,
 html.agent-mode select,
 html.agent-mode textarea,
@@ -158,38 +158,38 @@ html.agent-mode .data-table th {
 }
 
 /* Buttons are [ bracketed ]; hover inverts. */
-html.agent-mode .btn {
+html.agent-mode .os-button {
   background: transparent;
   font-weight: 500;
   gap: 0.4rem;
 }
-html.agent-mode .btn::before {
+html.agent-mode .os-button::before {
   content: '[';
   color: var(--faint);
 }
-html.agent-mode .btn::after {
+html.agent-mode .os-button::after {
   content: ']';
   color: var(--faint);
 }
-html.agent-mode .btn:hover:not(:disabled) {
+html.agent-mode .os-button:hover:not(:disabled) {
   background: var(--ink);
   color: var(--ground);
   border-color: var(--ink);
 }
-html.agent-mode .btn:hover:not(:disabled)::before,
-html.agent-mode .btn:hover:not(:disabled)::after {
+html.agent-mode .os-button:hover:not(:disabled)::before,
+html.agent-mode .os-button:hover:not(:disabled)::after {
   color: inherit;
 }
-html.agent-mode .btn.primary {
+html.agent-mode .os-button[data-variant='primary'] {
   background: var(--agent);
   color: var(--accent-ink);
   border-color: var(--agent);
 }
-html.agent-mode .btn.primary::before,
-html.agent-mode .btn.primary::after {
+html.agent-mode .os-button[data-variant='primary']::before,
+html.agent-mode .os-button[data-variant='primary']::after {
   color: inherit;
 }
-html.agent-mode .icon-btn:hover {
+html.agent-mode .os-button[data-icon-only]:hover {
   background: var(--hover);
 }
 

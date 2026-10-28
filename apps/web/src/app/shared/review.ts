@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ReviewComment, ReviewThread } from '../core/models';
 import { diffLines } from './diff';
@@ -27,7 +28,7 @@ interface Row {
 /** One conversation: comments, suggestions with "Apply", reply box, resolve. */
 @Component({
   selector: 'app-thread',
-  imports: [FormsModule, DatePipe, Icon, MarkdownView],
+  imports: [FormsModule, DatePipe, Icon, MarkdownView, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
@@ -80,7 +81,13 @@ interface Row {
                         {{ c.applied_by_name ?? 'someone' }}</span
                       >
                     } @else if (canRevise() && !thread().outdated) {
-                      <button class="btn sm primary" type="button" (click)="apply(c)">
+                      <button
+                        os-button
+                        variant="primary"
+                        size="sm"
+                        type="button"
+                        (click)="apply(c)"
+                      >
                         Apply suggestion
                       </button>
                     } @else if (thread().outdated) {
@@ -115,10 +122,18 @@ interface Row {
                 (keydown.meta.enter)="reply()"
               ></textarea>
               <div class="form-actions">
-                <button class="btn sm primary" type="submit" [disabled]="!replyText.trim()">
+                <button
+                  os-button
+                  variant="primary"
+                  size="sm"
+                  type="submit"
+                  [disabled]="!replyText.trim()"
+                >
                   Reply
                 </button>
-                <button class="btn sm" type="button" (click)="replying.set(false)">Cancel</button>
+                <button os-button size="sm" type="button" (click)="replying.set(false)">
+                  Cancel
+                </button>
               </div>
             </form>
           } @else {
@@ -128,7 +143,13 @@ interface Row {
               </button>
             }
             @if (canResolve()) {
-              <button class="btn sm ghost" type="button" (click)="resolve(!thread().resolved_at)">
+              <button
+                os-button
+                variant="ghost"
+                size="sm"
+                type="button"
+                (click)="resolve(!thread().resolved_at)"
+              >
                 {{ thread().resolved_at ? 'Unresolve' : 'Resolve' }}
               </button>
             }
@@ -202,7 +223,7 @@ export class ThreadView {
  */
 @Component({
   selector: 'app-review-text',
-  imports: [FormsModule, Icon, ThreadView],
+  imports: [FormsModule, Icon, ThreadView, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="rt" [class.can-comment]="canComment()" [class.single]="base() === null">
@@ -254,7 +275,13 @@ export class ThreadView {
                       ? 'Line ' + selStart()
                       : 'Lines ' + selStart() + '–' + selEnd()
                   }}</span>
-                  <button type="button" class="btn sm ghost" (click)="toggleSuggestion()">
+                  <button
+                    type="button"
+                    os-button
+                    variant="ghost"
+                    size="sm"
+                    (click)="toggleSuggestion()"
+                  >
                     <app-icon name="pencil" [size]="12" />{{
                       suggesting() ? 'Remove suggestion' : 'Suggest a change'
                     }}
@@ -283,13 +310,15 @@ export class ThreadView {
                 }
                 <div class="form-actions">
                   <button
-                    class="btn sm primary"
+                    os-button
+                    variant="primary"
+                    size="sm"
                     type="submit"
                     [disabled]="!body.trim() && !suggesting()"
                   >
                     Comment
                   </button>
-                  <button class="btn sm" type="button" (click)="cancel()">Cancel</button>
+                  <button os-button size="sm" type="button" (click)="cancel()">Cancel</button>
                   <span class="quiet composer-hint">Ctrl+Enter to send</span>
                 </div>
               </form>

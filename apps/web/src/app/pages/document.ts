@@ -10,6 +10,7 @@ import {
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import {
   KIND_LABEL,
@@ -50,6 +51,7 @@ interface Draft {
     Icon,
     ActivityFigure,
     StatStyleSwitch,
+    Button,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -72,22 +74,23 @@ interface Draft {
         @if (editingTitle()) {
           <form class="title-form" (ngSubmit)="saveTitle()">
             <input name="title" [(ngModel)]="titleDraft" aria-label="Document title" required />
-            <button class="btn primary" type="submit">Save</button>
-            <button class="btn" type="button" (click)="editingTitle.set(false)">Cancel</button>
+            <button os-button variant="primary" type="submit">Save</button>
+            <button os-button type="button" (click)="editingTitle.set(false)">Cancel</button>
           </form>
         } @else {
           <div class="title-row">
             <h1>{{ d.title }}</h1>
             @if (d.can_edit) {
               <button
-                class="btn"
+                os-button
                 type="button"
                 (click)="titleDraft = d.title; editingTitle.set(true)"
               >
                 <app-icon name="pencil" />Rename
               </button>
               <button
-                class="btn danger"
+                os-button
+                variant="danger"
                 type="button"
                 (click)="removeDoc()"
                 aria-label="Delete document"
@@ -131,7 +134,7 @@ interface Draft {
               People can still read and edit it.
             </p>
             @if (d.can_edit) {
-              <button class="btn" type="button" (click)="setDisabled(false)">Enable</button>
+              <button os-button type="button" (click)="setDisabled(false)">Enable</button>
             }
           </div>
         } @else if (d.staleness) {
@@ -143,7 +146,7 @@ interface Draft {
               agents and save tokens. You can turn it back on at any time.
             </p>
             @if (d.can_edit) {
-              <button class="btn" type="button" (click)="setDisabled(true)">
+              <button os-button type="button" (click)="setDisabled(true)">
                 <app-icon name="eye-off" />Disable document
               </button>
             }
@@ -173,10 +176,15 @@ interface Draft {
                   ><input name="note" [(ngModel)]="draft.note" placeholder="What changed and why"
                 /></label>
                 <div class="form-actions">
-                  <button class="btn primary" type="submit" [disabled]="!draft.heading.trim()">
+                  <button
+                    os-button
+                    variant="primary"
+                    type="submit"
+                    [disabled]="!draft.heading.trim()"
+                  >
                     Save section
                   </button>
-                  <button class="btn" type="button" (click)="editing.set(null)">Cancel</button>
+                  <button os-button type="button" (click)="editing.set(null)">Cancel</button>
                 </div>
               </form>
             } @else {
@@ -236,10 +244,14 @@ interface Draft {
                 <code class="sid" title="Section id agents use">s:{{ s.id.slice(0, 8) }}</code>
                 <span class="section-actions">
                   @if (d.can_edit) {
-                    <button class="link-btn" type="button" (click)="startEdit(s)">Edit</button>
+                    <button os-button variant="link" size="sm" type="button" (click)="startEdit(s)">
+                      Edit
+                    </button>
                   }
                   <button
-                    class="link-btn"
+                    os-button
+                    variant="link"
+                    size="sm"
                     type="button"
                     (click)="toggleHistory(s)"
                     [attr.aria-expanded]="historyFor() === s.id"
@@ -248,7 +260,9 @@ interface Draft {
                   </button>
                   @if (d.kind === 'glossary') {
                     <button
-                      class="link-btn"
+                      os-button
+                      variant="link"
+                      size="sm"
                       type="button"
                       (click)="toggleRefs(s)"
                       [attr.aria-expanded]="refsFor() === s.id"
@@ -258,7 +272,9 @@ interface Draft {
                   }
                   @if (d.can_edit) {
                     <button
-                      class="link-btn"
+                      os-button
+                      variant="link"
+                      size="sm"
                       type="button"
                       [disabled]="first"
                       (click)="move(s, -1)"
@@ -267,7 +283,9 @@ interface Draft {
                       Up
                     </button>
                     <button
-                      class="link-btn"
+                      os-button
+                      variant="link"
+                      size="sm"
                       type="button"
                       [disabled]="last"
                       (click)="move(s, 1)"
@@ -275,7 +293,14 @@ interface Draft {
                     >
                       Down
                     </button>
-                    <button class="link-btn danger" type="button" (click)="removeSection(s)">
+                    <button
+                      os-button
+                      variant="link"
+                      size="sm"
+                      class="danger"
+                      type="button"
+                      (click)="removeSection(s)"
+                    >
                       Delete
                     </button>
                   }
@@ -296,7 +321,7 @@ interface Draft {
                         <p class="quiet">{{ v.heading }}, {{ modeNames[v.mode] }}</p>
                         <app-md [text]="v.body" />
                         @if (d.can_edit && v.version !== s.version) {
-                          <button class="btn" type="button" (click)="revert(s, v.version)">
+                          <button os-button type="button" (click)="revert(s, v.version)">
                             Restore version {{ v.version }}
                           </button>
                         }
@@ -362,14 +387,19 @@ interface Draft {
               />
             </div>
             <div class="form-actions">
-              <button class="btn primary" type="submit" [disabled]="!newDraft.heading.trim()">
+              <button
+                os-button
+                variant="primary"
+                type="submit"
+                [disabled]="!newDraft.heading.trim()"
+              >
                 Add section
               </button>
-              <button class="btn" type="button" (click)="adding.set(false)">Cancel</button>
+              <button os-button type="button" (click)="adding.set(false)">Cancel</button>
             </div>
           </form>
         } @else {
-          <button class="btn" type="button" (click)="startAdd()">
+          <button os-button type="button" (click)="startAdd()">
             <app-icon name="plus" />Add section
           </button>
         }

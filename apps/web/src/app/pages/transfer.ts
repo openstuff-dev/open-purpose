@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api, type ImportUpload } from '../core/api';
 import type {
   ExportIncludes,
@@ -71,7 +72,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
 /** Settings › Export and import: download a group or organization, and import such a file. */
 @Component({
   selector: 'app-transfer',
-  imports: [FormsModule, Icon, DiffView],
+  imports: [FormsModule, Icon, DiffView, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -166,7 +167,13 @@ async function readUpload(file: File): Promise<ImportUpload> {
             >
             on the server.
           </p>
-          <button class="btn primary" type="button" (click)="exportNow()" [disabled]="busy()">
+          <button
+            os-button
+            variant="primary"
+            type="button"
+            (click)="exportNow()"
+            [disabled]="busy()"
+          >
             <app-icon name="download" />Download
           </button>
         </div>
@@ -186,19 +193,19 @@ async function readUpload(file: File): Promise<ImportUpload> {
           <p>{{ summary(d) }}</p>
           <div class="form-actions">
             @if (d.group?.id) {
-              <button class="btn primary" type="button" (click)="openGroup(d.group!.id!)">
+              <button os-button variant="primary" type="button" (click)="openGroup(d.group!.id!)">
                 Switch to {{ d.group!.name }}
               </button>
             } @else {
               @for (o of d.organizations; track o.key) {
                 @if (o.id) {
-                  <button class="btn" type="button" (click)="openOrg(o.id)">
+                  <button os-button type="button" (click)="openOrg(o.id)">
                     Open {{ o.into?.name ?? o.name }}
                   </button>
                 }
               }
             }
-            <button class="btn" type="button" (click)="done.set(null)">Done</button>
+            <button os-button type="button" (click)="done.set(null)">Done</button>
           </div>
         </div>
       }
@@ -209,7 +216,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
             <h3>File</h3>
             <p>{{ fileName() || 'An OpenPurpose export, .json or .zip' }}</p>
           </div>
-          <label class="btn">
+          <label class="os-button">
             <app-icon name="upload" />{{ fileName() ? 'Choose another' : 'Choose file' }}
             <input
               type="file"
@@ -276,7 +283,9 @@ async function readUpload(file: File): Promise<ImportUpload> {
                 {{ r.group.conflict }}
                 <button
                   type="button"
-                  class="link-btn"
+                  os-button
+                  variant="link"
+                  size="sm"
                   (click)="useGroupSlug(r.group.suggested_slug!)"
                 >
                   Use {{ r.group.suggested_slug }}
@@ -320,7 +329,9 @@ async function readUpload(file: File): Promise<ImportUpload> {
                     @if (o.suggested_slug) {
                       <button
                         type="button"
-                        class="link-btn"
+                        os-button
+                        variant="link"
+                        size="sm"
                         (click)="setSlug(o.key, o.suggested_slug)"
                       >
                         Use {{ o.suggested_slug }}
@@ -440,14 +451,15 @@ async function readUpload(file: File): Promise<ImportUpload> {
 
         <div class="form-actions">
           <button
-            class="btn primary"
+            os-button
+            variant="primary"
             type="button"
             (click)="run()"
             [disabled]="busy() || !r.ok || nothingChosen(r)"
           >
             <app-icon name="upload" />Import
           </button>
-          <button class="btn" type="button" (click)="reset()">Cancel</button>
+          <button os-button type="button" (click)="reset()">Cancel</button>
           @if (!r.ok) {
             <span class="quiet">Fix the slugs above first.</span>
           }

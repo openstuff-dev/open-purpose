@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Repository, Scope } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -28,7 +29,7 @@ export const repoName = (key: string) => key.split('/').pop() || key;
 /** Scopes at the org level (projectId null) or inside a project. */
 @Component({
   selector: 'app-scope-list',
-  imports: [RouterLink, FormsModule, Icon, RepoPicker],
+  imports: [RouterLink, FormsModule, Icon, RepoPicker, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (scopes().length) {
@@ -112,14 +113,14 @@ export const repoName = (key: string) => key.split('/').pop() || key;
             }}
           </p>
           <div class="form-actions full">
-            <button class="btn primary" type="submit" [disabled]="!name.trim()">
+            <button os-button variant="primary" type="submit" [disabled]="!name.trim()">
               Create scope
             </button>
-            <button class="btn" type="button" (click)="adding.set(false)">Cancel</button>
+            <button os-button type="button" (click)="adding.set(false)">Cancel</button>
           </div>
         </form>
       } @else {
-        <button class="btn" type="button" (click)="adding.set(true)">
+        <button os-button type="button" (click)="adding.set(true)">
           <app-icon name="plus" />New scope
         </button>
       }

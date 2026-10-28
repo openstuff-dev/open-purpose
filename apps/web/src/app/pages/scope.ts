@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Repository, ScopeDetail } from '../core/models';
 import { Session, provideHere } from '../core/session';
@@ -13,7 +14,7 @@ import { SlugRenameField } from '../shared/slug-rename';
 
 @Component({
   selector: 'app-scope',
-  imports: [DocList, FormsModule, RouterLink, SlugRenameField, Icon, RepoPicker],
+  imports: [DocList, FormsModule, RouterLink, SlugRenameField, Icon, RepoPicker, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (scope(); as s) {
@@ -67,8 +68,8 @@ import { SlugRenameField } from '../shared/slug-rename';
               >Stacks <input name="stacks" [(ngModel)]="draft.stacks" placeholder="angular"
             /></label>
             <div class="form-actions full">
-              <button class="btn primary" type="submit">Save</button>
-              <button class="btn" type="button" (click)="editing.set(false)">Cancel</button>
+              <button os-button variant="primary" type="submit">Save</button>
+              <button os-button type="button" (click)="editing.set(false)">Cancel</button>
             </div>
           </form>
         } @else {
@@ -105,8 +106,10 @@ import { SlugRenameField } from '../shared/slug-rename';
           <p class="quiet">{{ explain(s) }}</p>
           @if (s.can_edit) {
             <div class="form-actions">
-              <button class="btn" type="button" (click)="startEdit()">Edit matching</button>
-              <button class="btn danger" type="button" (click)="remove()">Delete scope</button>
+              <button os-button type="button" (click)="startEdit()">Edit matching</button>
+              <button os-button variant="danger" type="button" (click)="remove()">
+                Delete scope
+              </button>
             </div>
           }
         }

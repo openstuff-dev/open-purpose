@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Button } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import { ROLE_LABEL, type Member, type Role } from '../core/models';
 import { Session } from '../core/session';
@@ -18,7 +19,7 @@ const GROUP = 'group';
 
 @Component({
   selector: 'app-people',
-  imports: [FormsModule, DatePipe, NgTemplateOutlet, Icon],
+  imports: [FormsModule, DatePipe, NgTemplateOutlet, Icon, Button],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -41,8 +42,8 @@ const GROUP = 'group';
           <pre><code>{{ mcpJson(t.token) }}</code></pre>
         }
         <div class="form-actions">
-          <button class="btn" type="button" (click)="copy(t.token)">Copy token</button>
-          <button class="btn" type="button" (click)="fresh.set(null)">Done</button>
+          <button os-button type="button" (click)="copy(t.token)">Copy token</button>
+          <button os-button type="button" (click)="fresh.set(null)">Done</button>
         </div>
       </section>
     }
@@ -96,7 +97,7 @@ const GROUP = 'group';
           }
         </p>
         <div class="form-actions full">
-          <button class="btn primary" type="submit" [disabled]="!name.trim() || !level">
+          <button os-button variant="primary" type="submit" [disabled]="!name.trim() || !level">
             <app-icon name="plus" />Add and create token
           </button>
         </div>
@@ -135,11 +136,17 @@ const GROUP = 'group';
           }
           @if (m.manageable) {
             <span class="actor-actions">
-              <button class="btn sm ghost" type="button" (click)="issue(m)">
+              <button os-button variant="ghost" size="sm" type="button" (click)="issue(m)">
                 <app-icon name="key" [size]="13" />New token
               </button>
               @if (m.id !== session.me()?.actor?.id) {
-                <button class="btn sm ghost" type="button" (click)="toggleDisabled(m)">
+                <button
+                  os-button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  (click)="toggleDisabled(m)"
+                >
                   {{ m.disabled_at ? 'Enable' : 'Disable' }}
                 </button>
               }
@@ -172,7 +179,10 @@ const GROUP = 'group';
                 </select>
                 @if (m.memberships.length > 1 || m.id !== session.me()?.actor?.id) {
                   <button
-                    class="link-btn danger"
+                    os-button
+                    variant="link"
+                    size="sm"
+                    class="danger"
                     type="button"
                     (click)="removeRole(m, ms)"
                     [attr.aria-label]="
@@ -200,11 +210,17 @@ const GROUP = 'group';
                   <option value="editor">Editor</option>
                   <option value="admin">Admin</option>
                 </select>
-                <button class="link-btn" type="button" (click)="addRoleTo(m)">Add</button>
-                <button class="link-btn" type="button" (click)="adding.set(null)">Cancel</button>
+                <button os-button variant="link" size="sm" type="button" (click)="addRoleTo(m)">
+                  Add
+                </button>
+                <button os-button variant="link" size="sm" type="button" (click)="adding.set(null)">
+                  Cancel
+                </button>
               </span>
             } @else {
-              <button class="link-btn" type="button" (click)="startAdd(m)">Add a role</button>
+              <button os-button variant="link" size="sm" type="button" (click)="startAdd(m)">
+                Add a role
+              </button>
             }
           }
         </div>
@@ -223,7 +239,14 @@ const GROUP = 'group';
                   }
                 </span>
                 @if (!t.revoked_at) {
-                  <button class="link-btn danger" type="button" (click)="revoke(t.id)">
+                  <button
+                    os-button
+                    variant="link"
+                    size="sm"
+                    class="danger"
+                    type="button"
+                    (click)="revoke(t.id)"
+                  >
                     Revoke
                   </button>
                 }
