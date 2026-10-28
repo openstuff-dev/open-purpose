@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Badge, Button } from '@openstuff-dev/ui-angular';
+import { Badge, Button, SegmentedControl } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type {
   ActivityFigure as Figure,
@@ -36,7 +36,17 @@ function readPeriod(): ActivityPeriod {
 
 @Component({
   selector: 'app-organization',
-  imports: [DocList, ScopeList, RouterLink, Icon, ActivityFigure, StatStyleSwitch, Button, Badge],
+  imports: [
+    DocList,
+    ScopeList,
+    RouterLink,
+    Icon,
+    ActivityFigure,
+    StatStyleSwitch,
+    Button,
+    Badge,
+    SegmentedControl,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (session.org(); as org) {
@@ -81,17 +91,7 @@ function readPeriod(): ActivityPeriod {
             <p class="quiet">What agents in {{ org.name }} requested over MCP.</p>
           </div>
           <div class="activity-controls">
-            <span class="segmented" role="group" aria-label="Period">
-              @for (p of periods; track p.value) {
-                <button
-                  type="button"
-                  [attr.aria-pressed]="period() === p.value"
-                  (click)="period.set(p.value)"
-                >
-                  {{ p.label }}
-                </button>
-              }
-            </span>
+            <os-segmented-control label="Period" size="sm" [options]="periods" [(value)]="period" />
             <app-stat-style-switch />
           </div>
         </div>

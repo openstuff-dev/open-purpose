@@ -18,6 +18,10 @@ const replaced = [
     pattern: String.raw`class="([^"]*\s)?(chip|chip-x|flag|status|mode-badge)[\s"]`,
     message: 'Use os-chip, os-badge or os-status-dot from @openstuff-dev/ui-angular instead of .chip, .flag, .status or .mode-badge.',
   },
+  {
+    pattern: String.raw`class="([^"]*\s)?segmented[\s"]`,
+    message: 'Use <os-segmented-control> from @openstuff-dev/ui-angular (or .os-segmented with radios when options need icons or counts) instead of .segmented.',
+  },
 ];
 
 export default [

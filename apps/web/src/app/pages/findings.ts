@@ -95,19 +95,16 @@ function lines(f: Finding): string {
     </header>
 
     <div class="inbox-bar">
-      <div class="segmented" role="group" aria-label="Show findings that are">
+      <!-- Several can be on at once, so checkboxes in the toolkit's segmented look. -->
+      <div class="os-segmented" role="group" aria-label="Show findings that are">
         @for (s of statuses; track s) {
-          <button
-            type="button"
-            [attr.aria-pressed]="shown().includes(s)"
-            [title]="hint[s]"
-            (click)="toggle(s)"
-          >
+          <label [title]="hint[s]">
+            <input type="checkbox" [checked]="shown().includes(s)" (change)="toggle(s)" />
             {{ label[s] }}
             @if (counts(); as c) {
               <span class="seg-count">{{ c[s] }}</span>
             }
-          </button>
+          </label>
         }
       </div>
       <div class="inbox-filters">

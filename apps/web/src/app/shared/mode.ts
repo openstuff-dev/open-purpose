@@ -29,24 +29,32 @@ export class ModeBadge {
   readonly help = MODE_HELP;
 }
 
+let nextPicker = 0;
+
 /** Three-way switch for what agents may do. Disabled for people without edit rights. */
 @Component({
   selector: 'app-mode-picker',
   imports: [ModeIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: ` <div class="mode-picker" role="radiogroup" [attr.aria-label]="label()">
+  // The toolkit's segmented control holds plain labels; this one needs an icon and a colour per mode.
+  template: ` <div
+    class="os-segmented mode-picker"
+    data-size="sm"
+    role="radiogroup"
+    [attr.aria-label]="label()"
+  >
     @for (m of modes; track m) {
-      <button
-        type="button"
-        role="radio"
-        [attr.data-mode]="m"
-        [attr.aria-checked]="m === mode()"
-        [disabled]="disabled()"
-        [attr.title]="help[m]"
-        (click)="m !== mode() && changed.emit(m)"
-      >
-        <app-mode-icon [mode]="m" /><span>{{ names[m] }}</span>
-      </button>
+      <label [attr.data-mode]="m" [attr.title]="help[m]">
+        <input
+          type="radio"
+          [name]="name"
+          [value]="m"
+          [checked]="m === mode()"
+          [disabled]="disabled()"
+          (change)="changed.emit(m)"
+        />
+        <app-mode-icon [mode]="m" />{{ names[m] }}
+      </label>
     }
   </div>`,
 })
@@ -58,4 +66,5 @@ export class ModePicker {
   readonly modes = EDIT_MODES;
   readonly help = MODE_HELP;
   readonly names: Record<EditMode, string> = { locked: 'Locked', propose: 'Propose', open: 'Open' };
+  readonly name = `mode-${nextPicker++}`;
 }

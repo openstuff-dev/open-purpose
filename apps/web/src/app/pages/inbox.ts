@@ -25,6 +25,7 @@ import {
   StatusDot,
   type Tone,
 } from '@openstuff-dev/ui-angular';
+import { SegmentedControl } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import {
   MODE_LABEL,
@@ -137,6 +138,7 @@ function ago(iso: string): string {
     StatusDot,
     Badge,
     Chip,
+    SegmentedControl,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)', class: 'wide-page' },
@@ -150,19 +152,22 @@ function ago(iso: string): string {
     </header>
 
     <div class="inbox-bar">
-      <div class="segmented" role="tablist" aria-label="Status">
+      <!-- The toolkit's segmented look, with a count after each label. -->
+      <div class="os-segmented" role="radiogroup" aria-label="Status">
         @for (t of tabs; track t.value) {
-          <button
-            type="button"
-            role="tab"
-            [attr.aria-selected]="status() === t.value"
-            (click)="setStatus(t.value)"
-          >
+          <label>
+            <input
+              type="radio"
+              name="inbox-status"
+              [value]="t.value"
+              [checked]="status() === t.value"
+              (change)="setStatus(t.value)"
+            />
             {{ t.label }}
             @if (countFor(t.value) !== null) {
               <span class="seg-count">{{ countFor(t.value) }}</span>
             }
-          </button>
+          </label>
         }
       </div>
       <div class="inbox-filters">
@@ -513,34 +518,12 @@ function ago(iso: string): string {
                   <span os-chip>Revision {{ p.revision }}</span>
                 }
               </h3>
-              <div class="segmented sm" role="tablist" aria-label="View">
-                <button
-                  type="button"
-                  role="tab"
-                  [attr.aria-selected]="view() === 'review'"
-                  (click)="view.set('review')"
-                >
-                  Lines
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  [attr.aria-selected]="view() === 'rendered'"
-                  (click)="view.set('rendered')"
-                >
-                  Rendered
-                </button>
-                @if (p.kind === 'edit_section') {
-                  <button
-                    type="button"
-                    role="tab"
-                    [attr.aria-selected]="view() === 'before'"
-                    (click)="view.set('before')"
-                  >
-                    Before
-                  </button>
-                }
-              </div>
+              <os-segmented-control
+                label="View"
+                size="sm"
+                [options]="p.kind === 'edit_section' ? editViews : views"
+                [(value)]="view"
+              />
             </div>
             @if (r.editing) {
               <div class="section-edit">
@@ -915,6 +898,11 @@ export class InboxPage {
   /** Review threads, revisions and timeline, per opened proposal. */
   readonly reviewData = signal<Record<string, Review>>({});
   readonly view = signal<'review' | 'rendered' | 'before'>('review');
+  readonly views = [
+    { value: 'review', label: 'Lines' },
+    { value: 'rendered', label: 'Rendered' },
+  ] as const;
+  readonly editViews = [...this.views, { value: 'before', label: 'Before' }] as const;
   /** What the proposed text is compared with: 'section', 'none' or a revision number. */
   readonly compare = signal<string>('none');
   readonly eventInfo = EVENT;

@@ -157,8 +157,8 @@ p {
 }
 
 /* ─── Controls ─── */
-/* Labels that aren't toolkit fields, checks or buttons: unlayered rules win over its layers. */
-label:not(:where(.os-field, .os-check, .os-button)) {
+/* Labels that aren't toolkit fields, checks, buttons or segments: unlayered rules win over its layers. */
+label:not(:where(.os-field, .os-check, .os-button, .os-segmented > label)) {
   display: block;
   font-weight: 500;
   font-size: var(--fs-sm);
@@ -1129,44 +1129,6 @@ pre {
 }
 
 /* ─── Edit modes ─── */
-.mode-picker {
-  display: inline-flex;
-  padding: 2px;
-  gap: 2px;
-  border-radius: var(--r-sm);
-  background: var(--sunken);
-}
-.mode-picker button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  font: 500 var(--fs-xs)/1 var(--sans);
-  padding: 0.35rem 0.55rem;
-  color: var(--muted);
-  border-radius: 4px;
-}
-.mode-picker button:hover:not(:disabled) {
-  color: var(--ink);
-}
-.mode-picker button[aria-checked='true'] {
-  background: var(--surface);
-  box-shadow: var(--os-shadow-xs);
-}
-.mode-picker button[aria-checked='true'][data-mode='locked'] {
-  color: var(--locked);
-}
-.mode-picker button[aria-checked='true'][data-mode='propose'] {
-  color: var(--propose);
-}
-.mode-picker button[aria-checked='true'][data-mode='open'] {
-  color: var(--open);
-}
-.mode-picker button:disabled {
-  cursor: default;
-}
 .doc-mode {
   display: flex;
   flex-wrap: wrap;
@@ -2691,44 +2653,26 @@ mark {
   padding-left: 2rem;
   height: 2.125rem;
 }
-.segmented {
-  display: inline-flex;
-  gap: 2px;
-  padding: 3px;
-  background: var(--sunken);
-  border-radius: var(--r-md);
-}
-.segmented button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  font: 500 var(--fs-sm)/1 var(--sans);
-  color: var(--muted);
-  padding: 0.45rem 0.75rem;
-  border-radius: var(--r-sm);
-}
-.segmented button:hover {
-  color: var(--ink);
-}
-.segmented button[aria-selected='true'] {
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: var(--os-shadow-xs);
-}
-.segmented.sm button {
-  font-size: var(--fs-xs);
-  padding: 0.3rem 0.55rem;
-}
 .seg-count {
   font-size: var(--fs-xs);
   color: var(--faint);
   font-variant-numeric: tabular-nums;
 }
-.segmented button[aria-selected='true'] .seg-count {
+.os-segmented > label:has(:checked) .seg-count {
   color: var(--accent-text);
+}
+/* Edit modes: the picked one takes its colour. */
+.mode-picker > label:has(:checked)[data-mode='locked'] {
+  color: var(--locked);
+}
+.mode-picker > label:has(:checked)[data-mode='propose'] {
+  color: var(--propose);
+}
+.mode-picker > label:has(:checked)[data-mode='open'] {
+  color: var(--open);
+}
+.av-pick .os-segmented {
+  flex-wrap: wrap;
 }
 
 .table-wrap {
@@ -3142,9 +3086,6 @@ mark {
   display: grid;
   gap: 0.6rem;
   justify-items: start;
-}
-.av-pick .segmented {
-  flex-wrap: wrap;
 }
 .av-custom {
   display: flex;
@@ -4705,20 +4646,11 @@ mark {
 
 /* ───────────── agent activity: tiles, figures and the style switcher ───────────── */
 
-.segmented button[aria-pressed='true'] {
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: var(--os-shadow-xs);
-}
 .activity-controls {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-}
-.activity-controls .segmented button {
-  font-size: var(--fs-xs);
-  padding: 0.3rem 0.55rem;
 }
 .stat-tiles {
   display: grid;
@@ -4916,36 +4848,6 @@ ul.stat-rest {
 }
 
 /* The tiny number / dots / chart switcher. */
-.stat-switch {
-  display: inline-flex;
-  gap: 1px;
-  padding: 2px;
-  background: var(--sunken);
-  border-radius: var(--r-sm);
-}
-.stat-switch button {
-  display: inline-grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border: 0;
-  border-radius: 4px;
-  background: none;
-  color: var(--faint);
-  cursor: pointer;
-}
-.stat-switch button:hover {
-  color: var(--ink);
-}
-.stat-switch button[aria-pressed='true'] {
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: var(--os-shadow-xs);
-}
-.stat-switch button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
 
 /* Document page: requests per section, and the stale / disabled notice. */
 .sections-head {
@@ -5009,14 +4911,6 @@ ul.stat-rest {
 }
 
 /* ───────────── findings ───────────── */
-.segmented button[aria-pressed='true'] {
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: var(--os-shadow-xs);
-}
-.segmented button[aria-pressed='true'] .seg-count {
-  color: var(--accent-text);
-}
 .finding-gist {
   display: -webkit-box;
   -webkit-line-clamp: 1;

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { Button, Control, Field } from '@openstuff-dev/ui-angular';
+import { Button, Control, Field, SegmentedControl } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Project } from '../core/models';
 import { Session } from '../core/session';
@@ -91,7 +91,7 @@ function followUps(call: {
  */
 @Component({
   selector: 'app-agent-console',
-  imports: [FormsModule, MarkdownView, Button, Field, Control],
+  imports: [FormsModule, MarkdownView, Button, Field, Control, SegmentedControl],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header class="page-head">
@@ -179,24 +179,13 @@ function followUps(call: {
 
     @if (calls().length) {
       <div class="console-view">
-        <div class="segmented sm" role="tablist" aria-label="Show answers">
-          <button
-            type="button"
-            role="tab"
-            [attr.aria-selected]="!readable()"
-            (click)="setReadable(false)"
-          >
-            Exactly as sent
-          </button>
-          <button
-            type="button"
-            role="tab"
-            [attr.aria-selected]="readable()"
-            (click)="setReadable(true)"
-          >
-            Readable
-          </button>
-        </div>
+        <os-segmented-control
+          label="Show answers"
+          size="sm"
+          [options]="answerViews"
+          [value]="readable() ? 'readable' : 'raw'"
+          (valueChange)="setReadable($event === 'readable')"
+        />
       </div>
     }
 
@@ -248,6 +237,10 @@ export class AgentConsolePage {
   readonly projects = signal<Project[]>([]);
   readonly calls = signal<Call[]>([]);
   readonly readable = signal(readStoredReadable());
+  readonly answerViews = [
+    { value: 'raw', label: 'Exactly as sent' },
+    { value: 'readable', label: 'Readable' },
+  ] as const;
   private seq = 0;
   project = '';
   remote = '';

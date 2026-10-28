@@ -9,7 +9,7 @@ import {
   untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Badge, Button, Chip, Control } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Chip, Control, SegmentedControl } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ContextResult, Scope } from '../core/models';
 import { Session } from '../core/session';
@@ -43,39 +43,27 @@ function samplePath(glob: string): string {
  */
 @Component({
   selector: 'app-agent-view',
-  imports: [FormsModule, Icon, MarkdownView, ModeBadge, Button, Control, Badge, Chip],
+  imports: [
+    FormsModule,
+    Icon,
+    MarkdownView,
+    ModeBadge,
+    Button,
+    Control,
+    Badge,
+    Chip,
+    SegmentedControl,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="agent-view">
       <div class="av-pick">
-        <div class="segmented" role="tablist" aria-label="Part of the code">
-          <button
-            type="button"
-            role="tab"
-            [attr.aria-selected]="choice() === 'root'"
-            (click)="pick('root')"
-          >
-            Whole project
-          </button>
-          @for (s of scopes(); track s.id) {
-            <button
-              type="button"
-              role="tab"
-              [attr.aria-selected]="choice() === s.id"
-              (click)="pick(s.id)"
-            >
-              {{ s.name }}
-            </button>
-          }
-          <button
-            type="button"
-            role="tab"
-            [attr.aria-selected]="choice() === 'custom'"
-            (click)="pick('custom')"
-          >
-            Other path…
-          </button>
-        </div>
+        <os-segmented-control
+          label="Part of the code"
+          [options]="parts()"
+          [value]="choice()"
+          (valueChange)="pick($event!)"
+        />
         @if (choice() === 'custom') {
           <form class="av-custom" (ngSubmit)="run()">
             <input
@@ -114,19 +102,13 @@ function samplePath(glob: string): string {
           <span><span class="quiet">New learnings go to</span> {{ r.learning_target.label }}</span>
           <span><span class="quiet">Size</span> {{ size(r) }}</span>
           <span class="av-actions">
-            <div class="segmented sm" role="tablist" aria-label="View">
-              <button
-                type="button"
-                role="tab"
-                [attr.aria-selected]="!raw()"
-                (click)="raw.set(false)"
-              >
-                Layers
-              </button>
-              <button type="button" role="tab" [attr.aria-selected]="raw()" (click)="raw.set(true)">
-                Exactly as sent
-              </button>
-            </div>
+            <os-segmented-control
+              label="View"
+              size="sm"
+              [options]="views"
+              [value]="raw() ? 'raw' : 'layers'"
+              (valueChange)="raw.set($event === 'raw')"
+            />
             <button os-button size="sm" type="button" (click)="copy(r.markdown)">
               <app-icon name="copy" [size]="13" />Copy
             </button>
@@ -220,6 +202,15 @@ export class AgentView {
   private notices = inject(Notices);
   readonly session = inject(Session);
   readonly choice = signal<string>('root');
+  readonly views = [
+    { value: 'layers', label: 'Layers' },
+    { value: 'raw', label: 'Exactly as sent' },
+  ] as const;
+  readonly parts = computed(() => [
+    { value: 'root', label: 'Whole project' },
+    ...this.scopes().map((s) => ({ value: s.id, label: s.name })),
+    { value: 'custom', label: 'Other path…' },
+  ]);
   readonly result = signal<ContextResult | null>(null);
   readonly loading = signal(false);
   readonly raw = signal(false);

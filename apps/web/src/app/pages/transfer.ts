@@ -1,7 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Badge, Button, Check, Checkbox, Control, Field, Radio } from '@openstuff-dev/ui-angular';
+import {
+  Badge,
+  Button,
+  Check,
+  Checkbox,
+  Control,
+  Field,
+  Radio,
+  SegmentedControl,
+} from '@openstuff-dev/ui-angular';
 import { Api, type ImportUpload } from '../core/api';
 import type {
   ExportIncludes,
@@ -72,7 +81,19 @@ async function readUpload(file: File): Promise<ImportUpload> {
 /** Settings › Export and import: download a group or organization, and import such a file. */
 @Component({
   selector: 'app-transfer',
-  imports: [FormsModule, Icon, DiffView, Button, Field, Control, Check, Checkbox, Radio, Badge],
+  imports: [
+    FormsModule,
+    Icon,
+    DiffView,
+    Button,
+    Field,
+    Control,
+    Check,
+    Checkbox,
+    Radio,
+    Badge,
+    SegmentedControl,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -110,26 +131,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
               }}
             </p>
           </div>
-          <div class="segmented sm" role="radiogroup" aria-label="Format">
-            <button
-              type="button"
-              role="radio"
-              [attr.aria-checked]="format === 'json'"
-              [attr.aria-selected]="format === 'json'"
-              (click)="format = 'json'"
-            >
-              JSON
-            </button>
-            <button
-              type="button"
-              role="radio"
-              [attr.aria-checked]="format === 'zip'"
-              [attr.aria-selected]="format === 'zip'"
-              (click)="format = 'zip'"
-            >
-              Markdown (.zip)
-            </button>
-          </div>
+          <os-segmented-control label="Format" size="sm" [options]="formats" [(value)]="format" />
         </div>
         <div class="setting-row stack">
           <div>
@@ -246,26 +248,13 @@ async function readUpload(file: File): Promise<ImportUpload> {
                 }}
               </p>
             </div>
-            <div class="segmented sm" role="radiogroup" aria-label="Import into">
-              <button
-                type="button"
-                role="radio"
-                [attr.aria-checked]="!asGroup()"
-                [attr.aria-selected]="!asGroup()"
-                (click)="setAsGroup(false)"
-              >
-                This group
-              </button>
-              <button
-                type="button"
-                role="radio"
-                [attr.aria-checked]="asGroup()"
-                [attr.aria-selected]="asGroup()"
-                (click)="setAsGroup(true)"
-              >
-                A new group
-              </button>
-            </div>
+            <os-segmented-control
+              label="Import into"
+              size="sm"
+              [options]="targets"
+              [value]="asGroup() ? 'new' : 'group'"
+              (valueChange)="setAsGroup($event === 'new')"
+            />
           </div>
         }
       </div>
@@ -499,6 +488,14 @@ export class TransferPage {
 
   what = this.session.canAdmin(null) ? '' : (this.adminOrgs()[0]?.id ?? '');
   format: 'json' | 'zip' = 'json';
+  readonly formats = [
+    { value: 'json', label: 'JSON' },
+    { value: 'zip', label: 'Markdown (.zip)' },
+  ] as const;
+  readonly targets = [
+    { value: 'group', label: 'This group' },
+    { value: 'new', label: 'A new group' },
+  ] as const;
   includes: ExportIncludes = {
     history: true,
     proposals: true,

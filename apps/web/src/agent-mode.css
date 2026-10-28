@@ -257,11 +257,11 @@ html.agent-mode .tabs [role='tab'][aria-selected='true'] {
   background: var(--ink);
   color: var(--ground);
 }
-html.agent-mode .segmented {
+html.agent-mode .os-segmented {
   background: transparent;
   border: 1px dashed var(--line-strong);
 }
-html.agent-mode .segmented [aria-selected='true'] {
+html.agent-mode .os-segmented > label:has(:checked) {
   background: var(--ink);
   color: var(--ground);
   box-shadow: none;
