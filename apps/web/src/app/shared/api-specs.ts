@@ -11,7 +11,14 @@ import {
 } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Button, Chip, Control, Field, SegmentedControl } from '@openstuff-dev/ui-angular';
+import {
+  Button,
+  Chip,
+  ConfirmDialog,
+  Control,
+  Field,
+  SegmentedControl,
+} from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { ApiSpec, ApiSpecDetail } from '../core/models';
 import { Icon } from './icon';
@@ -289,6 +296,7 @@ export class ApiSpecs {
   readonly canEdit = input(false);
   readonly changed = output<void>();
   private api = inject(Api);
+  private readonly confirmDialog = inject(ConfirmDialog);
   private notices = inject(Notices);
   readonly ago = ago;
 
@@ -450,7 +458,13 @@ export class ApiSpecs {
   }
 
   async remove(s: ApiSpec): Promise<void> {
-    if (!confirm(`Remove ${s.name}? Agents will no longer get its endpoints and DTOs.`)) return;
+    const remove = await this.confirmDialog.confirm({
+      title: `Remove ${s.name}?`,
+      message: 'Agents no longer get its endpoints and DTOs.',
+      confirmLabel: 'Remove API',
+      danger: true,
+    });
+    if (!remove) return;
     try {
       await this.api.deleteApi(s.id);
       this.notices.ok(`Removed ${s.name}`);

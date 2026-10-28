@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Button, Chip, Control, Field } from '@openstuff-dev/ui-angular';
+import { Button, Chip, ConfirmDialog, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Repository, ScopeDetail } from '../core/models';
 import { Session, provideHere } from '../core/session';
@@ -161,6 +161,7 @@ import { SlugRenameField } from '../shared/slug-rename';
 export class ScopePage {
   readonly id = input.required<string>();
   readonly session = inject(Session);
+  private readonly confirmDialog = inject(ConfirmDialog);
   private api = inject(Api);
   private router = inject(Router);
   private notices = inject(Notices);
@@ -236,7 +237,13 @@ export class ScopePage {
 
   async remove(): Promise<void> {
     const s = this.scope()!;
-    if (!confirm(`Delete the ${s.name} scope and its documents and learnings?`)) return;
+    const remove = await this.confirmDialog.confirm({
+      title: `Delete the ${s.name} scope?`,
+      message: 'Its documents and learnings are deleted too.',
+      confirmLabel: 'Delete scope',
+      danger: true,
+    });
+    if (!remove) return;
     try {
       await this.api.deleteScope(s.id);
       this.notices.ok(`Deleted ${s.name}`);

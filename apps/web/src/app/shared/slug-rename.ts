@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Button, Check, Checkbox, Chip } from '@openstuff-dev/ui-angular';
+import { Button, Check, Checkbox, Chip, ConfirmDialog } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { SlugAlias, SlugKind, SlugRename, SlugRenameRef } from '../core/models';
 import { aliasConflict, errorMessage } from '../core/session';
@@ -203,6 +203,7 @@ export class SlugRenameField {
   readonly changed = output<void>();
 
   private api = inject(Api);
+  private readonly confirmDialog = inject(ConfirmDialog);
   private notices = inject(Notices);
 
   readonly open = signal(false);
@@ -306,12 +307,13 @@ export class SlugRenameField {
   }
 
   async removeAlias(a: SlugAlias): Promise<void> {
-    if (
-      !confirm(
-        `Remove the old slug "${a.old_slug}"? Repositories, agents and [[links]] that still use it stop finding ${this.name()}.`,
-      )
-    )
-      return;
+    const remove = await this.confirmDialog.confirm({
+      title: `Remove the old slug ${a.old_slug}?`,
+      message: `Repositories, agents and [[links]] that still use it stop finding ${this.name()}.`,
+      confirmLabel: 'Remove old slug',
+      danger: true,
+    });
+    if (!remove) return;
     try {
       await this.api.deleteAlias(a.id);
       this.notices.ok(`Removed ${a.old_slug}`);

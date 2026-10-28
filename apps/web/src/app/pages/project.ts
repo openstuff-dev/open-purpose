@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Badge, Button, Chip, Control, Field } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Chip, ConfirmDialog, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Graph, GraphNode, LinkRef, ProjectDetail } from '../core/models';
 import { Session, provideHere } from '../core/session';
@@ -408,6 +408,7 @@ export class ProjectPage {
   /** From the ?tab= query parameter. */
   readonly tab = input<string | undefined>();
   readonly session = inject(Session);
+  private readonly confirmDialog = inject(ConfirmDialog);
   private api = inject(Api);
   private router = inject(Router);
   private notices = inject(Notices);
@@ -567,12 +568,13 @@ export class ProjectPage {
 
   async remove(): Promise<void> {
     const p = this.project()!;
-    if (
-      !confirm(
-        `Delete ${p.name} with all its documents, scopes and learnings? This cannot be undone.`,
-      )
-    )
-      return;
+    const remove = await this.confirmDialog.confirm({
+      title: `Delete ${p.name}?`,
+      message: "Its documents, scopes and learnings are deleted too. You can't undo this.",
+      confirmLabel: 'Delete project',
+      danger: true,
+    });
+    if (!remove) return;
     try {
       await this.api.deleteProject(p.id);
       this.notices.ok(`Deleted ${p.name}`);

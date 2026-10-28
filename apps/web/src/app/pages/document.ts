@@ -10,7 +10,7 @@ import {
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Badge, Button, Chip, Control, Field } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Chip, ConfirmDialog, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import {
   KIND_LABEL,
@@ -427,6 +427,7 @@ interface Draft {
 export class DocumentPage {
   readonly id = input.required<string>();
   readonly session = inject(Session);
+  private readonly confirmDialog = inject(ConfirmDialog);
   private api = inject(Api);
   private router = inject(Router);
   private notices = inject(Notices);
@@ -633,7 +634,13 @@ export class DocumentPage {
   }
 
   async removeSection(s: Section): Promise<void> {
-    if (!confirm(`Delete “${s.heading}”? Its history is deleted too.`)) return;
+    const remove = await this.confirmDialog.confirm({
+      title: `Delete “${s.heading}”?`,
+      message: 'Its history is deleted too.',
+      confirmLabel: 'Delete section',
+      danger: true,
+    });
+    if (!remove) return;
     try {
       await this.api.deleteSection(s.id);
       this.notices.ok('Deleted section');
@@ -645,7 +652,13 @@ export class DocumentPage {
 
   async removeDoc(): Promise<void> {
     const d = this.doc()!;
-    if (!confirm(`Delete “${d.title}” and all its sections?`)) return;
+    const remove = await this.confirmDialog.confirm({
+      title: `Delete “${d.title}”?`,
+      message: 'All its sections are deleted too.',
+      confirmLabel: 'Delete document',
+      danger: true,
+    });
+    if (!remove) return;
     try {
       await this.api.deleteDocument(d.id);
       this.notices.ok(`Deleted ${d.title}`);

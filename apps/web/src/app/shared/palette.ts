@@ -11,6 +11,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { Router } from '@angular/router';
+import { Dialog } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { EditMode, Project, ProjectDetail, SearchHit } from '../core/models';
 import { Session } from '../core/session';
@@ -44,97 +45,99 @@ function escapeHtml(s: string): string {
  */
 @Component({
   selector: 'app-palette',
-  imports: [Icon, ModeIcon],
+  imports: [Icon, ModeIcon, Dialog],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="palette-backdrop" (click)="close.emit()" (keydown.escape)="close.emit()">
-      <div
-        class="palette"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Go to or search"
-        (click)="$event.stopPropagation()"
-      >
-        <div class="palette-input">
-          <app-icon name="search" [size]="18" />
-          <input
-            #input
-            type="text"
-            placeholder="Go to a page or project, or search rules…"
-            aria-label="Search"
-            role="combobox"
-            aria-controls="palette-list"
-            [attr.aria-activedescendant]="'pi-' + active()"
-            [value]="query()"
-            (input)="onInput($any($event.target).value)"
-            (keydown)="onKey($event)"
-          />
-          @if (near(); as n) {
-            <button
-              type="button"
-              class="palette-scope"
-              [attr.aria-pressed]="narrow()"
-              [attr.aria-label]="narrow() ? 'Searching ' + n.label + ' only. Search everywhere' : 'Searching everywhere. Search ' + n.label + ' only'"
-              (click)="toggleNarrow()"
-            >
-              @if (narrow()) {
-                <app-icon [name]="n.icon" [size]="13" />{{ n.label }}
-              } @else {
-                Everywhere
-              }
-            </button>
-          }
-          <kbd>Esc</kbd>
-        </div>
-        @if (items().length) {
-          <ul class="palette-list" id="palette-list" role="listbox">
-            @for (it of items(); track $index; let i = $index) {
-              @if (i === 0 || items()[i - 1].group !== it.group) {
-                <li class="palette-group" role="presentation">{{ it.group }}</li>
-              }
-              <li
-                class="palette-item"
-                role="option"
-                [id]="'pi-' + i"
-                [class.active]="i === active()"
-                [attr.aria-selected]="i === active()"
-                (mousemove)="active.set(i)"
-                (click)="pick(it)"
-              >
-                <app-icon [name]="it.icon" />
-                @if (it.snippet !== undefined) {
-                  <span class="palette-text">
-                    <span
-                      >{{ it.label }}
-                      @if (it.mode && it.mode !== 'open') {
-                        <app-mode-icon [mode]="it.mode" />
-                      }
-                    </span>
-                    <span class="palette-snippet" [innerHTML]="marked(it.snippet)"></span>
-                  </span>
-                } @else {
-                  <span>{{ it.label }}</span>
-                }
-                @if (it.hint) {
-                  <small>{{ it.hint }}</small>
-                }
-              </li>
+    <!-- The toolkit's dialog and command-palette look; the search and grouping stay ours. -->
+    <dialog
+      os-dialog
+      class="os-command-palette palette"
+      aria-label="Go to or search"
+      [open]="true"
+      (openChange)="$event || close.emit()"
+    >
+      <div class="os-command-search palette-input">
+        <app-icon name="search" [size]="18" />
+        <input
+          #input
+          type="text"
+          placeholder="Go to a page or project, or search rules…"
+          aria-label="Search"
+          role="combobox"
+          aria-controls="palette-list"
+          [attr.aria-activedescendant]="'pi-' + active()"
+          [value]="query()"
+          (input)="onInput($any($event.target).value)"
+          (keydown)="onKey($event)"
+        />
+        @if (near(); as n) {
+          <button
+            type="button"
+            class="palette-scope"
+            [attr.aria-pressed]="narrow()"
+            [attr.aria-label]="
+              narrow()
+                ? 'Searching ' + n.label + ' only. Search everywhere'
+                : 'Searching everywhere. Search ' + n.label + ' only'
+            "
+            (click)="toggleNarrow()"
+          >
+            @if (narrow()) {
+              <app-icon [name]="n.icon" [size]="13" />{{ n.label }}
+            } @else {
+              Everywhere
             }
-          </ul>
-        } @else {
-          <p class="palette-empty">{{ searching() ? 'Searching…' : 'Nothing found.' }}</p>
+          </button>
         }
-        <div class="palette-foot">
-          <span><kbd>↑</kbd> <kbd>↓</kbd> to move</span><span><kbd>Enter</kbd> to open</span>
-          @if (near(); as n) {
-            <span
-              ><kbd>Tab</kbd>
-              {{ narrow() ? 'to search everywhere' : 'to search ' + n.label + ' only' }}</span
-            >
-          }
-        </div>
+        <kbd>Esc</kbd>
       </div>
-    </div>
+      @if (items().length) {
+        <ul class="os-command-list palette-list" id="palette-list" role="listbox">
+          @for (it of items(); track $index; let i = $index) {
+            @if (i === 0 || items()[i - 1].group !== it.group) {
+              <li class="os-command-group-label" role="presentation">{{ it.group }}</li>
+            }
+            <li
+              class="os-command-item"
+              role="option"
+              [id]="'pi-' + i"
+              [attr.aria-selected]="i === active()"
+              (mousemove)="active.set(i)"
+              (click)="pick(it)"
+            >
+              <app-icon [name]="it.icon" />
+              @if (it.snippet !== undefined) {
+                <span class="palette-text">
+                  <span
+                    >{{ it.label }}
+                    @if (it.mode && it.mode !== 'open') {
+                      <app-mode-icon [mode]="it.mode" />
+                    }
+                  </span>
+                  <span class="palette-snippet" [innerHTML]="marked(it.snippet)"></span>
+                </span>
+              } @else {
+                <span>{{ it.label }}</span>
+              }
+              @if (it.hint) {
+                <small class="os-command-hint">{{ it.hint }}</small>
+              }
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="os-command-empty">{{ searching() ? 'Searching…' : 'Nothing found.' }}</p>
+      }
+      <div class="palette-foot">
+        <span><kbd>↑</kbd> <kbd>↓</kbd> to move</span><span><kbd>Enter</kbd> to open</span>
+        @if (near(); as n) {
+          <span
+            ><kbd>Tab</kbd>
+            {{ narrow() ? 'to search everywhere' : 'to search ' + n.label + ' only' }}</span
+          >
+        }
+      </div>
+    </dialog>
   `,
 })
 export class Palette {
@@ -166,9 +169,15 @@ export class Palette {
   /** What Tab narrows to: the project, or the organization when there are others to leave out. */
   readonly near = computed(() => {
     const { project, organization } = this.here();
-    if (project) return { kind: 'project' as const, id: project.id, label: project.name, icon: 'repo' };
+    if (project)
+      return { kind: 'project' as const, id: project.id, label: project.name, icon: 'repo' };
     if (organization && this.session.groupShown())
-      return { kind: 'organization' as const, id: organization.id, label: organization.name, icon: 'layers' };
+      return {
+        kind: 'organization' as const,
+        id: organization.id,
+        label: organization.name,
+        icon: 'layers',
+      };
     return null;
   });
 
@@ -416,8 +425,6 @@ export class Palette {
     } else if (ev.key === 'Tab' && this.near()) {
       ev.preventDefault();
       this.toggleNarrow();
-    } else if (ev.key === 'Escape') {
-      this.close.emit();
     }
   }
 

@@ -1,7 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { Badge, Button, Check, Checkbox, Chip, Control, Field } from '@openstuff-dev/ui-angular';
+import {
+  Badge,
+  Button,
+  Check,
+  Checkbox,
+  Chip,
+  ConfirmDialog,
+  Control,
+  Field,
+} from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Project } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -168,6 +177,7 @@ import { Icon } from '../shared/icon';
 })
 export class ProjectsPage {
   readonly session = inject(Session);
+  private readonly confirmDialog = inject(ConfirmDialog);
   private api = inject(Api);
   private router = inject(Router);
   private notices = inject(Notices);
@@ -211,7 +221,7 @@ export class ProjectsPage {
 
   async create(): Promise<void> {
     try {
-      const p = await claimingOldSlug((take_alias) =>
+      const p = await claimingOldSlug(this.confirmDialog, (take_alias) =>
         this.api.createProject({
           organization_id: this.session.orgId(),
           name: this.draft.name.trim(),
