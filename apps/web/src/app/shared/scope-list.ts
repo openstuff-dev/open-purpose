@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Button, Chip, Control, Field } from '@openstuff-dev/ui-angular';
+import { Button, Chip, ConfirmDialog, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Repository, Scope } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -143,6 +143,7 @@ export class ScopeList {
   readonly repositories = input<Repository[]>([]);
   readonly repositoryAdded = output<Repository>();
   readonly session = inject(Session);
+  private readonly confirmDialog = inject(ConfirmDialog);
   private api = inject(Api);
   private notices = inject(Notices);
   readonly scopes = signal<Scope[]>([]);
@@ -180,7 +181,7 @@ export class ScopeList {
 
   async create(): Promise<void> {
     try {
-      const created = await claimingOldSlug((take_alias) =>
+      const created = await claimingOldSlug(this.confirmDialog, (take_alias) =>
         this.api.createScope({
           organization_id: this.organizationId(),
           project_id: this.projectId(),

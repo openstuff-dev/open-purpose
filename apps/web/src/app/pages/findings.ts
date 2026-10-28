@@ -644,7 +644,7 @@ export class FindingsPage {
       if (ev.key === 'Escape' && this.current()) (target as HTMLInputElement).blur();
       return;
     }
-    if (document.querySelector('.palette-backdrop')) return;
+    if (document.querySelector('.os-command-palette[open]')) return;
     if (ev.key === 'Escape' && this.current()) {
       this.close();
     } else if ((ev.key === 'ArrowDown' || ev.key === 'j') && this.rows().length) {

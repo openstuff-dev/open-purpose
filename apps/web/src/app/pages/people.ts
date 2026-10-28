@@ -1,7 +1,20 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Badge, Button, Chip, Control, Field } from '@openstuff-dev/ui-angular';
+import {
+  Badge,
+  Button,
+  Chip,
+  ConfirmDialog,
+  Control,
+  Dialog,
+  DialogBody,
+  DialogClose,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Field,
+} from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import { ROLE_LABEL, type Member, type Role } from '../core/models';
 import { Session } from '../core/session';
@@ -19,7 +32,23 @@ const GROUP = 'group';
 
 @Component({
   selector: 'app-people',
-  imports: [FormsModule, DatePipe, NgTemplateOutlet, Icon, Button, Field, Control, Badge, Chip],
+  imports: [
+    FormsModule,
+    DatePipe,
+    NgTemplateOutlet,
+    Icon,
+    Button,
+    Field,
+    Control,
+    Badge,
+    Chip,
+    Dialog,
+    DialogHeader,
+    DialogTitle,
+    DialogBody,
+    DialogFooter,
+    DialogClose,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
@@ -134,7 +163,7 @@ const GROUP = 'group';
           }
           @if (m.manageable) {
             <span class="actor-actions">
-              <button os-button variant="ghost" size="sm" type="button" (click)="issue(m)">
+              <button os-button variant="ghost" size="sm" type="button" (click)="issuing.set(m)">
                 <app-icon name="key" [size]="13" />New token
               </button>
               @if (m.id !== session.me()?.actor?.id) {
@@ -257,10 +286,30 @@ const GROUP = 'group';
         }
       </li>
     </ng-template>
+
+    <dialog os-dialog size="sm" [open]="!!issuing()" (openChange)="$event || issuing.set(null)">
+      @if (issuing(); as m) {
+        <form (ngSubmit)="issue(m)">
+          <header os-dialog-header>
+            <h2 os-dialog-title>New token for {{ m.name }}</h2>
+          </header>
+          <div os-dialog-body>
+            <os-field label="Label" hint="Where it's used, for example work laptop.">
+              <input os-input name="label" [(ngModel)]="tokenLabel" />
+            </os-field>
+          </div>
+          <footer os-dialog-footer>
+            <button os-button os-dialog-close>Cancel</button>
+            <button os-button variant="primary" type="submit">Create token</button>
+          </footer>
+        </form>
+      }
+    </dialog>
   `,
 })
 export class PeoplePage {
   readonly session = inject(Session);
+  private readonly confirmDialog = inject(ConfirmDialog);
   private api = inject(Api);
   private notices = inject(Notices);
   readonly GROUP = GROUP;
@@ -269,6 +318,9 @@ export class PeoplePage {
   readonly people = computed(() => this.members().filter((m) => m.kind === 'human'));
   readonly agents = computed(() => this.members().filter((m) => m.kind === 'agent'));
   readonly fresh = signal<NewToken | null>(null);
+  /** Whose new token is being labelled. */
+  readonly issuing = signal<Member | null>(null);
+  tokenLabel = 'laptop';
   readonly adding = signal<string | null>(null);
   /** Levels this admin manages: the group (group admins) and each organization they administer. */
   readonly levels = computed(() => {
@@ -387,12 +439,20 @@ export class PeoplePage {
 
   async removeRole(m: Member, ms: Member['memberships'][number]): Promise<void> {
     const where = this.session.orgName(ms.organization_id);
-    if (!confirm(`Remove ${m.name} from ${where}?`)) return;
+    const remove = await this.confirmDialog.confirm({
+      title: `Remove ${m.name} from ${where}?`,
+      message: `They lose their role in ${where}.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!remove) return;
     await this.run(() => this.api.removeMembership(ms.id), `Removed ${m.name} from ${where}`);
   }
 
   async issue(m: Member): Promise<void> {
-    const label = prompt(`Label for the new token for ${m.name}`, 'laptop') ?? '';
+    const label = this.tokenLabel.trim();
+    this.issuing.set(null);
+    this.tokenLabel = 'laptop';
     try {
       const r = await this.api.issueToken(m.id, label);
       const org = m.memberships.find((x) => x.organization_id)?.organization_id ?? null;
@@ -409,7 +469,13 @@ export class PeoplePage {
   }
 
   async revoke(id: string): Promise<void> {
-    if (!confirm('Revoke this token? Anything using it stops working immediately.')) return;
+    const revoke = await this.confirmDialog.confirm({
+      title: 'Revoke this token?',
+      message: 'Anything using it stops working immediately.',
+      confirmLabel: 'Revoke token',
+      danger: true,
+    });
+    if (!revoke) return;
     await this.run(() => this.api.revokeToken(id), 'Revoked token');
   }
 

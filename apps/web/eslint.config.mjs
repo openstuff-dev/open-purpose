@@ -27,8 +27,8 @@ const replaced = [
     message: 'Use <os-tabs> from @openstuff-dev/ui-angular (or .os-tab-list and .os-tab for link tabs and tab-styled filters) instead of .tabs.',
   },
   {
-    pattern: String.raw`<aside[^>]*role="dialog"`,
-    message: 'Use <dialog os-drawer> from @openstuff-dev/ui-angular instead of an <aside role="dialog">.',
+    pattern: String.raw`role="dialog"`,
+    message: 'Use <dialog os-dialog> or <dialog os-drawer> from @openstuff-dev/ui-angular instead of an element with role="dialog".',
   },
 ];
 
@@ -51,6 +51,12 @@ export default [
         'error',
         ...shared,
         ...replaced.map(({ pattern, message }) => ({ selector: `TemplateElement[value.raw=/${pattern}/]`, message })),
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'confirm', message: 'Use ConfirmDialog from @openstuff-dev/ui-angular.' },
+        { name: 'prompt', message: 'Ask in a <dialog os-dialog> with an os-field.' },
+        { name: 'alert', message: 'Use Notices, or a <dialog os-dialog> for something that needs an answer.' },
       ],
     },
   },

@@ -1,14 +1,7 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
-import {
-  DestroyRef,
-  Injectable,
-  computed,
-  effect,
-  inject,
-  signal,
-  untracked,
-} from '@angular/core';
+import { DestroyRef, Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
+import type { ConfirmDialog } from '@openstuff-dev/ui-angular';
 import type { Me, Organization } from './models';
 import { orgColor } from './theme';
 
@@ -184,14 +177,19 @@ export function aliasConflict(err: unknown): { id: string; name: string; slug: s
  * Resolves to undefined when the person says no.
  */
 export async function claimingOldSlug<T>(
+  confirmDialog: ConfirmDialog,
   run: (take_alias?: boolean) => Promise<T>,
 ): Promise<T | undefined> {
   try {
     return await run();
   } catch (e) {
     if (!aliasConflict(e)) throw e;
-    if (!confirm(`${errorMessage(e)}\n\nTake the slug anyway?`)) return undefined;
-    return run(true);
+    const take = await confirmDialog.confirm({
+      title: 'Take this slug?',
+      message: errorMessage(e),
+      confirmLabel: 'Take the slug',
+    });
+    return take ? run(true) : undefined;
   }
 }
 

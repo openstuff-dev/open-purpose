@@ -2033,80 +2033,19 @@ mark {
 }
 
 /* ─── Command palette ─── */
-.palette-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: var(--os-backdrop);
-  display: grid;
-  justify-items: center;
-  align-items: start;
-  padding: 12vh 1rem 1rem;
-}
-.palette {
-  width: min(38rem, 100%);
-  background: var(--surface);
-  border: 1px var(--os-border-style) var(--line);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-pop);
-  overflow: hidden;
-}
-.palette-input {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0 1rem;
-  border-bottom: 1px var(--os-border-style) var(--line);
-}
-.palette-input .icon {
-  color: var(--muted);
-}
-.palette-input input {
-  width: 100%;
-  color: var(--ink);
-  outline: none;
-  border: 0;
-  box-shadow: none;
-  padding: 0.95rem 0;
-  font-size: var(--fs-md);
-  background: transparent;
-}
-.palette-input input:focus {
-  box-shadow: none;
-}
 .palette-list {
-  list-style: none;
   margin: 0;
-  padding: 0.35rem;
-  max-height: 55vh;
-  overflow: auto;
+  list-style: none;
 }
-.palette-group {
-  font-size: var(--fs-xs);
-  color: var(--faint);
-  padding: 0.55rem 0.65rem 0.25rem;
-  font-weight: 500;
-}
-.palette-item {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  padding: 0.55rem 0.65rem;
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  font-size: var(--fs-sm);
-}
-.palette-item .icon {
-  color: var(--muted);
-}
-.palette-item small {
-  margin-left: auto;
-  color: var(--faint);
-  font-size: var(--fs-xs);
+.palette .os-command-hint {
+  max-width: 45%;
   overflow: hidden;
+  font-size: var(--fs-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 45%;
+}
+.palette .os-command-item[aria-selected='true'] .icon {
+  color: var(--accent);
 }
 .palette-text {
   flex: 1;
@@ -2149,18 +2088,6 @@ mark {
   border-color: var(--accent);
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
-}
-.palette-item.active {
-  background: var(--hover);
-}
-.palette-item.active .icon {
-  color: var(--accent);
-}
-.palette-empty {
-  padding: 1.5rem;
-  text-align: center;
-  color: var(--muted);
-  font-size: var(--fs-sm);
 }
 .palette-foot {
   display: flex;

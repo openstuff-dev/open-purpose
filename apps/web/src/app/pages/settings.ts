@@ -10,7 +10,7 @@ import {
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
-import { Badge, Button, Checkbox, Control, Field } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Checkbox, ConfirmDialog, Control, Field } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Organization, TokenRow } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
@@ -677,6 +677,7 @@ organization, the project and the part of the code you are in (a repository or a
 export class SettingsPage {
   readonly tab = input<string | undefined>();
   readonly session = inject(Session);
+  private readonly confirmDialog = inject(ConfirmDialog);
   readonly theme = inject(Theme);
   private api = inject(Api);
   private notices = inject(Notices);
@@ -807,14 +808,22 @@ export class SettingsPage {
 
   async revoke(t: TokenRow): Promise<void> {
     const current = this.isCurrent(t);
-    if (
-      !confirm(
-        current
-          ? 'This is the token you are signed in with. Revoke it and sign out?'
-          : `Revoke "${t.label}"? Anything using it stops working immediately.`,
-      )
-    )
-      return;
+    const revoke = await this.confirmDialog.confirm(
+      current
+        ? {
+            title: 'Revoke the token you are signed in with?',
+            message: 'You are signed out, and anything else using it stops working.',
+            confirmLabel: 'Revoke and sign out',
+            danger: true,
+          }
+        : {
+            title: `Revoke ${t.label}?`,
+            message: 'Anything using it stops working immediately.',
+            confirmLabel: 'Revoke token',
+            danger: true,
+          },
+    );
+    if (!revoke) return;
     try {
       await this.api.revokeMyToken(t.id);
       if (current) {
@@ -870,9 +879,12 @@ export class SettingsPage {
     const archive = !o.archived_at;
     if (
       archive &&
-      !confirm(
-        `Archive ${o.name}? It disappears from menus, lists and the map; its content stays and can be restored.`,
-      )
+      !(await this.confirmDialog.confirm({
+        title: `Archive ${o.name}?`,
+        message:
+          'It disappears from menus, lists and the map. Its content stays, and you can restore it.',
+        confirmLabel: 'Archive',
+      }))
     )
       return;
     await this.run(
@@ -894,7 +906,7 @@ export class SettingsPage {
       const naming =
         !this.session.groupShown() && this.groupName.trim() !== this.session.group()?.name;
       if (
-        !(await claimingOldSlug((take_alias) =>
+        !(await claimingOldSlug(this.confirmDialog, (take_alias) =>
           this.api.createOrganization({ ...body, take_alias }),
         ))
       )
