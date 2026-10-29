@@ -1,0 +1,10 @@
+# Keep local installs and builds out of the image: the Dockerfile installs and builds everything itself.
+**/node_modules
+**/dist
+**/.angular
+**/src/tokens
+.git
+.nx
+.env
+.env.*
+!.env.example

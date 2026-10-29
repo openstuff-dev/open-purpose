@@ -55,7 +55,12 @@ import type {
   SignInErrorCode,
 } from '@openpurpose/contracts';
 
-export const VERSION = '0.2.0';
+// From apps/server/package.json, which a release bumps (the image copies it next to dist/).
+export const VERSION = (
+  JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+    version: string;
+  }
+).version;
 
 declare module 'fastify' {
   interface FastifyRequest {

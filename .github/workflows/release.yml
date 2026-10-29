@@ -1,0 +1,104 @@
+name: Release
+
+# Runs CI, then publishes the Docker image to ghcr.io/openstuff-dev/open-purpose:
+# - a tag v1.2.3 pushes :1.2.3, :1.2 and :latest (a pre-release like v1.3.0-rc.1 pushes only its own tag)
+# - every push to master pushes :edge
+# Nothing is pushed unless CI passes (on a tag, for every project) and the image starts.
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    with:
+      all: ${{ startsWith(github.ref, 'refs/tags/v') }}
+
+  image:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check that the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          for f in package.json apps/server/package.json apps/web/package.json packages/contracts/package.json; do
+            version="$(node -p "require('./$f').version")"
+            if [ "$version" != "$tag" ]; then
+              echo "::error file=$f::$f says $version, but the tag is $GITHUB_REF_NAME. Run: npm version $tag --workspaces --include-workspace-root --no-git-tag-version"
+              exit 1
+            fi
+          done
+          grep -q "^## $tag" CHANGELOG.md || { echo "::error file=CHANGELOG.md::CHANGELOG.md has no '## $tag' entry."; exit 1; }
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ !contains(github.ref_name, '-') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
+            type=edge,branch=master
+
+      # Build once and load it locally, so a broken image is never pushed.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: openpurpose:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Check that the image starts and migrates a fresh database
+        run: |
+          docker network create smoke
+          docker run -d --name db --network smoke -e POSTGRES_PASSWORD=smoke postgres:16-alpine
+          for _ in $(seq 30); do docker exec db pg_isready -U postgres && break; sleep 1; done
+          docker run -d --name app --network smoke -p 8080:8080 \
+            -e DATABASE_URL=postgres://postgres:smoke@db:5432/postgres openpurpose:smoke
+          for _ in $(seq 60); do
+            if body="$(curl -fsS http://127.0.0.1:8080/api/health)"; then echo "$body"; exit 0; fi
+            sleep 2
+          done
+          docker logs app
+          exit 1
+
+      # Same inputs, so this comes from the cache.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
