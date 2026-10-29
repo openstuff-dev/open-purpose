@@ -285,22 +285,17 @@ note "away from the other devices at home."
 pause
 
 # ── 2 ─────────────────────────────────────────────────────────────────────
-stage "GitHub: pull the image"
+stage "The image"
 ask OPENPURPOSE_IMAGE_TAG "Which release to run? (see CHANGELOG.md, e.g. 0.3.0)"
 write_env OPENPURPOSE_IMAGE_TAG "$OPENPURPOSE_IMAGE_TAG"
 IMAGE="ghcr.io/openstuff-dev/open-purpose:$OPENPURPOSE_IMAGE_TAG"
-if docker pull -q "$IMAGE" >/dev/null 2>&1; then
-  printf '  %s✓%s already able to pull %s\n' "$GREEN" "$RESET" "$IMAGE"
+say "Pulling $IMAGE..."
+if docker pull -q "$IMAGE" >/dev/null; then
+  printf '  %s✓ pulled%s %s\n' "$GREEN" "$RESET" "$IMAGE"
 else
-  say "The repository is private, so Docker needs a read-only GitHub token."
-  open_url "https://github.com/settings/tokens/new?scopes=read:packages&description=openpurpose-home-server"
-  step "It's a classic token: GitHub's package registry doesn't take fine-grained ones."
-  step "Leave only read:packages ticked, pick an expiry, click Generate token, copy it."
-  ask GHCR_USER "Your GitHub username:"
-  ask_secret GHCR_TOKEN "Paste the token (ghp_...):"
-  printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null
-  docker pull -q "$IMAGE" >/dev/null && printf '  %s✓ pulled%s %s\n' "$GREEN" "$RESET" "$IMAGE"
-  note "Docker keeps the login in ~/.docker/config.json. Once the repo is public, run: docker logout ghcr.io"
+  warn "Couldn't pull it. Check that the release exists:"
+  open_url "https://github.com/openstuff-dev/open-purpose/pkgs/container/open-purpose"
+  exit 1
 fi
 pause
 

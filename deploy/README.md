@@ -24,8 +24,6 @@ values you already entered. To do it by hand, you need:
 - A Cloudflare Tunnel (Zero Trust › Networks › Tunnels › Create a tunnel › Cloudflared).
   Copy its token, then add the public hostname `purpose.openstuff.app` with the service
   `http://openpurpose:8080`.
-- While the repository is private, a GitHub token with only `read:packages`:
-  `echo <token> | docker login ghcr.io -u <github-user> --password-stdin`.
 
 ## Start it
 
@@ -109,6 +107,6 @@ update first.
 
 ## Move to another machine
 
-Install Docker, copy this folder and the saved `.env`, log in to GHCR and run
+Install Docker, copy this folder and the saved `.env`, and run
 `docker compose up -d`. Stop the old stack first if it's still running: two `cloudflared`
 connectors for one tunnel both get traffic.
