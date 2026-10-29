@@ -64,7 +64,7 @@ export async function seedGroupDocs(c: Queryable, actorId: string | null): Promi
   const level = { organization_id: null, project_id: null, scope_id: null };
   const purpose = await insertDocument(c, level, {
     kind: 'purpose',
-    title: 'Group purpose',
+    title: 'Workspace purpose',
     slug: 'purpose',
     mode: 'locked',
     position: 0,
@@ -74,15 +74,15 @@ export async function seedGroupDocs(c: Queryable, actorId: string | null): Promi
     purpose.id,
     {
       heading: 'What holds for every organization',
-      body: '_Rules every organization in the group follows: security, legal, privacy, brand._',
+      body: '_Rules every organization in the workspace follows: security, legal, privacy, brand._',
       mode: 'locked',
     },
     actorId,
-    'Created with group',
+    'Created with workspace',
   );
   await insertDocument(c, level, {
     kind: 'guidelines',
-    title: 'Group-wide guidelines',
+    title: 'Workspace-wide guidelines',
     slug: 'guidelines',
     mode: 'propose',
     position: 1,
@@ -603,7 +603,7 @@ export async function removeMembership(db: Db, a: Access, membershipId: string):
   if (!m) throw notFound('Membership');
   a.requireAdmin(m.organization_id);
   if (m.actor_id === a.actor.id && m.organization_id === null && !a.actor.is_superadmin) {
-    throw badRequest('You cannot remove your own group role');
+    throw badRequest('You cannot remove your own workspace role');
   }
   await db.query('DELETE FROM memberships WHERE id = $1', [membershipId]);
 }
@@ -617,7 +617,7 @@ async function requireManage(
   const m = await loadMember(db, actorId);
   if (!(await canManageActor(pool, a, actorId, m.kind, m.memberships))) {
     throw forbidden(
-      `${m.name} also belongs to other groups or organizations you don't administer; a server admin manages their account`,
+      `${m.name} also belongs to other workspaces or organizations you don't administer; a server admin manages their account`,
     );
   }
   return m;

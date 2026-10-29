@@ -104,7 +104,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
       <h2>Export</h2>
       <p class="quiet">
         Download everything in {{ session.group()?.name }} or one organization, to keep as a backup
-        or to import into another OpenPurpose server. A group export is a complete backup.
+        or to import into another OpenPurpose server. A workspace export is a complete backup.
       </p>
       <div class="os-setting-card">
         <div class="os-setting-row" data-inline>
@@ -114,7 +114,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
           <select os-select name="what" [(ngModel)]="what" aria-label="What to export">
             @if (session.canAdmin(null)) {
               <option value="">
-                {{ session.groupShown() ? 'The whole group' : 'Everything' }} ({{
+                {{ session.groupShown() ? 'The whole workspace' : 'Everything' }} ({{
                   session.group()?.name
                 }})
               </option>
@@ -244,7 +244,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
               <p>
                 {{
                   asGroup()
-                    ? 'A new group with everything in the file, including its group-wide content. You become its admin.'
+                    ? 'A new workspace with everything in the file, including its workspace-wide content. You become its admin.'
                     : 'Organizations in ' +
                       session.group()?.name +
                       ', new or merged into ones already here.'
@@ -269,7 +269,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
 
         @if (asGroup() && r.group) {
           <form class="inline-form os-panel os-panel-body" (ngSubmit)="refresh()">
-            <os-field label="Group name" class="grow"
+            <os-field label="Workspace name" class="grow"
               ><input os-input name="gname" [(ngModel)]="groupName" (change)="refresh()"
             /></os-field>
             <os-field label="Slug" class="grow"
@@ -402,7 +402,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
                 [ngModel]="groupContent()"
                 (ngModelChange)="groupContent.set($event); refresh()"
               />
-              Also merge the file's group-wide content ({{ groupContentSize(r) }}) into
+              Also merge the file's workspace-wide content ({{ groupContentSize(r) }}) into
               {{ session.group()?.name }}</label
             >
           }
@@ -498,8 +498,8 @@ export class TransferPage {
   ] as const;
 
   readonly targets = [
-    { value: 'group', label: 'This group' },
-    { value: 'new', label: 'A new group' },
+    { value: 'group', label: 'This workspace' },
+    { value: 'new', label: 'A new workspace' },
   ] as const;
 
   includes: ExportIncludes = {

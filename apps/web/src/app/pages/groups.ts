@@ -18,19 +18,21 @@ import { initials } from '../core/theme';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section>
-      <h2>All groups</h2>
+      <h2>All workspaces</h2>
       <p class="quiet">
-        Each group is walled off from the others in the database: its people, agents and rules never
-        see another group's. Use one per company or client. A group starts as one organization; its
-        admins can add more later. Export downloads a full backup of a group, people included;
-        restore one under Settings › Export and import.
+        Each workspace is walled off from the others in the database: its people, agents and rules
+        never see another workspace's. Use one per company or client. A workspace starts as one
+        organization; its admins can add more later. Export downloads a full backup of a workspace,
+        people included; restore one under Settings › Export and import.
       </p>
     </section>
 
     @if (created(); as c) {
       <os-callout tone="success" role="alert" title="{{ c.name }} is ready" level="2">
         @if (c.token) {
-          <p>Give this token to {{ c.admin }}, the group's first admin. It is not shown again.</p>
+          <p>
+            Give this token to {{ c.admin }}, the workspace's first admin. It is not shown again.
+          </p>
           <pre><code>{{ c.token }}</code></pre>
         } @else {
           <p>You are its first admin. Switch to it to add organizations, people and agents.</p>
@@ -69,7 +71,7 @@ import { initials } from '../core/theme';
     </ul>
 
     <section>
-      <h3 class="list-label">New group</h3>
+      <h3 class="list-label">New workspace</h3>
       <form class="inline-form os-panel os-panel-body" (ngSubmit)="create()">
         <os-field label="Company or client" class="grow"
           ><input os-input name="name" [(ngModel)]="draft.name" required placeholder="Contoso"
@@ -94,7 +96,7 @@ import { initials } from '../core/theme';
         /></label>
         <div class="form-actions full">
           <button os-button variant="primary" type="submit" [disabled]="!draft.name.trim()">
-            <app-icon name="plus" />Create group
+            <app-icon name="plus" />Create workspace
           </button>
         </div>
       </form>

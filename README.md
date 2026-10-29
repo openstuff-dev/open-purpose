@@ -8,45 +8,47 @@ specific ones last:
 
 | Level | Applies to | Example |
 |---|---|---|
-| Group | every organization in a company group (only once there are several) | "Never log personal data" |
+| Workspace | every organization in a workspace (only once there are several) | "Never log personal data" |
 | Organization | every project in one company or division | "Amounts are integer øre, never floats" |
 | Project | every repo and folder of one product | "The portal owns no business data" |
-| Scope | one part of a project: some of its repositories, some folders, or both; or one kind of code across an organization or the group | "Every user action in the frontend must be undoable" (only the Angular repo, or only `frontend/**`) |
+| Scope | one part of a project: some of its repositories, some folders, or both; or one kind of code across an organization or the workspace | "Every user action in the frontend must be undoable" (only the Angular repo, or only `frontend/**`) |
 
 Agents read it over **MCP**; people curate it in an **Angular web UI**. When a
 developer corrects an agent, the agent proposes a learning. It is filed under the
 most specific scope that matches the code it was working on, and a person approves
 it before any other agent sees it. A frontend rule never reaches backend code.
 
-## Groups and organizations
+## Workspaces and organizations
 
-One server hosts any number of **groups** (tenants), for example one per company
-or client. Each group is isolated in the database with Postgres row-level
-security: every request runs in a transaction that can only see its own group's
-rows, so even a query that forgets its `WHERE` clause can't leak another group's
+One server hosts any number of **workspaces** (tenants), for example one per company
+or client. Each workspace is isolated in the database with Postgres row-level
+security: every request runs in a transaction that can only see its own workspace's
+rows, so even a query that forgets its `WHERE` clause can't leak another workspace's
 data.
+In the database, the API and headers a workspace is still called a group
+(`groups`, `/api/groups`, `X-OpenPurpose-Group`, `--group`), so integrations keep working.
 
-Inside a group, **organizations** (say GitHub and Azure inside Microsoft) are
+Inside a workspace, **organizations** (say GitHub and Azure inside Microsoft) are
 private to their members by default:
 
-- A **group admin** creates organizations, decides which organizations may read
-  which others, and manages everyone in the group.
-- People with a **role in the group** read every organization; group editors edit
-  group-wide rules and can promote any organization's learning to the whole group.
+- A **workspace admin** creates organizations, decides which organizations may read
+  which others, and manages everyone in the workspace.
+- People with a **role in the workspace** read every organization; workspace editors edit
+  workspace-wide rules and can promote any organization's learning to the whole workspace.
 - People with a **role in an organization** (admin, editor, viewer) work there only.
   One person can have different roles in different organizations.
-- **Agents** belong to exactly one organization. They read the group, their
+- **Agents** belong to exactly one organization. They read the workspace, their
   organization and organizations shared with it, and write only to their own
-  organization and to group-wide content (subject to edit modes).
+  organization and to workspace-wide content (subject to edit modes).
 - **Links across organizations** use `[[org/project]]`, e.g. `[[payments/payment-gateway]]`.
   Someone who can't read the target sees its name only, never its content.
 - **Glossaries layer.** `[[Customer]]` resolves to the project's glossary first,
-  then the organization's, then the group's, so an organization can redefine a
-  group-wide term.
-- **Server admins** create groups, and can switch between them.
+  then the organization's, then the workspace's, so an organization can redefine a
+  workspace-wide term.
+- **Server admins** create workspaces, and can switch between them.
 
-A small company simply has one organization. Its group stays out of sight (no
-group page, menu or layer in the agent's context) until a group admin adds a
+A small company simply has one organization. Its workspace stays out of sight (no
+workspace page, menu or layer in the agent's context) until a workspace admin adds a
 second organization under Settings › Organizations.
 
 ## What else is in it
@@ -55,7 +57,7 @@ second organization under Settings › Organizations.
   SSH, `visualstudio.com`) map to the same key, `azure:{org}/{project}/{repo}`.
   A `.openpurpose.json` with `{"project": "org/slug"}` overrides it. Unknown
   repos make the agent ask the user and register the repo. One project can span
-  many repos, and the same repo can belong to projects in different groups.
+  many repos, and the same repo can belong to projects in different workspaces.
 - **Scopes** match by repository, by path glob (`frontend/**`) or by stack tag
   (`angular`, `dotnet`). A project scope bound to repositories (say "Angular" for
   the web repo and ".NET" for the API repo) only applies inside them; its paths and
@@ -104,7 +106,7 @@ second organization under Settings › Organizations.
   tab shows exactly that text, endpoint by endpoint.
 - **Project pages** split into tabs: Documents, Scopes, API, What agents see,
   Connections, Repositories and Settings, under a strip that shows where the
-  project sits (group › organization › project › scopes).
+  project sits (workspace › organization › project › scopes).
 - **Agent mode**, a switch in the top bar: the UI is replaced by a console that
   shows only what an agent in the chosen organization gets back from OpenPurpose.
   You ask like an agent would: `get_context` for a project or git remote, a path
@@ -115,10 +117,10 @@ second organization under Settings › Organizations.
   eyes if they can already read everything that agent can.
 - **Context budget.** Big rule sets don't flood an agent. When `get_context` would be
   larger than the budget (estimated as characters / 4), the most general sections are
-  cut to their heading and first sentence: group first, then organization, project and
+  cut to their heading and first sentence: workspace first, then organization, project and
   scopes, with learnings and reference before purpose. Each shortened section says how
   much is left and which `read_section` call returns it, so the most specific rules
-  always arrive in full. A group admin sets the budget for the whole group; while there
+  always arrive in full. A workspace admin sets the budget for the whole workspace; while there
   is only one organization, its admin sets it there. Budgets are opt-in: until one is
   set, every matching section is sent in full.
 - **What agents see** on every project: the exact merged context an agent gets
@@ -127,7 +129,7 @@ second organization under Settings › Organizations.
 - Personal and per-agent **tokens** with revocation, and Postgres full-text search.
 - **Settings** for your account and personal tokens, light/dark theme, agent setup
   instructions, organizations, read access and context budgets, people and agents, export and import,
-  and (for server admins) all groups.
+  and (for server admins) all workspaces.
 - **Search** is ⌘K / Ctrl+K, anywhere: jump to a page or project, or search rules, terms and
   learnings. What belongs to the project (or organization) on screen comes first; Tab narrows the
   search to just that project or organization.
@@ -143,7 +145,7 @@ docker compose logs openpurpose | grep "Admin token"
 Open http://localhost:8080 and sign in with the admin token. Then go to
 **Settings → People and agents** and create a token for each person and each agent.
 
-To try it with example data (a group with two organizations, nine linked
+To try it with example data (a workspace with two organizations, nine linked
 services, learnings and pending proposals). This wipes the database:
 
 ```bash
@@ -152,17 +154,17 @@ docker compose exec openpurpose node dist/seed-demo.js --reset
 
 ### Upgrading from v0.1
 
-Just start the new version. The migration moves everything into one group with
+Just start the new version. The migration moves everything into one workspace with
 one organization (both named after your old organization), turns v0.1 admins
-into group admins and server admins, and keeps editors, viewers and agents in
+into workspace admins and server admins, and keeps editors, viewers and agents in
 that organization.
 
 ### Backup, export and import
 
-**Settings → Export and import** downloads the whole group or one organization as
+**Settings → Export and import** downloads the whole workspace or one organization as
 one JSON file: every document and section, projects, repositories, scopes, API specs
 and, if you choose, section history, proposals with their reviews, and the names and
-roles of people and agents, and findings. Tokens are never exported. A group export is a complete
+roles of people and agents, and findings. Tokens are never exported. A workspace export is a complete
 backup. The Markdown (.zip) format adds a readable `.md` file per document next to
 the same JSON (`manifest.json`).
 
@@ -172,7 +174,7 @@ or left out. A merge matches projects and scopes by slug (old slugs too), docume
 slug and sections by heading. New content is added. For changed sections you choose
 whether they become proposals in the inbox (the default), are updated right away, or
 stay as they are. Nothing is deleted unless you tick "Remove what's not in the file".
-Server admins can also restore a file as a new group, with its group-wide content.
+Server admins can also restore a file as a new workspace, with its workspace-wide content.
 Imported people arrive disabled and without tokens.
 
 For scheduled backups, run the export on the server:
@@ -183,7 +185,7 @@ docker compose exec openpurpose node dist/export-cli.js --group my-group --out /
 ```
 
 Without Docker, use `npm run -s export -w apps/server -- --group my-group --out backup.json`.
-For a backup of the whole server, every group at once, use `pg_dump`.
+For a backup of the whole server, every workspace at once, use `pg_dump`.
 
 ### Without Docker
 
@@ -210,7 +212,7 @@ forced on the owner instead. Either way works without configuration.
 | `DATABASE_URL` | `postgres://openpurpose:openpurpose@localhost:5432/openpurpose` | |
 | `PORT` | `8080` | |
 | `OPENPURPOSE_ORG_NAME` | `Our company` | first organization, created on first boot only |
-| `OPENPURPOSE_GROUP_NAME` | the organization's name | the group around it; only shown once it has a second organization |
+| `OPENPURPOSE_GROUP_NAME` | the organization's name | the workspace around it; only shown once it has a second organization |
 | `OPENPURPOSE_PUBLIC_URL` | `http://localhost:PORT` | shown in MCP setup snippets |
 | `OPENPURPOSE_BOOTSTRAP_TOKEN` | random | first admin's token; otherwise printed once in the log |
 | `OPENPURPOSE_API_FETCH` | `on` | `off` stops the server from fetching API spec URLs (uploads still work) |
@@ -286,11 +288,11 @@ claude mcp add --transport http openpurpose https://openpurpose.example.com/mcp 
   --header "Authorization: Bearer chr_..."
 ```
 
-The token decides the group and organization, so there is nothing else to
+The token decides the workspace and organization, so there is nothing else to
 configure. Any MCP client that supports streamable HTTP works (Cursor, VS Code,
 Codex, ...). Personal tokens work over MCP too; if the person belongs to several
-organizations, add `--header "X-OpenPurpose-Org: <org-slug>"` (and `X-OpenPurpose-Group`
-if they belong to several groups).
+organizations, add `--header "X-OpenPurpose-Org: <org-slug>"` (and `X-OpenPurpose-Workspace`
+if they belong to several workspaces).
 
 The server sends its workflow as MCP instructions, but agents follow it more
 reliably when the repo says so too: copy [`agent/AGENTS.snippet.md`](agent/AGENTS.snippet.md)
@@ -300,8 +302,8 @@ into your repo's `AGENTS.md` or `CLAUDE.md`.
 
 | Tool | What it does |
 |---|---|
-| `get_context` | The rules for a repo + path + manifest, from group to scope, with section ids and modes |
-| `propose_learning` | File a correction as a learning under the most specific matching scope (or `level`: project, organization, group) |
+| `get_context` | The rules for a repo + path + manifest, from workspace to scope, with section ids and modes |
+| `propose_learning` | File a correction as a learning under the most specific matching scope (or `level`: project, organization, workspace) |
 | `create_scope` | Suggest a scope for a part of the project (paths, stacks, one repository) or a kind of code across the organization; a person approves it, editors' tokens create it right away |
 | `resolve_project`, `register_repository`, `create_project` | Find or register the project for a repo |
 | `get_related` | Projects and terms linked to/from a project, with their purpose where readable |
@@ -333,7 +335,7 @@ Lint uses `@openstuff-dev/lint` and reports warnings only for now.
 
 Run the tests with a Postgres available at `TEST_DATABASE_URL`
 (default `postgres://openpurpose:openpurpose@localhost:5432/openpurpose_test`; the test
-wipes that database). They cover group isolation at the database level and the
+wipes that database). They cover workspace isolation at the database level and the
 upgrade from v0.1:
 
 ```bash

@@ -615,7 +615,7 @@ async function applyApproval(
       throw forbidden(
         level.organization_id === p.organization_id || level.organization_id
           ? `Only editors of ${a.levelName(level.organization_id)} can file it there`
-          : `Only group editors can promote a learning to ${a.group.name}`,
+          : `Only workspace editors can promote a learning to ${a.group.name}`,
       );
     }
     const doc = await ensureLearningsDocument(c, level);

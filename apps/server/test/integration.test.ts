@@ -132,7 +132,7 @@ describe('OpenPurpose with groups and organizations', () => {
     expect((await api('GET', '/documents?organization_id=group')).data).toEqual([]);
     const { client, call } = await mcp(ADMIN);
     const ctx = (await call('get_context', {})).text;
-    expect(ctx).not.toContain('- Group:');
+    expect(ctx).not.toContain('- Workspace:');
     expect(ctx).toContain('general rules come first (organization)');
     await client.close();
     expect(
@@ -276,7 +276,7 @@ describe('OpenPurpose with groups and organizations', () => {
       manifests: [{ path: 'frontend/package.json', content: FRONTEND_PKG }],
     });
     expect(fe.isError).toBe(false);
-    expect(fe.text).toContain('- Group: **Acme Group**');
+    expect(fe.text).toContain('- Workspace: **Acme Group**');
     expect(fe.text).toContain('- Organization: **Acme Logistics**');
     expect(fe.text).toContain('(`logistics/customer-portal`, found via git remote)');
     expect(fe.text).toContain('Acme Logistics › Angular apps (stack "angular")');
@@ -1931,7 +1931,7 @@ definitions:`,
       id: null,
     });
     expect(preview.data.counts.sections).toBe(sections);
-    expect(preview.data.warnings.join('\n')).toContain('already registered in this group');
+    expect(preview.data.warnings.join('\n')).toContain('already registered in this workspace');
     expect(await orgCount()).toBe(before);
     expect((await api('POST', '/import', { file })).status).toBe(409);
     expect((await api('POST', '/import', { file: { ...file, version: 2 } })).status).toBe(400);
@@ -1993,7 +1993,7 @@ definitions:`,
     expect(res.status).toBe(201);
     expect(res.data.organizations[0].slug).toBe('logistics');
     // Other Corp has its own copy of the portal's repository already.
-    expect(res.data.warnings.join('\n')).toContain('already registered in this group');
+    expect(res.data.warnings.join('\n')).toContain('already registered in this workspace');
     expect((await api('GET', '/organizations')).data.length).toBe(acme);
     expect(
       (await api('GET', '/organizations', undefined, other)).data.map((x: any) => x.slug).sort(),
@@ -2142,7 +2142,7 @@ definitions:`,
       name: 'Acme restored',
     });
     expect(res.status).toBe(201);
-    expect(res.data.warnings.join('\n')).not.toContain('Group-wide content is left out');
+    expect(res.data.warnings.join('\n')).not.toContain('Workspace-wide content is left out');
     const restored: Who = { token: ADMIN, group: 'acme-restored' };
     const again = (await api('GET', '/export?people=1', undefined, restored)).data;
     expect(again.source.group).toEqual({

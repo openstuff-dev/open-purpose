@@ -163,7 +163,7 @@ import { SignInPage } from './pages/sign-in';
                 }
                 @if (me.groups.length > 1) {
                   <hr os-menu-separator />
-                  <div os-menu-label>Groups</div>
+                  <div os-menu-label>Workspaces</div>
                   @for (g of me.groups; track g.id) {
                     <button
                       type="button"
@@ -233,7 +233,7 @@ import { SignInPage } from './pages/sign-in';
               @if (session.groupShown()) {
                 <li>
                   <a routerLink="/group" routerLinkActive="active"
-                    ><app-icon name="building" />Group-wide rules</a
+                    ><app-icon name="building" />Workspace-wide rules</a
                   >
                 </li>
               }

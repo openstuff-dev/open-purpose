@@ -74,7 +74,7 @@ function readPeriod(): ActivityPeriod {
               org.summary ||
                 'Rules here reach every agent in ' +
                   org.name +
-                  (session.groupShown() ? ', after the group rules and' : ',') +
+                  (session.groupShown() ? ', after the workspace rules and' : ',') +
                   ' before project rules.'
             }}
           </p>

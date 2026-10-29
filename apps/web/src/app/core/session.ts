@@ -108,7 +108,7 @@ export class Session {
   }
 
   orgName(id: string | null): string {
-    if (!id) return this.group()?.name ?? 'Group';
+    if (!id) return this.group()?.name ?? 'Workspace';
     return this.me()?.organizations.find((o) => o.id === id)?.name ?? 'Unknown organization';
   }
 

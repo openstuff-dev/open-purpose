@@ -202,8 +202,8 @@ export class Palette {
             {
               group: 'Pages',
               icon: 'building',
-              label: s.group()?.name ?? 'Group',
-              hint: 'Group overview',
+              label: s.group()?.name ?? 'Workspace',
+              hint: 'Workspace overview',
               run: this.go(['/group']),
             },
           ]
@@ -252,7 +252,7 @@ export class Palette {
       pages.push({
         group: 'Settings',
         icon: 'building',
-        label: s.groupShown() ? 'Group and organizations' : 'Organizations',
+        label: s.groupShown() ? 'Workspace and organizations' : 'Organizations',
         run: this.go(['/settings', 'group']),
       });
     if (s.adminsAnything)
@@ -266,7 +266,7 @@ export class Palette {
       pages.push({
         group: 'Settings',
         icon: 'server',
-        label: 'All groups',
+        label: 'All workspaces',
         run: this.go(['/settings', 'server']),
       });
     return pages;

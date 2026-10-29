@@ -16,7 +16,7 @@ import { Session } from '../core/session';
         [title]="r.name"
         description="This belongs to {{
           r.org
-        }}, which you can't read. A group admin can share it with your organization."
+        }}, which you can't read. A workspace admin can share it with your organization."
       ></header>
       <p><a routerLink="/group">See who can read what</a></p>
     } @else if (missing()) {
