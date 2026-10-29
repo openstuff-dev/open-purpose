@@ -206,14 +206,60 @@ APP_URL=https://purpose.openstuff.app
 SITE_URL=https://purpose.openstuff.dev
 MAIL_DOMAIN=openstuff.app
 
+# trim VAR: drops surrounding whitespace, carriage returns and bracketed-paste markers that
+# some terminals add to a paste.
+trim() {
+  local v="${!1}"
+  v="${v//$'\e[200~'/}"; v="${v//$'\e[201~'/}"; v="${v//$'\r'/}"
+  v="${v#"${v%%[![:space:]]*}"}"; v="${v%"${v##*[![:space:]]}"}"
+  printf -v "$1" '%s' "$v"
+}
+
+# forget_invalid KEY REGEX: blanks KEY in .env when it holds a placeholder from .env.example (or
+# anything else that doesn't match), so Enter can't keep it.
+forget_invalid() {
+  local key="$1" re="$2" cur tmp
+  cur=$(_existing "$key" || true)
+  [[ -z "$cur" ]] && return 0
+  [[ "$cur" =~ $re && "$cur" != *'<'* && "$cur" != *'...'* ]] && return 0
+  tmp=$(mktemp)
+  grep -vE "^${key}=" "$ENV_FILE" > "$tmp" || true
+  printf '%s=\n' "$key" >> "$tmp"
+  cat "$tmp" > "$ENV_FILE"
+  rm -f "$tmp"
+}
+
 # ask_valid KEY "Prompt" REGEX "Hint" [secret]: asks again until the value matches REGEX.
 ask_valid() {
   local key="$1" prompt="$2" re="$3" hint="$4" secret="${5:-}"
+  forget_invalid "$key" "$re"
   while :; do
     if [[ -n "$secret" ]]; then ask_secret "$key" "$prompt"; else ask "$key" "$prompt"; fi
+    trim "$key"
     [[ "${!key}" =~ $re ]] && return 0
-    warn "$hint"
+    if [[ -z "${!key}" ]]; then warn "Nothing came through. Paste it, then press Enter."
+    else warn "$hint"; fi
   done
+}
+
+DB_URL_RE='^postgres(ql)?://postgres\.[a-z0-9]{20}:[^@/[:space:]]+@[a-z0-9.-]+\.pooler\.supabase\.com:5432/postgres$'
+
+# db_url_problem URL: says what's wrong with a pasted Supabase connection string, or nothing.
+# The password part may be anything here: the wizard replaces it.
+db_url_problem() {
+  local url="$1" user host port db
+  if [[ -z "$url" ]]; then echo "Nothing came through. Paste it, then press Enter."; return; fi
+  if [[ ! "$url" =~ ^postgres(ql)?://([^:/@]+):.*@([^@/:]+):([0-9]+)/([^?[:space:]]+)$ ]]; then
+    echo "That isn't a connection string. It starts with postgresql:// and ends with :5432/postgres."
+    return
+  fi
+  user="${BASH_REMATCH[2]}" host="${BASH_REMATCH[3]}" port="${BASH_REMATCH[4]}" db="${BASH_REMATCH[5]}"
+  if [[ "$host" == db.*.supabase.co ]]; then echo "That's the Direct connection. Pick Session pooler."
+  elif [[ "$port" == 6543 ]]; then echo "That's the Transaction pooler (port 6543). Pick Session pooler."
+  elif [[ "$host" != *.pooler.supabase.com || "$port" != 5432 ]]; then echo "Expected a host ending in .pooler.supabase.com on port 5432, got $host:$port."
+  elif [[ "$user" != "postgres.$SUPABASE_REF" ]]; then echo "The user is $user, but this project's is postgres.$SUPABASE_REF. Is it the right project?"
+  elif [[ "$db" != postgres ]]; then echo "Expected the database postgres, got $db."
+  fi
 }
 
 # supabase_auth JSON: PATCHes the project's auth config through the Management API. The token
@@ -323,14 +369,37 @@ stage "Supabase: database connection"
 open_url "https://supabase.com/dashboard/project/$SUPABASE_REF?showConnect=true"
 step "Under Connection String, pick Session pooler (port 5432), not the transaction pooler"
 step "(6543, which breaks the app's role switch) and not Direct (IPv6 only)."
-step "Copy the URI and put your database password in place of [YOUR-PASSWORD]."
-note "If the password has @ : / ? # or %, URL-encode it, or generate one without them."
-ask_valid DATABASE_URL "Paste the connection string:" \
-  '^postgres(ql)?://postgres\.[a-z0-9]{20}:[^@[:space:]]+@[a-z0-9.-]+\.pooler\.supabase\.com:5432/postgres$' \
-  "Expected postgres://postgres.<ref>:<password>@<region>.pooler.supabase.com:5432/postgres" secret
-write_env DATABASE_URL "$DATABASE_URL"
+step "Copy the URI as it is, with [YOUR-PASSWORD] still in it. You type the password next."
+forget_invalid DATABASE_URL "$DB_URL_RE"
+saved_url=$(_existing DATABASE_URL || true)
+keep=n
+if [[ -n "$saved_url" ]]; then
+  note "Saved: $(sed -E 's#(://[^:]+:).*@#\1•••@#' <<<"$saved_url")"
+  read -r -p "  Keep the saved connection string? [Y/n] " keep || true
+  [[ "$keep" =~ ^[Nn] ]] && keep=n || keep=y
+  DATABASE_URL="$saved_url"
+fi
+if [[ "$keep" == n ]]; then
+  while :; do
+    read -e -r -p "  ${BOLD}Paste the connection string:${RESET} " pasted || exit 1
+    trim pasted
+    problem=$(db_url_problem "$pasted")
+    [[ -z "$problem" ]] && break
+    warn "$problem"
+  done
+  while :; do
+    ask_secret DB_PASSWORD "Database password (hidden; the one from stage 3):"
+    [[ -n "$DB_PASSWORD" ]] && break
+    warn "Nothing came through. Type or paste it, then press Enter."
+  done
+  [[ "$DB_PASSWORD" == *[[:space:]]* ]] && warn "The password has a space in it. If that's a stray one from pasting, run this stage again."
+  encoded=$(jq -rn --arg p "$DB_PASSWORD" '$p | @uri')
+  [[ "$pasted" =~ ^(postgres(ql)?://[^:/@]+:).*(@[^@]+)$ ]]
+  write_env DATABASE_URL "${BASH_REMATCH[1]}${encoded}${BASH_REMATCH[3]}"
+  unset DB_PASSWORD encoded
+fi
 say "Checking the connection and the database user..."
-if roles=$(docker run --rm -e DATABASE_URL postgres:17-alpine sh -c \
+if roles=$(DATABASE_URL="$DATABASE_URL" docker run --rm -e DATABASE_URL postgres:17-alpine sh -c \
      'psql "$DATABASE_URL" -XAtc "select rolsuper, rolbypassrls, rolcreaterole from pg_roles where rolname = current_user"' 2>&1); then
   printf '  %s✓ connected%s (superuser|bypassrls|createrole = %s)\n' "$GREEN" "$RESET" "$roles"
   [[ "$roles" == *"|t" ]] || warn "This user can't create roles, so the first start can't create openpurpose_app."
