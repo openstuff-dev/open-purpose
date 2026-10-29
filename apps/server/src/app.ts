@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
+import fastifyCookie from '@fastify/cookie';
 import fastifyStatic from '@fastify/static';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type pg from 'pg';
@@ -14,6 +15,8 @@ import {
   resolveAccess,
   type Actor,
 } from './auth.js';
+import { createProvider, SignInError } from './auth/providers/index.js';
+import { RateLimiter } from './auth/rate-limit.js';
 import type { Config } from './config.js';
 import { beginScope, endScope, type Pool } from './db.js';
 import { AppError, badRequest, notFound } from './errors.js';
@@ -44,8 +47,12 @@ import { exportZip, readExportZip } from './service/transfer/markdown.js';
 import { DOC_KINDS, EDIT_MODES } from './service/types.js';
 import type {
   AuthConfig as AuthConfigDto,
+  AuthStartResult,
+  AuthStatus,
   ExportIncludes,
   ImportReport,
+  PendingSignup,
+  SignInErrorCode,
 } from '@openpurpose/contracts';
 
 export const VERSION = '0.2.0';
@@ -99,7 +106,12 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
   const app = Fastify({
     logger: { level: process.env.LOG_LEVEL ?? 'info' },
     bodyLimit: 5 * 1024 * 1024,
+    trustProxy: config.trustProxy,
   });
+  // Fails at startup on an unknown OPENPURPOSE_AUTH_PROVIDER.
+  const provider = createProvider(config.auth);
+  // Only the PKCE verifier between /api/auth/start and /api/auth/callback is a cookie.
+  await app.register(fastifyCookie);
 
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof AppError) {
@@ -227,12 +239,92 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       const open = { config: { public: true } };
 
       // signing in (no token needed)
+      const callbackUrl = `${config.publicUrl.replace(/\/+$/, '')}/api/auth/callback`;
+      const verifierCookie = {
+        name: 'op_auth_verifier',
+        options: {
+          path: '/api/auth',
+          httpOnly: true,
+          secure: config.publicUrl.startsWith('https:'),
+          sameSite: 'lax' as const,
+        },
+      };
+      // Per IP and per email, so nobody can use the magic-link sender to spam people.
+      const startsPerIp = new RateLimiter(20, 15 * 60_000);
+      const startsPerEmail = new RateLimiter(5, 15 * 60_000);
+      const needProvider = () => {
+        if (!provider)
+          throw badRequest('This server has no sign-in provider. Sign in with an access token.');
+        return provider;
+      };
+
       api.get('/auth/config', open, (): AuthConfigDto => ({
         signup: config.auth.signup,
-        // The providers arrive with the sign-in adapter; until then only tokens sign in.
-        methods: [],
+        methods: provider?.methods() ?? [],
         site_url: config.auth.siteUrl || null,
       }));
+      api.post('/auth/start', open, async (req, reply): Promise<AuthStartResult> => {
+        const p = needProvider();
+        const body = parse(
+          z.object({
+            method: z.discriminatedUnion('kind', [
+              z.object({ kind: z.literal('magic_link') }),
+              z.object({ kind: z.literal('oauth'), provider: z.string().min(1).max(50) }),
+            ]),
+            email: z.email().max(320).optional(),
+          }),
+          req.body,
+        );
+        const method = p
+          .methods()
+          .find(
+            (m) =>
+              m.kind === body.method.kind &&
+              (m.kind !== 'oauth' ||
+                (body.method.kind === 'oauth' && m.provider === body.method.provider)),
+          );
+        if (!method) throw badRequest('This server does not offer that way to sign in');
+        if (method.kind === 'magic_link' && !body.email)
+          throw badRequest('Enter your email address');
+        const email = body.email?.trim().toLowerCase();
+        if (!startsPerIp.take(`ip:${req.ip}`) || (email && !startsPerEmail.take(`email:${email}`)))
+          throw new AppError('too_many_requests', 'Too many sign-in attempts. Try again in 15 minutes.');
+        const started = await p.start({ method, email, callbackUrl });
+        if (started.verifier) {
+          reply.setCookie(verifierCookie.name, started.verifier, {
+            ...verifierCookie.options,
+            maxAge: 10 * 60,
+          });
+        }
+        return { redirect: started.redirect ?? null, email_sent: !!started.emailSent };
+      });
+      api.get('/auth/callback', open, async (req, reply) => {
+        const back = (reason: SignInErrorCode) => reply.redirect(`/sign-in?error=${reason}`);
+        if (!provider) return back('failed');
+        const verifier = req.cookies[verifierCookie.name];
+        reply.clearCookie(verifierCookie.name, verifierCookie.options);
+        let code: string;
+        try {
+          const identity = await provider.finish({
+            query: Object.fromEntries(
+              Object.entries(req.query as Record<string, unknown>).filter(
+                (e): e is [string, string] => typeof e[1] === 'string',
+              ),
+            ),
+            verifier,
+          });
+          const actorId = await signin.actorForIdentity(pool, config.auth.signup, identity);
+          code = await signin.issueAuthCode(pool, actorId);
+        } catch (err) {
+          if (err instanceof SignInError) {
+            req.log.info({ reason: err.reason }, `Sign-in refused: ${err.message}`);
+            return back(err.reason);
+          }
+          req.log.error(err);
+          return back('failed');
+        }
+        return reply.redirect(`/auth/done?code=${encodeURIComponent(code)}`);
+      });
       api.post('/auth/exchange', open, async (req) => {
         const body = parse(z.object({ code: z.string().min(1).max(200) }), req.body);
         return { token: await signin.exchangeAuthCode(pool, body.code, config.auth.sessionDays) };
@@ -240,6 +332,29 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       api.post('/auth/sign-out', server, async (req, reply) => {
         const token = bearer(req.headers.authorization);
         if (token) await signin.signOut(pool, token);
+        return reply.status(204).send();
+      });
+      // Works without a workspace, unlike /me, so a pending person sees that they're waiting.
+      api.get('/auth/status', server, async (req): Promise<AuthStatus> =>
+        signin.status(pool, req.actor),
+      );
+
+      // sign-ups waiting for a server admin
+      api.get('/signups', server, async (req): Promise<PendingSignup[]> => {
+        const q = parse(
+          z.object({ status: z.enum(['pending', 'approved', 'rejected']).default('pending') }),
+          req.query,
+        );
+        return signin.listSignups(pool, req.actor, q.status);
+      });
+      api.post('/signups/:id/approve', server, async (req) => {
+        const { id: actorId } = parse(z.object({ id }), req.params);
+        const body = parse(z.object({ workspace: z.string().min(1).max(200) }), req.body);
+        return signin.approveSignup(pool, req.actor, actorId, body.workspace);
+      });
+      api.post('/signups/:id/reject', server, async (req, reply) => {
+        const { id: actorId } = parse(z.object({ id }), req.params);
+        await signin.rejectSignup(pool, req.actor, actorId);
         return reply.status(204).send();
       });
 

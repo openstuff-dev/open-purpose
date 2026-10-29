@@ -170,6 +170,42 @@ export async function createGroup(
   },
 ): Promise<{ group: Group; organization: Organization; token?: string }> {
   requireSuperadmin(actor);
+  let token: string | undefined;
+  const adminName = input.admin_name?.trim();
+  const made = await provisionWorkspace(
+    pool,
+    adminName
+      ? async (c) => {
+        const { rows } = await c.query<{ id: string }>(
+          'INSERT INTO actors (name, kind) VALUES ($1, \'human\') RETURNING id',
+          [adminName],
+        );
+        token = await insertToken(c, rows[0].id, 'first sign-in');
+        return rows[0].id;
+      }
+      : actor.id,
+    { ...input, created_by: actor.id },
+  );
+  return { ...made, token };
+}
+
+/**
+ * A group with its first organization (named like the group unless given) and its first admin:
+ * an existing actor, or one `admin` creates in the same transaction. Server admins get one
+ * through createGroup, people who sign up through service/signin.ts.
+ */
+export async function provisionWorkspace(
+  pool: Pool,
+  admin: string | ((c: Queryable) => Promise<string>),
+  input: {
+    name: string;
+    slug?: string;
+    organization_name?: string;
+    organization_slug?: string;
+    /** Who the default documents are by. */
+    created_by: string | null;
+  },
+): Promise<{ group: Group; organization: Organization }> {
   if (!input.name.trim()) throw badRequest('name is required');
   try {
     const { rows } = await pool.query<Group>(
@@ -182,23 +218,14 @@ export async function createGroup(
         const org = await insertOrganization(
           c,
           { name: input.organization_name?.trim() || input.name, slug: input.organization_slug },
-          actor.id,
+          input.created_by,
         );
-        let token: string | undefined;
-        let adminId = actor.id;
-        if (input.admin_name?.trim()) {
-          const { rows: a } = await c.query<{ id: string }>(
-            'INSERT INTO actors (name, kind) VALUES ($1, \'human\') RETURNING id',
-            [input.admin_name.trim()],
-          );
-          adminId = a[0].id;
-          token = await insertToken(c, adminId, 'first sign-in');
-        }
+        const adminId = typeof admin === 'string' ? admin : await admin(c);
         await c.query(
           'INSERT INTO memberships (actor_id, organization_id, role) VALUES ($1, NULL, \'admin\')',
           [adminId],
         );
-        return { group, organization: org, token };
+        return { group, organization: org };
       });
     } catch (err) {
       await pool.query('DELETE FROM groups WHERE id = $1', [group.id]);
@@ -207,6 +234,20 @@ export async function createGroup(
   } catch (err) {
     throw mapPgError(err);
   }
+}
+
+/** A group slug nobody has yet, from `name`: acme, then acme-2, acme-3, … */
+export async function freeGroupSlug(pool: Pool, name: string): Promise<string> {
+  const base = (slugify(name) || 'workspace').slice(0, 56).replace(/-+$/, '');
+  const { rows } = await pool.query<{ slug: string }>(
+    'SELECT slug FROM groups WHERE slug = $1 OR slug LIKE $1 || \'-%\'',
+    [base],
+  );
+  const taken = new Set(rows.map((r) => r.slug));
+  if (!taken.has(base)) return base;
+  let n = 2;
+  while (taken.has(`${base}-${n}`)) n++;
+  return `${base}-${n}`;
 }
 
 export async function renameGroup(db: Db, a: Access, name: string): Promise<void> {

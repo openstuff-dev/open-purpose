@@ -217,8 +217,16 @@ forced on the owner instead. Either way works without configuration.
 | `OPENPURPOSE_API_REFRESH_MINUTES` | `60` | re-fetch linked API specs older than this when agents read them; `0` = only on demand |
 | `OPENPURPOSE_API_MAX_MB` | `20` | largest API spec accepted |
 | `OPENPURPOSE_IMPORT_MAX_MB` | `100` | largest export file accepted by an import |
+| `OPENPURPOSE_TRUST_PROXY` | off | behind a reverse proxy: `true`, or the proxy's addresses (`10.0.0.0/8,127.0.0.1`) |
 
 Migrations run automatically on start.
+
+Behind a reverse proxy (nginx, Caddy, Traefik, a load balancer), set
+`OPENPURPOSE_TRUST_PROXY` so the server sees each visitor's own address in
+`X-Forwarded-For`. Sign-in links are limited to 20 per address every 15 minutes;
+without this setting every visitor shares the proxy's address and that one limit.
+Leave it off when people reach the server directly: then anyone could fake the
+header.
 
 Linked API specs are fetched by the server, so it must be able to reach those URLs.
 Only editors can add a link, and only http(s) URLs without credentials are accepted;
