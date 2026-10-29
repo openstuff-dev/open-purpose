@@ -5,6 +5,7 @@ import type {
   ActivityPeriod,
   OrgActivity,
   ContextResult,
+  Counts,
   Doc,
   DocDetail,
   DocKind,
@@ -106,6 +107,7 @@ export class Api {
   rejectSignup = (id: string) => this.send<undefined>('POST', `/signups/${id}/reject`);
 
   me = () => this.get<Me>('/me');
+  counts = () => this.get<Counts>('/me/counts');
   /** Agent mode: run one read-only MCP tool as the agent and get its text exactly. */
   agentTool = (name: string, args: Record<string, unknown>) =>
     this.send<{ text: string; is_error: boolean }>('POST', '/agent/tool', { name, args });

@@ -24,6 +24,7 @@ import {
 } from '@openstuff-dev/ui-angular';
 import { positionAnchors } from '@openstuff-dev/ui';
 import { Api } from './core/api';
+import { Badges } from './core/badges';
 import { isPublicUrl } from './app.routes';
 import { type AuthStatus, ROLE_LABEL } from './core/models';
 import { Session, errorMessage } from './core/session';
@@ -34,9 +35,6 @@ import { Notices } from './shared/notice';
 import { Palette } from './shared/palette';
 import { PendingPage } from './pages/pending';
 import { SignInPage } from './pages/sign-in';
-
-/** How old /me may get before moving to another page reloads it. */
-const ME_MAX_AGE_MS = 60_000;
 
 @Component({
   selector: 'app-root',
@@ -213,7 +211,7 @@ const ME_MAX_AGE_MS = 60_000;
               <li>
                 <a routerLink="/inbox" routerLinkActive="active">
                   <app-icon name="inbox" />Inbox
-                  @if (me.pending_proposals; as n) {
+                  @if (badges.counts()?.pending_proposals; as n) {
                     <span class="count" [attr.aria-label]="n + ' waiting for review'">{{ n }}</span>
                   }
                 </a>
@@ -221,7 +219,7 @@ const ME_MAX_AGE_MS = 60_000;
               <li>
                 <a routerLink="/findings" routerLinkActive="active">
                   <app-icon name="bug" />Findings
-                  @if (me.new_findings; as n) {
+                  @if (badges.counts()?.new_findings; as n) {
                     <span class="count" [attr.aria-label]="n + ' new, not sorted yet'">{{
                       n
                     }}</span>
@@ -370,6 +368,7 @@ export class App {
   private api = inject(Api);
   private router = inject(Router);
   private switcher = inject(ContextSwitch);
+  readonly badges = inject(Badges);
   readonly theme = inject(Theme);
   readonly railOpen = signal(false);
   readonly loadError = signal('');
@@ -396,6 +395,14 @@ export class App {
       if (this.session.token()) untracked(() => void this.refreshMe());
       else this.pending.set(null);
     });
+    // New who-am-I (sign-in, a switch, a settings change): the badges count for that view now.
+    effect(() => {
+      if (this.session.me()) untracked(() => void this.badges.refresh());
+      else
+        untracked(() => {
+          this.badges.clear();
+        });
+    });
     // The agent tip is anchored in CSS; the polyfill (where needed) has to see it once it renders.
     effect(() => {
       const trigger = this.agentSwitch()?.nativeElement;
@@ -405,22 +412,16 @@ export class App {
     this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe((e) => {
       this.railOpen.set(false);
       this.publicPage.set(isPublicUrl(e.urlAfterRedirects));
-      this.refreshStaleMe();
+      this.refreshStaleBadges();
     });
     // Back on the tab after a while: pick up what others changed meanwhile.
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') this.refreshStaleMe();
+      if (document.visibilityState === 'visible') this.refreshStaleBadges();
     });
   }
 
-  /**
-   * The badges and organizations in /me change when others act, so they're refreshed while
-   * someone moves around, but at most once a minute: it's the heaviest request, and pages that
-   * change something reload it themselves.
-   */
-  private refreshStaleMe(): void {
-    if (!this.session.token() || this.publicPage()) return;
-    if (Date.now() - this.meLoadedAt > ME_MAX_AGE_MS) void this.refreshMe();
+  private refreshStaleBadges(): void {
+    if (this.session.me() && !this.publicPage()) this.badges.refreshStale();
   }
 
   onKey(ev: KeyboardEvent): void {
@@ -464,7 +465,6 @@ export class App {
     return org?.role ? `${ROLE_LABEL[org.role]}, ${org.name}` : '';
   }
 
-  private meLoadedAt = 0;
   private meLoading: Promise<void> | null = null;
 
   /** Reloads /me; calls while one is running share it. */
@@ -478,7 +478,6 @@ export class App {
   private async loadMe(): Promise<void> {
     try {
       this.session.me.set(await this.api.me());
-      this.meLoadedAt = Date.now();
       this.pending.set(null);
       this.loadError.set('');
     } catch (err) {
@@ -493,7 +492,6 @@ export class App {
         this.forgetChoices();
         try {
           this.session.me.set(await this.api.me());
-          this.meLoadedAt = Date.now();
           return;
         } catch (again) {
           err = again;

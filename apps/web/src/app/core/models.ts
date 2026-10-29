@@ -148,11 +148,15 @@ export interface Me {
     readable_organization_ids: string[];
     switchable_organization_ids: string[];
   } | null;
+  public_url: string;
+  version: string;
+}
+
+/** The sidebar badges (GET /me/counts). */
+export interface Counts {
   pending_proposals: number;
   /** New findings this person could sort. */
   new_findings: number;
-  public_url: string;
-  version: string;
 }
 
 export interface OrgRef {
