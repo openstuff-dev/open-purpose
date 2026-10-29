@@ -583,7 +583,7 @@ else
 fi
 step "Click Continue (or Next) to the public hostname (newer dashboards: Published application routes):"
 step "  Subdomain purpose, domain openstuff.app, path empty"
-step "  Service type HTTP, URL openpurpose:8080"
+step "  Service: http://openpurpose:8080 (if there is a separate type field: HTTP, URL openpurpose:8080)"
 step "Save. Cloudflare adds the DNS record for purpose.openstuff.app itself."
 pause
 
