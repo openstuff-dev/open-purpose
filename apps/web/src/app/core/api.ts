@@ -51,6 +51,7 @@ import type {
   AuthMethod,
   AuthStartResult,
   AuthStatus,
+  PendingSignup,
 } from './models';
 
 /** An export to import: parsed JSON, or a zip as base64. */
@@ -93,6 +94,16 @@ export class Api {
   signOut = () => this.send<undefined>('POST', '/auth/sign-out');
   /** Works without a workspace: tells a pending person they're waiting. */
   authStatus = () => this.get<AuthStatus>('/auth/status');
+
+  // sign-ups waiting for a server admin
+  signups = () => this.get<PendingSignup[]>('/signups', { status: 'pending' });
+  /** Gives the person a workspace of their own, with them as its admin. */
+  approveSignup = (id: string, workspace: string) =>
+    this.send<{ group: GroupRef; organization: Organization }>('POST', `/signups/${id}/approve`, {
+      workspace,
+    });
+
+  rejectSignup = (id: string) => this.send<undefined>('POST', `/signups/${id}/reject`);
 
   me = () => this.get<Me>('/me');
   /** Agent mode: run one read-only MCP tool as the agent and get its text exactly. */

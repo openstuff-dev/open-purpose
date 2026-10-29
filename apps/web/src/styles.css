@@ -2528,11 +2528,11 @@ mark {
   margin-bottom: 0;
 }
 
-.settings-body :is(app-people, app-groups) > section {
+.settings-body :is(app-people, app-groups, app-signups) > section {
   margin-bottom: 1.25rem;
 }
 
-.settings-body :is(app-people, app-groups) > section > h2 + .quiet {
+.settings-body :is(app-people, app-groups, app-signups) > section > h2 + .quiet {
   margin-top: 0.25rem;
   font-size: var(--fs-sm);
 }

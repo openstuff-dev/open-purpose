@@ -119,7 +119,7 @@ export class GroupsPage {
     void this.load();
   }
 
-  private async load(): Promise<void> {
+  async load(): Promise<void> {
     try {
       this.groups.set(await this.api.groups());
     } catch (e) {
