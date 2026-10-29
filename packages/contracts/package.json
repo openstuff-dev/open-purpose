@@ -1,6 +1,6 @@
 {
   "name": "@openpurpose/contracts",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "private": true,
   "description": "Types shared by the OpenPurpose server and web app. Declarations only.",
   "type": "module",
