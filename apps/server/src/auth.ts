@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
+import type pg from 'pg';
 import type { Pool } from './db.js';
-import { withScope } from './db.js';
+import { scopeSql, withScope } from './db.js';
 import { AppError, forbidden } from './errors.js';
 import type { Actor, GroupRef, Role } from '@openpurpose/contracts';
 
@@ -184,18 +185,21 @@ export async function actorFromToken(pool: Pool, token: string | undefined): Pro
   return { id: row.id, name: row.name, kind: row.kind, is_superadmin: row.is_superadmin };
 }
 
+/** SQL for the groups an actor belongs to (server admins: all), to share a round trip. */
+function groupsSql(c: pg.ClientBase, actor: Actor): string {
+  return actor.is_superadmin && actor.kind === 'human'
+    ? 'SELECT id, slug, name FROM groups ORDER BY name'
+    : `SELECT DISTINCT g.id, g.slug, g.name FROM memberships m JOIN groups g ON g.id = m.group_id
+        WHERE m.actor_id = ${c.escapeLiteral(actor.id)} ORDER BY g.name`;
+}
+
 /** The groups an actor belongs to (server admins: all groups). */
 export async function groupsOf(pool: Pool, actor: Actor): Promise<GroupRef[]> {
-  return withScope(pool, { groupId: null, bypass: true }, async (c) => {
-    const { rows } = await c.query<GroupRef>(
-      actor.is_superadmin && actor.kind === 'human'
-        ? 'SELECT id, slug, name FROM groups ORDER BY name'
-        : `SELECT DISTINCT g.id, g.slug, g.name FROM memberships m JOIN groups g ON g.id = m.group_id
-            WHERE m.actor_id = $1 ORDER BY g.name`,
-      actor.is_superadmin && actor.kind === 'human' ? [] : [actor.id],
-    );
-    return rows;
-  });
+  return withScope(
+    pool,
+    { groupId: null, bypass: true },
+    async (c) => (await c.query<GroupRef>(groupsSql(c, actor))).rows,
+  );
 }
 
 /**
@@ -211,7 +215,43 @@ export async function resolveAccess(
   wantGroup?: string | null,
   wantOrg?: string | null,
 ): Promise<Access> {
-  const groups = await groupsOf(pool, actor);
+  return withScope(pool, { groupId: null, bypass: true }, async (c) =>
+    accessIn(c, actor, (await c.query<GroupRef>(groupsSql(c, actor))).rows, wantGroup, wantOrg),
+  );
+}
+
+/**
+ * Open the transaction a request runs in and build its Access, in two round trips: the
+ * transaction with the actor's groups, then the switch to the chosen group with everything
+ * Access needs. The transaction stays open, scoped to that group; on an error it is closed.
+ */
+export async function beginRequest(
+  pool: Pool,
+  actor: Actor,
+  wantGroup?: string | null,
+  wantOrg?: string | null,
+): Promise<{ db: pg.PoolClient; access: Access }> {
+  const db = await pool.connect();
+  try {
+    const [, , groups] = (await db.query(
+      `BEGIN; ${scopeSql(db, { groupId: null, bypass: true })}; ${groupsSql(db, actor)}`,
+    )) as unknown as [pg.QueryResult, pg.QueryResult, pg.QueryResult<GroupRef>];
+    return { db, access: await accessIn(db, actor, groups.rows, wantGroup, wantOrg) };
+  } catch (err) {
+    await db.query('ROLLBACK').catch(() => undefined);
+    db.release();
+    throw err;
+  }
+}
+
+/** Access from `groups`, on a transaction open with `bypass`; scopes it to the chosen group. */
+async function accessIn(
+  c: pg.PoolClient,
+  actor: Actor,
+  groups: GroupRef[],
+  wantGroup?: string | null,
+  wantOrg?: string | null,
+): Promise<Access> {
   if (groups.length === 0) {
     throw new AppError(
       'forbidden',
@@ -225,17 +265,19 @@ export async function resolveAccess(
     : groups[0];
   if (!group) throw new AppError('forbidden', 'You are not a member of that workspace');
 
-  return withScope(pool, { groupId: group.id }, async (c) => {
-    const orgs = await c.query<OrgRef>(`SELECT o.id, o.slug, o.name, o.archived_at,
-              ARRAY(SELECT x.old_slug FROM slug_aliases x WHERE x.organization_id = o.id) AS aliases
-         FROM organizations o ORDER BY o.name`);
-    const memberships = await c.query<Membership>(
-      'SELECT group_id, organization_id, role FROM memberships WHERE actor_id = $1',
-      [actor.id],
-    );
-    const grants = await c.query<{ reader_org_id: string; target_org_id: string }>(
-      'SELECT reader_org_id, target_org_id FROM org_read_grants',
-    );
+  // Several statements in one query come back as one result each.
+  const [, orgs, memberships, grants] = (await c.query(`${scopeSql(c, { groupId: group.id })};
+    SELECT o.id, o.slug, o.name, o.archived_at,
+           ARRAY(SELECT x.old_slug FROM slug_aliases x WHERE x.organization_id = o.id) AS aliases
+      FROM organizations o ORDER BY o.name;
+    SELECT group_id, organization_id, role FROM memberships WHERE actor_id = ${c.escapeLiteral(actor.id)};
+    SELECT reader_org_id, target_org_id FROM org_read_grants`)) as unknown as [
+    pg.QueryResult,
+    pg.QueryResult<OrgRef>,
+    pg.QueryResult<Membership>,
+    pg.QueryResult<{ reader_org_id: string; target_org_id: string }>,
+  ];
+  {
     const grantMap = new Map<string, Set<string>>();
     for (const g of grants.rows) {
       const targets = grantMap.get(g.reader_org_id) ?? new Set<string>();
@@ -258,7 +300,7 @@ export async function resolveAccess(
     const probe = new Access(actor, group, orgs.rows, memberships.rows, grantMap, orgId);
     if (orgId && !probe.canRead(orgId)) orgId = null;
     return new Access(actor, group, orgs.rows, memberships.rows, grantMap, orgId);
-  });
+  }
 }
 
 /**

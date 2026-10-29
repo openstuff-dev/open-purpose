@@ -29,7 +29,20 @@ END $$`;
 const ready = new WeakSet<pg.PoolClient>();
 
 export function createPool(databaseUrl: string): Pool {
-  const pool = new pg.Pool({ connectionString: databaseUrl, max: 10 });
+  // Keep connections open: against a remote database (Supabase) a new one costs TCP, TLS,
+  // authentication and DROP_PRIVILEGES, about ten round trips. pg's default closes them after
+  // 10 seconds idle, so most requests paid that.
+  const pool = new pg.Pool({
+    connectionString: databaseUrl,
+    max: 10,
+    idleTimeoutMillis: 0,
+    keepAlive: true,
+  });
+  // A dropped idle connection (database restart, pooler timeout) is removed from the pool and
+  // replaced on next use; without a listener it would crash the server.
+  pool.on('error', (err) => {
+    console.warn(`Database connection dropped: ${err.message}`);
+  });
   // Every client, however it is checked out (pool.connect or pool.query), drops privileges
   // once before its first use.
   const connect = pool.connect.bind(pool) as () => Promise<pg.PoolClient>;
@@ -53,7 +66,9 @@ export function createPool(databaseUrl: string): Pool {
     });
     if (!cb) return p;
     p.then(
-      (c) => { cb(undefined, c, c.release.bind(c)); },
+      (c) => {
+        cb(undefined, c, c.release.bind(c));
+      },
       (e: unknown) => {
         cb(e as Error);
       },
@@ -106,15 +121,20 @@ export interface Scope {
   bypass?: boolean;
 }
 
+/**
+ * SQL that points row-level security at `scope` for the rest of the transaction. Literals
+ * instead of parameters, so it can share one round trip with other statements.
+ */
+export function scopeSql(client: pg.ClientBase, scope: Scope): string {
+  return `SELECT set_config('openpurpose.group_id', ${client.escapeLiteral(scope.groupId ?? '')}, true),
+    set_config('openpurpose.bypass', ${scope.bypass ? "'on'" : "''"}, true)`;
+}
+
 /** Open a transaction in which row-level security shows exactly one group. */
 export async function beginScope(pool: Pool, scope: Scope): Promise<pg.PoolClient> {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    await client.query(
-      'SELECT set_config(\'openpurpose.group_id\', $1, true), set_config(\'openpurpose.bypass\', $2, true)',
-      [scope.groupId ?? '', scope.bypass ? 'on' : ''],
-    );
+    await client.query(`BEGIN; ${scopeSql(client, scope)}`);
     return client;
   } catch (err) {
     client.release();
@@ -165,7 +185,7 @@ export async function migrate(databaseUrl: string, dir: string): Promise<string[
       try {
         // Serialise concurrent boots of several replicas.
         await client.query('SELECT pg_advisory_xact_lock(4242)');
-        await client.query('SELECT set_config(\'openpurpose.bypass\', \'on\', true)');
+        await client.query("SELECT set_config('openpurpose.bypass', 'on', true)");
         const done = await client.query('SELECT 1 FROM schema_migrations WHERE name = $1', [file]);
         if (!done.rowCount) {
           await client.query(sql);
@@ -179,7 +199,7 @@ export async function migrate(databaseUrl: string, dir: string): Promise<string[
       }
     }
     // Keep the unprivileged role's grants in step with the schema.
-    const role = await client.query('SELECT 1 FROM pg_roles WHERE rolname = \'openpurpose_app\'');
+    const role = await client.query("SELECT 1 FROM pg_roles WHERE rolname = 'openpurpose_app'");
     if (role.rowCount) {
       await client.query(`
         GRANT USAGE ON SCHEMA public TO openpurpose_app;
