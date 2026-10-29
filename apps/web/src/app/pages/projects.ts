@@ -16,6 +16,7 @@ import type { Project } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
 import { Notices } from '../shared/notice';
 import { Icon } from '../shared/icon';
+import { ListSkeleton } from '../shared/list-skeleton';
 
 @Component({
   selector: 'app-projects',
@@ -32,6 +33,7 @@ import { Icon } from '../shared/icon';
     Badge,
     Chip,
     EmptyState,
+    ListSkeleton,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -182,6 +184,8 @@ import { Icon } from '../shared/icon';
           for review.
         </os-empty-state>
       }
+    } @else {
+      <app-list-skeleton kind="project" [rows]="6" />
     }
   `,
 })

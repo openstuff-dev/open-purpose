@@ -10,11 +10,13 @@ import { Notices } from '../shared/notice';
 import { Icon } from '../shared/icon';
 import { RepoPicker } from '../shared/repo-picker';
 import { repoName, splitList } from '../shared/scope-list';
+import { PageSkeleton } from '../shared/list-skeleton';
 import { SlugRenameField } from '../shared/slug-rename';
 
 @Component({
   selector: 'app-scope',
   imports: [
+    PageSkeleton,
     Breadcrumbs,
     DocList,
     FormsModule,
@@ -166,6 +168,8 @@ import { SlugRenameField } from '../shared/slug-rename';
           emptyText="Approved learnings for this scope will appear in a Learnings document here."
         />
       </section>
+    } @else if (!failed()) {
+      <app-page-skeleton />
     }
   `,
 })
@@ -177,6 +181,7 @@ export class ScopePage {
   private router = inject(Router);
   private notices = inject(Notices);
   readonly scope = signal<ScopeDetail | null>(null);
+  readonly failed = signal(false);
   readonly editing = signal(false);
   draft = { name: '', description: '', globs: '', stacks: '' };
   readonly repos = signal<Repository[]>([]);
@@ -212,6 +217,7 @@ export class ScopePage {
     try {
       this.scope.set(await this.api.scope(id));
     } catch (e) {
+      this.failed.set(true);
       this.notices.error(e);
     }
   }

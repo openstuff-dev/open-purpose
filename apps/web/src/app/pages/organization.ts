@@ -7,7 +7,14 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Badge, Button, SegmentedControl, EmptyState, Breadcrumbs } from '@openstuff-dev/ui-angular';
+import {
+  Badge,
+  Button,
+  SegmentedControl,
+  EmptyState,
+  Breadcrumbs,
+  Skeleton,
+} from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type {
   ActivityFigure as Figure,
@@ -21,6 +28,7 @@ import { initials } from '../core/theme';
 import { ActivityFigure, StatStyleSwitch } from '../shared/activity-figure';
 import { DocList } from '../shared/doc-list';
 import { Icon } from '../shared/icon';
+import { ListSkeleton } from '../shared/list-skeleton';
 import { ScopeList } from '../shared/scope-list';
 
 const PERIOD_KEY = 'openpurpose.activityPeriod';
@@ -48,6 +56,8 @@ function readPeriod(): ActivityPeriod {
     Button,
     Badge,
     SegmentedControl,
+    Skeleton,
+    ListSkeleton,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -91,7 +101,11 @@ function readPeriod(): ActivityPeriod {
         </div>
       </header>
 
-      <section class="block activity" aria-labelledby="activity-h">
+      <section
+        class="block activity"
+        aria-labelledby="activity-h"
+        [attr.aria-busy]="!activityLoaded()"
+      >
         <div class="block-head">
           <div>
             <h2 id="activity-h">Agent activity</h2>
@@ -202,41 +216,57 @@ function readPeriod(): ActivityPeriod {
               </p>
             }
           }
+        } @else if (!activityLoaded()) {
+          <div class="os-stat-grid" aria-hidden="true">
+            @for (w of tilePlaceholders; track $index) {
+              <div class="os-stat-tile skeleton-wait">
+                <span class="os-stat-label"><os-skeleton [style.inline-size.rem]="w" /></span>
+                <span class="fig-num"
+                  ><os-skeleton [style.inline-size.rem]="3" class="skeleton-lg"
+                /></span>
+                <os-skeleton [lines]="2" class="skeleton-fill" />
+              </div>
+            }
+          </div>
         }
       </section>
 
-      @if (recent().length) {
-        <section class="block">
+      @if (org.projects) {
+        <section class="block" [attr.aria-busy]="!recentLoaded()">
           <div class="block-head">
             <div><h2>Projects</h2></div>
             <a routerLink="/projects" os-button variant="link" size="sm"
               >All {{ org.projects }} projects</a
             >
           </div>
-          <ul class="project-list">
-            @for (p of recent(); track p.id) {
-              <li>
-                <a [routerLink]="['/projects', p.id]">
-                  <span class="project-id">
-                    <span class="project-name"
-                      >{{ p.name }}
-                      @if (!p.reviewed) {
-                        <span os-badge tone="warning">Needs review</span>
-                      }
+          @if (!recentLoaded()) {
+            <app-list-skeleton kind="project" [rows]="Math.min(org.projects, 6)" />
+          } @else {
+            <ul class="project-list">
+              @for (p of recent(); track p.id) {
+                <li>
+                  <a [routerLink]="['/projects', p.id]">
+                    <span class="project-id">
+                      <span class="project-name"
+                        >{{ p.name }}
+                        @if (!p.reviewed) {
+                          <span os-badge tone="warning">Needs review</span>
+                        }
+                      </span>
+                      <code class="project-slug">{{ p.slug }}</code>
                     </span>
-                    <code class="project-slug">{{ p.slug }}</code>
-                  </span>
-                  <span class="project-summary">{{ p.summary || 'No summary yet' }}</span>
-                  <span class="project-stats">
-                    @if (p.pending_proposals) {
-                      <span class="pending">{{ p.pending_proposals }} to review</span>
-                    }
-                    <span><app-icon name="branch" [size]="12" /> {{ p.repository_count }}</span>
-                  </span>
-                </a>
-              </li>
-            }
-          </ul>
+                    <span class="project-summary">{{ p.summary || 'No summary yet' }}</span>
+                    <span class="project-stats">
+                      @if (p.pending_proposals) {
+                        <span class="pending">{{ p.pending_proposals }} to review</span>
+                      }
+                      <span><app-icon name="branch" [size]="12" /> {{ p.repository_count }}</span>
+                    </span>
+                  </a>
+                </li>
+              }
+            </ul>
+          }
         </section>
       }
 
@@ -292,6 +322,12 @@ export class OrganizationPage {
   readonly recent = signal<Project[]>([]);
   readonly style = inject(StatStyle);
   readonly activity = signal<OrgActivity | null>(null);
+  /** False until the first activity answer (or error), while the tiles show placeholders. */
+  readonly activityLoaded = signal(false);
+  readonly recentLoaded = signal(false);
+  /** Label widths of the placeholder tiles, one per real tile. */
+  readonly tilePlaceholders = [7, 7, 8.5, 8, 6, 9.5, 10];
+  readonly Math = Math;
   readonly period = signal<ActivityPeriod>(readPeriod());
   readonly periods: { value: ActivityPeriod; label: string }[] = [
     { value: '7d', label: '7 days' },
@@ -354,7 +390,8 @@ export class OrganizationPage {
         void this.api
           .orgActivity(id, period)
           .then((a) => { this.activity.set(a); })
-          .catch(() => { this.activity.set(null); });
+          .catch(() => { this.activity.set(null); })
+          .finally(() => { this.activityLoaded.set(true); });
     });
     effect(() => {
       const id = this.session.orgId();
@@ -362,7 +399,8 @@ export class OrganizationPage {
         void this.api
           .projects({ organizationId: id })
           .then((p) => { this.recent.set(p.slice(0, 6)); })
-          .catch(() => undefined);
+          .catch(() => undefined)
+          .finally(() => { this.recentLoaded.set(true); });
     });
   }
 }

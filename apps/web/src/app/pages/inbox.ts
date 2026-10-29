@@ -23,6 +23,7 @@ import {
   Field,
   IconButton,
   StatusDot,
+  Skeleton,
   type Tone, PageHeader } from '@openstuff-dev/ui-angular';
 import { DialogTitle, Drawer, SegmentedControl } from '@openstuff-dev/ui-angular';
 import { Badges } from '../core/badges';
@@ -121,6 +122,7 @@ function ago(iso: string): string {
   selector: 'app-inbox',
   imports: [
     PageHeader,
+    Skeleton,
     FormsModule,
     RouterLink,
     DatePipe,
@@ -342,6 +344,32 @@ function ago(iso: string): string {
                   }
                 </td>
               </tr>
+            } @else {
+              @for (w of placeholderRows; track $index) {
+                <tr role="row" class="skeleton-wait" aria-hidden="true">
+                  <td role="cell" class="col-change">
+                    <span class="change-cell"
+                      ><span class="kind-dot"></span
+                      ><span class="change-text"
+                        ><span class="cell-main"><os-skeleton [style.inline-size.rem]="w" /></span
+                        ><span class="os-cell-sub"
+                          ><os-skeleton [style.inline-size.rem]="w * 1.3" /></span></span
+                    ></span>
+                  </td>
+                  <td role="cell" class="col-where">
+                    <span class="cell-main"><os-skeleton [style.inline-size.rem]="6" /></span
+                    ><span class="os-cell-sub"><os-skeleton [style.inline-size.rem]="8" /></span>
+                  </td>
+                  <td role="cell" class="col-from"><os-skeleton [style.inline-size.rem]="6" /></td>
+                  <td role="cell" class="col-when">
+                    <os-skeleton [style.inline-size.rem]="3.5" />
+                  </td>
+                  <td role="cell" class="col-file"><os-skeleton [style.inline-size.rem]="7" /></td>
+                  <td role="cell" class="col-status">
+                    <os-skeleton [style.inline-size.rem]="5" />
+                  </td>
+                </tr>
+              }
             }
           }
         </tbody>
@@ -955,6 +983,8 @@ export class InboxPage {
   readonly all = signal<Proposal[]>([]);
   readonly counts = signal<ProposalCounts | null>(null);
   readonly loaded = signal(false);
+  /** Title widths of the rows that hold the table's place while it loads. */
+  readonly placeholderRows = [12, 9, 14, 10, 11];
   readonly status = signal<StatusTab>('pending');
   readonly level = signal('all');
   readonly kindFilter = signal('');
