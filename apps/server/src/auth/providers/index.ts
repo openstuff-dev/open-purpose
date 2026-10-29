@@ -4,13 +4,14 @@
  */
 import type { AuthConfig } from '../../config.js';
 import type { AuthProvider } from './provider.js';
+import { createSupabaseProvider } from './supabase.js';
 
 export type { AuthProvider, ExternalIdentity } from './provider.js';
 export { SignInError } from './provider.js';
 
 export type ProviderFactory = (config: AuthConfig) => AuthProvider;
 
-const providers = new Map<string, ProviderFactory>();
+const providers = new Map<string, ProviderFactory>([['supabase', createSupabaseProvider]]);
 
 /** Make a provider available under `id`. Tests use this for a fake one. */
 export function registerProvider(id: string, factory: ProviderFactory): void {

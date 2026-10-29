@@ -20,13 +20,19 @@ export interface AuthProvider {
   methods(): AuthMethod[];
   /**
    * Begin signing in. OAuth returns a `redirect`; a magic link sends an email. Both end on
-   * `callbackUrl`. A `verifier` (PKCE) is kept in a cookie and handed back to finish().
+   * `callbackUrl`. A `verifier` (PKCE) is kept in a cookie and handed back to finish(). A
+   * `notice` goes to the server log only, never to the visitor.
    */
   start(input: {
     method: AuthMethod;
     email?: string;
     callbackUrl: string;
-  }): Promise<{ redirect?: string; emailSent?: boolean; verifier?: string }>;
+  }): Promise<{
+    redirect?: string;
+    emailSent?: boolean;
+    verifier?: string;
+    notice?: { level: 'info' | 'warn'; message: string };
+  }>;
   /** Turn the callback's query string into an identity. Throws a SignInError when it can't. */
   finish(input: { query: Record<string, string>; verifier?: string }): Promise<ExternalIdentity>;
 }

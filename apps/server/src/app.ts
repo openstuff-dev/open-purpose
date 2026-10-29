@@ -290,6 +290,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
         if (!startsPerIp.take(`ip:${req.ip}`) || (email && !startsPerEmail.take(`email:${email}`)))
           throw new AppError('too_many_requests', 'Too many sign-in attempts. Try again in 15 minutes.');
         const started = await p.start({ method, email, callbackUrl });
+        if (started.notice) req.log[started.notice.level](started.notice.message);
         if (started.verifier) {
           reply.setCookie(verifierCookie.name, started.verifier, {
             ...verifierCookie.options,
