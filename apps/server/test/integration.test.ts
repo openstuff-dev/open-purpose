@@ -68,6 +68,13 @@ const SSH_REMOTE = 'git@ssh.dev.azure.com:v3/acme/Platform/customer-portal';
 async function resetSchema() {
   const owner = new pg.Client({ connectionString: DATABASE_URL });
   await owner.connect();
+  // Dropping the schema erases everything, so only ever do it to a test database.
+  const { rows } = await owner.query<{ name: string }>('SELECT current_database() AS name');
+  const name = rows.at(0)?.name ?? '';
+  if (!name.endsWith('_test')) {
+    await owner.end();
+    throw new Error(`Refusing to wipe "${name}": TEST_DATABASE_URL must name a *_test database`);
+  }
   await owner.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
   await owner.end();
 }
