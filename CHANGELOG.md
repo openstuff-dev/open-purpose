@@ -3,6 +3,13 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## Unreleased
+
+- Added the `openpurpose-start` skill for a guided first run in your own repository: it
+  connects the repository to a project, shows what an agent sees there and turns one rule you
+  keep repeating into your first learning. Settings › Connect an agent and the README show how
+  to install it.
+
 ## 0.3.4
 
 - Pages no longer jump in section by section while they load. The Overview, Projects, Inbox,
