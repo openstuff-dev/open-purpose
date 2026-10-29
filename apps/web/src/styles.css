@@ -4583,7 +4583,8 @@ mark {
   font-size: var(--fs-sm);
 }
 
-.transfer-source {
+.transfer-source,
+.transfer-loading {
   margin-top: 1rem;
 }
 
