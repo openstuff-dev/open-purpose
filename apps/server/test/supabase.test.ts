@@ -118,7 +118,12 @@ describe('supabase provider', () => {
   it('trades the code for the user', async () => {
     answer(200, {
       access_token: 'jwt',
-      user: { id: 'u-1', email: 'Ada@Example.com', user_metadata: { full_name: 'Ada Lovelace' } },
+      user: {
+        id: 'u-1',
+        email: 'Ada@Example.com',
+        app_metadata: { provider: 'github' },
+        user_metadata: { full_name: 'Ada Lovelace' },
+      },
     });
     const identity = await createSupabaseProvider(config).finish({
       query: { code: 'c-1' },
@@ -133,6 +138,7 @@ describe('supabase provider', () => {
       subject: 'u-1',
       email: 'ada@example.com',
       name: 'Ada Lovelace',
+      method: 'github',
     });
   });
 
@@ -169,6 +175,7 @@ describe('identityOf', () => {
       subject: 'a',
       email: null,
       name: null,
+      method: null,
     });
   });
 });

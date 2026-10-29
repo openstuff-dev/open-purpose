@@ -2512,6 +2512,7 @@ describe('sign-up and sign-in through a provider', () => {
     subject,
     name,
     email: `${subject}@example.com`,
+    method: 'email',
   });
 
   it('offers the provider\'s methods and starts a sign-in', async () => {
@@ -2574,7 +2575,12 @@ describe('sign-up and sign-in through a provider', () => {
     expect((await call('GET', '/signups', undefined, token)).status).toBe(403);
     const list = await call('GET', '/signups', undefined, ADMIN);
     const maja = list.data.find((s: any) => s.email === 'maja@example.com');
-    expect(maja).toMatchObject({ name: 'Maja Berg', provider: 'fake', signup: 'pending' });
+    expect(maja).toMatchObject({
+      name: 'Maja Berg',
+      provider: 'fake',
+      method: 'email',
+      signup: 'pending',
+    });
 
     const ok = await call('POST', `/signups/${maja.id}/approve`, { workspace: 'Berg Studio' }, ADMIN);
     expect(ok.status).toBe(200);

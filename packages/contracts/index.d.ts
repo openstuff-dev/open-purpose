@@ -96,6 +96,8 @@ export interface PendingSignup {
   email: string | null;
   /** The provider they first signed in with, e.g. 'supabase'. */
   provider: string;
+  /** How they signed in there, e.g. 'github' or 'email'; null when the provider doesn't say. */
+  method: string | null;
   signup: SignupStatus;
   signup_at: string;
 }

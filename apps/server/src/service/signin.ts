@@ -115,9 +115,9 @@ export async function actorForIdentity(
       [personName(identity), identity.email],
     );
     await c.query(
-      `INSERT INTO identities (actor_id, provider, subject, email, last_sign_in_at)
-       VALUES ($1, $2, $3, $4, now())`,
-      [actor[0].id, identity.provider, identity.subject, identity.email],
+      `INSERT INTO identities (actor_id, provider, subject, email, method, last_sign_in_at)
+       VALUES ($1, $2, $3, $4, $5, now())`,
+      [actor[0].id, identity.provider, identity.subject, identity.email, identity.method ?? null],
     );
     return { actorId: actor[0].id, created: true };
   });
@@ -151,10 +151,11 @@ export async function listSignups(
 ): Promise<PendingSignup[]> {
   requireSuperadmin(actor);
   const { rows } = await pool.query<PendingSignup>(
-    `SELECT a.id, a.name, a.email, a.signup, a.signup_at,
-            (SELECT i.provider FROM identities i WHERE i.actor_id = a.id
-              ORDER BY i.created_at LIMIT 1) AS provider
-       FROM actors a WHERE a.signup = $1 ORDER BY a.signup_at`,
+    `SELECT a.id, a.name, a.email, a.signup, a.signup_at, i.provider, i.method
+       FROM actors a
+       LEFT JOIN LATERAL (SELECT provider, method FROM identities WHERE actor_id = a.id
+                           ORDER BY created_at LIMIT 1) i ON true
+      WHERE a.signup = $1 ORDER BY a.signup_at`,
     [signup],
   );
   return rows;

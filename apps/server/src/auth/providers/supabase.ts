@@ -12,6 +12,8 @@ import { type AuthProvider, type ExternalIdentity, SignInError } from './provide
 interface SupabaseUser {
   id: string;
   email?: string | null;
+  /** `provider` is how they signed in: 'github', 'email', ... */
+  app_metadata?: Record<string, unknown>;
   user_metadata?: Record<string, unknown>;
 }
 
@@ -138,6 +140,7 @@ export function identityOf(user: SupabaseUser): ExternalIdentity {
     email: text(user.email)?.toLowerCase() ?? null,
     // GitHub fills full_name or name; user_name is the GitHub login.
     name: text(meta.full_name) ?? text(meta.name) ?? text(meta.user_name),
+    method: text(user.app_metadata?.provider),
   };
 }
 
