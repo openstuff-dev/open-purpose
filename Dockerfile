@@ -1,11 +1,10 @@
 # OpenPurpose: one image with the API, the MCP endpoint and the Angular UI.
 # The repository is one npm workspace (apps/server, apps/web, packages/contracts) with a single
-# lockfile. vendor/ holds the OpenStuff packages until they are on npm.
+# lockfile. The OpenStuff packages come from npm.
 
 FROM node:24-alpine AS manifests
 WORKDIR /app
 COPY package.json package-lock.json ./
-COPY vendor/ vendor/
 COPY packages/contracts/ packages/contracts/
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/

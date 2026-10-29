@@ -17,7 +17,7 @@
   },
   "devDependencies": {
     "@nx/eslint": "^24.0.2",
-    "@openstuff-dev/lint": "file:vendor/openstuff-dev-lint-0.0.1.tgz",
+    "@openstuff-dev/lint": "^0.1.0",
     "eslint": "^10.13.0",
     "nx": "24.0.2",
     "prettier": "^3.9.10",
