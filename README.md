@@ -202,10 +202,17 @@ DATABASE_URL=postgres://user:pass@localhost:5432/openpurpose npx nx dev server
 The server serves the built UI from `apps/web/dist/web/browser`, the API under
 `/api` and MCP at `/mcp`.
 
-If the database user is a superuser (the Docker default), OpenPurpose creates a
-`openpurpose_app` role and switches to it on every connection, because superusers
-ignore row-level security. With a non-superuser owner, row-level security is
-forced on the owner instead. Either way works without configuration.
+If the database user is a superuser (the Docker default) or has `BYPASSRLS`
+(Supabase's `postgres` user), OpenPurpose creates an `openpurpose_app` role and
+switches to it on every connection, because those users ignore row-level security.
+If it can't switch, the server refuses to start and says why. With any other
+owner, row-level security is forced on the owner instead. Either way works without
+configuration.
+
+On Supabase, use the **session pooler** connection string (port 5432 on
+`pooler.supabase.com`). The transaction pooler (port 6543) shares connections
+between clients, which breaks the per-connection role switch, and the direct
+connection is IPv6 only unless you buy the IPv4 add-on.
 
 | Variable | Default | |
 |---|---|---|
