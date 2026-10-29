@@ -3,6 +3,15 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.3.2
+
+- Made every request much faster against a remote database such as Supabase: the server keeps
+  its database connections open instead of reconnecting after 10 seconds idle, and a request
+  now runs in one transaction with 6 round trips instead of three transactions with 16
+  (about 130 ms instead of 350 ms at 20 ms per round trip).
+- Added loading states to Settings › Export and import: checking a file, updating the preview,
+  importing and preparing a download each show that something is happening.
+
 ## 0.3.1
 
 - Fixed the first start on Supabase projects with automatic RLS ("new row violates row-level

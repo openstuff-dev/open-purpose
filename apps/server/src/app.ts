@@ -7,6 +7,7 @@ import type pg from 'pg';
 import { z, ZodError } from 'zod';
 import {
   type Access,
+  beginRequest,
   actorFromToken,
   agentViewOf,
   bearer,
@@ -18,7 +19,7 @@ import {
 import { createProvider, SignInError } from './auth/providers/index.js';
 import { RateLimiter } from './auth/rate-limit.js';
 import type { Config } from './config.js';
-import { beginScope, endScope, type Pool } from './db.js';
+import { endScope, type Pool } from './db.js';
 import { AppError, badRequest, notFound } from './errors.js';
 import { callReadTool, createMcpServer } from './mcp.js';
 import * as activity from './service/activity.js';
@@ -125,12 +126,10 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
         .send({ error: err.code, message: err.message, ...err.details });
     }
     if (err instanceof ZodError) {
-      return reply
-        .status(400)
-        .send({
-          error: 'bad_request',
-          message: err.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '),
-        });
+      return reply.status(400).send({
+        error: 'bad_request',
+        message: err.issues.map((i) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; '),
+      });
     }
     const status = (err as { statusCode?: number }).statusCode;
     if (status && status < 500)
@@ -208,12 +207,15 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
         if (req.routeOptions.config.public) return;
         req.actor = await actorFromToken(pool, bearer(req.headers.authorization));
         if (req.routeOptions.config.serverLevel) return;
-        req.access = await resolveAccess(
+        // One transaction for the whole request: access is read in it, then it stays scoped to
+        // the caller's group. The close hooks below end it, also when this hook throws later.
+        ({ db: req.db, access: req.access } = await beginRequest(
           pool,
           req.actor,
           header(req, 'x-openpurpose-group'),
           header(req, 'x-openpurpose-org'),
-        );
+        ));
+        req.scopeOpen = true;
         // Agent mode: answer as an agent in the chosen organization would see it. Read-only.
         if (header(req, 'x-openpurpose-agent-view') === '1' && !req.access.isAgent) {
           if (req.method !== 'GET' && req.method !== 'HEAD' && !req.routeOptions.config.readOnly) {
@@ -225,8 +227,6 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
           req.person = req.access;
           req.access = agentViewOf(req.access);
         }
-        req.db = await beginScope(pool, { groupId: req.access.group.id });
-        req.scopeOpen = true;
       });
       const close = async (req: FastifyRequest, ok: boolean) => {
         if (!req.scopeOpen) return;
@@ -293,7 +293,10 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
           throw badRequest('Enter your email address');
         const email = body.email?.trim().toLowerCase();
         if (!startsPerIp.take(`ip:${req.ip}`) || (email && !startsPerEmail.take(`email:${email}`)))
-          throw new AppError('too_many_requests', 'Too many sign-in attempts. Try again in 15 minutes.');
+          throw new AppError(
+            'too_many_requests',
+            'Too many sign-in attempts. Try again in 15 minutes.',
+          );
         const started = await p.start({ method, email, callbackUrl });
         if (started.notice) req.log[started.notice.level](started.notice.message);
         if (started.verifier) {
@@ -1355,17 +1358,15 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       });
       api.post('/members/:id/tokens', async (req, reply) => {
         const body = parse(z.object({ label: z.string().optional() }), req.body);
-        return reply
-          .status(201)
-          .send({
-            token: await admin.issueToken(
-              req.db,
-              pool,
-              req.access,
-              (req.params as { id: string }).id,
-              body.label ?? '',
-            ),
-          });
+        return reply.status(201).send({
+          token: await admin.issueToken(
+            req.db,
+            pool,
+            req.access,
+            (req.params as { id: string }).id,
+            body.label ?? '',
+          ),
+        });
       });
       api.delete('/tokens/:id', async (req, reply) => {
         await admin.revokeToken(req.db, pool, req.access, (req.params as { id: string }).id);
