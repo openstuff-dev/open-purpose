@@ -2,25 +2,31 @@ import type { Access } from '../auth.js';
 import type { Db, Queryable } from '../db.js';
 import { tx } from '../db.js';
 import { AppError, badRequest, forbidden, notFound } from '../errors.js';
+import { slugify } from '../domain/remote.js';
+import { normalizeTags } from '../domain/stacks.js';
 import {
   applySectionChange,
   assertMode,
   checkVersion,
+  cleanGlobs,
+  createScope,
   ensureLearningsDocument,
   getDocument,
   getSection,
   insertSection,
   loadSection,
   resolveLevel,
+  type ScopeInput,
   type SectionChange,
   type SectionInput,
 } from './content.js';
-import type { EditMode, Level, Proposal, ProposalStatus, Section } from './types.js';
-import type { ProposalCounts } from '@openpurpose/contracts';
+import type { EditMode, Level, Proposal, ProposalStatus, Scope, Section } from './types.js';
+import type { ProposalCounts, ScopeSpec } from '@openpurpose/contracts';
 
 const PROPOSAL_COLS = `x.id, x.kind, x.status, x.organization_id, x.project_id, x.scope_id, x.document_id, x.section_id,
   x.base_version, x.heading, x.body, x.rationale, x.context, x.created_by, a.name AS created_by_name,
-  x.created_at, x.reviewed_by, x.reviewed_at, x.review_note, x.result_section_id, x.revision, x.updated_at`;
+  x.created_at, x.reviewed_by, x.reviewed_at, x.review_note, x.result_section_id, x.scope_spec, x.result_scope_id,
+  x.revision, x.updated_at`;
 
 export const isOpen = (status: ProposalStatus) =>
   status === 'pending' || status === 'changes_requested';
@@ -46,8 +52,8 @@ async function insertProposal(
 ): Promise<Proposal> {
   const { rows } = await c.query<{ id: string }>(
     `INSERT INTO proposals (kind, organization_id, project_id, scope_id, document_id, section_id, base_version,
-                            heading, body, rationale, context, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+                            heading, body, rationale, context, created_by, scope_spec)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
     [
       p.kind,
       p.organization_id ?? null,
@@ -61,6 +67,7 @@ async function insertProposal(
       p.rationale ?? '',
       JSON.stringify(p.context ?? {}),
       a.actor.id,
+      p.scope_spec ? JSON.stringify(p.scope_spec) : null,
     ],
   );
   const id = rows[0].id;
@@ -102,6 +109,9 @@ export interface ProposalListItem extends Proposal {
   created_by_kind: 'human' | 'agent' | null;
   reviewed_by_name: string | null;
   result_document_id: string | null;
+  /** new_scope only: the remote keys of the repositories it would be bound to. */
+  scope_repositories: string[] | null;
+  result_scope_slug: string | null;
   section_mode: EditMode | null;
   document_mode: EditMode | null;
   open_threads: number;
@@ -153,6 +163,11 @@ export async function listProposals(
             sc.name AS scope_name, d.title AS document_title, d.mode AS document_mode, s.heading AS current_heading,
             s.body AS current_body, s.version AS current_version, s.mode AS section_mode,
             rv.name AS reviewed_by_name, rs.document_id AS result_document_id,
+            CASE WHEN x.scope_spec IS NULL THEN NULL
+                 ELSE ARRAY(SELECT r.remote_key FROM repositories r
+                             WHERE r.id::text IN (SELECT jsonb_array_elements_text(x.scope_spec->'repository_ids'))
+                             ORDER BY r.remote_key) END AS scope_repositories,
+            rsc.slug AS result_scope_slug,
             (SELECT count(*)::int FROM review_threads t WHERE t.proposal_id = x.id AND t.resolved_at IS NULL) AS open_threads,
             (SELECT count(*)::int FROM review_comments rc JOIN review_threads t ON t.id = rc.thread_id WHERE t.proposal_id = x.id) AS comment_count,
             CASE WHEN x.status NOT IN ('pending', 'changes_requested') THEN NULL
@@ -168,6 +183,7 @@ export async function listProposals(
        LEFT JOIN documents d ON d.id = x.document_id
        LEFT JOIN sections s ON s.id = x.section_id
        LEFT JOIN sections rs ON rs.id = x.result_section_id
+       LEFT JOIN scopes rsc ON rsc.id = x.result_scope_id
       WHERE ($1::proposal_status IS NULL OR x.status = $1)
         AND (x.organization_id IS NULL OR x.organization_id = ANY($2::uuid[]))
         AND ($3::uuid IS NULL OR x.organization_id = $3)
@@ -382,6 +398,72 @@ export async function proposeLearning(db: Db, a: Access, input: LearningInput): 
   });
 }
 
+// ───────────────────────────── scopes ─────────────────────────────
+
+export interface ScopeProposalInput extends ScopeInput {
+  /** Why this part of the code needs its own rules. */
+  rationale?: string;
+  context?: Record<string, unknown>;
+}
+
+export type ScopeResult =
+  | { status: 'applied'; scope: Scope } |
+  { status: 'proposed'; proposal: Proposal };
+
+/**
+ * A new scope of a project, or of an organization when no project is given. Editors create it
+ * right away; agents propose it, and it's created when a person approves the proposal.
+ */
+export async function proposeScope(
+  db: Db,
+  a: Access,
+  level: { organization_id?: string | null; project_id?: string | null },
+  input: ScopeProposalInput,
+): Promise<ScopeResult> {
+  if (!input.name.trim()) throw badRequest('name is required');
+  const lv = await resolveLevel(db, level);
+  if (a.canEdit(lv.organization_id)) {
+    return { status: 'applied', scope: await createScope(db, a, lv, input) };
+  }
+  a.requireContribute(lv.organization_id);
+  const slug = input.slug?.trim() || slugify(input.name);
+  const taken = await db.query(
+    `SELECT 1 FROM scopes WHERE organization_id IS NOT DISTINCT FROM $1 AND project_id IS NOT DISTINCT FROM $2
+        AND slug = $3`,
+    [lv.organization_id, lv.project_id, slug],
+  );
+  if (taken.rowCount) {
+    throw new AppError('conflict', `There already is a scope "${slug}" here; call list_scopes`);
+  }
+  const repositoryIds = [...new Set(input.repository_ids ?? [])];
+  if (repositoryIds.length) {
+    if (!lv.project_id) throw badRequest('Only project scopes can be bound to repositories');
+    const { rowCount } = await db.query(
+      'SELECT 1 FROM repositories WHERE id = ANY($1::uuid[]) AND project_id = $2',
+      [repositoryIds, lv.project_id],
+    );
+    if (rowCount !== repositoryIds.length)
+      throw badRequest("repository_ids must be repositories of the scope's project");
+  }
+  const spec: ScopeSpec = {
+    slug,
+    path_globs: cleanGlobs(input.path_globs),
+    stacks: normalizeTags(input.stacks ?? []),
+    repository_ids: repositoryIds,
+  };
+  const proposal = await insertProposal(db, a, {
+    kind: 'new_scope',
+    organization_id: lv.organization_id,
+    project_id: lv.project_id,
+    heading: input.name.trim(),
+    body: input.description?.trim() ?? '',
+    rationale: input.rationale ?? '',
+    context: input.context ?? {},
+    scope_spec: spec,
+  });
+  return { status: 'proposed', proposal };
+}
+
 // ───────────────────────────── review ─────────────────────────────
 
 export interface ApproveInput {
@@ -402,7 +484,7 @@ export async function approveProposal(
   a: Access,
   id: string,
   input: ApproveInput = {},
-): Promise<{ proposal: Proposal; section: Section }> {
+): Promise<{ proposal: Proposal; section: Section | null; scope: Scope | null }> {
   return tx(db, async (c) => {
     const { rows } = await c.query<{ status: ProposalStatus }>(
       'SELECT status FROM proposals WHERE id = $1 FOR UPDATE',
@@ -421,7 +503,8 @@ export async function approveProposal(
       revision = await insertRevision(c, a, p, heading, body, 'Edited while approving');
     }
     const note = input.note || `Approved proposal from ${p.created_by_name ?? 'unknown'}`;
-    let section: Section;
+    let section: Section | null = null;
+    let scope: Scope | null = null;
     let level: Level = {
       organization_id: p.organization_id,
       project_id: p.project_id,
@@ -449,6 +532,30 @@ export async function approveProposal(
         a.actor.id,
         note,
       );
+    } else if (p.kind === 'new_scope') {
+      const spec = p.scope_spec;
+      // Repositories removed since the proposal was made are left out.
+      const repositoryIds = spec?.repository_ids.length
+        ? (
+            await c.query<{ id: string }>(
+              'SELECT id FROM repositories WHERE id = ANY($1::uuid[]) AND project_id = $2',
+              [spec.repository_ids, p.project_id],
+            )
+          ).rows.map((r) => r.id)
+        : undefined;
+      scope = await createScope(
+        c,
+        a,
+        { organization_id: p.organization_id, project_id: p.project_id },
+        {
+          name: heading,
+          description: body,
+          slug: spec?.slug,
+          path_globs: spec?.path_globs,
+          stacks: spec?.stacks,
+          repository_ids: repositoryIds,
+        },
+      );
     } else {
       if (input.target) level = await resolveLevel(c, input.target);
       // Filing somewhere else (e.g. promoting to the group) needs edit rights there too.
@@ -472,24 +579,25 @@ export async function approveProposal(
     await c.query(
       `UPDATE proposals SET status = 'approved', reviewed_by = $2, reviewed_at = now(), review_note = $3,
               result_section_id = $4, heading = $5, body = $6, organization_id = $7, project_id = $8, scope_id = $9,
-              document_id = COALESCE(document_id, $10)
+              document_id = COALESCE(document_id, $10), result_scope_id = $11
         WHERE id = $1`,
       [
         id,
         a.actor.id,
         input.note ?? '',
-        section.id,
+        section?.id ?? null,
         heading,
         body,
         level.organization_id,
         level.project_id,
         level.scope_id,
-        section.document_id,
+        section?.document_id ?? null,
+        scope?.id ?? null,
       ],
     );
     await c.query('UPDATE proposals SET updated_at = now() WHERE id = $1', [id]);
     await addEvent(c, a, id, 'approved', revision, input.note ?? '');
-    return { proposal: await loadProposal(c, id), section };
+    return { proposal: await loadProposal(c, id), section, scope };
   });
 }
 

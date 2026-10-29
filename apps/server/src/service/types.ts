@@ -1,4 +1,10 @@
-import type { DocKind, EditMode, ProposalKind, ProposalStatus } from '@openpurpose/contracts';
+import type {
+  DocKind,
+  EditMode,
+  ProposalKind,
+  ProposalStatus,
+  ScopeSpec,
+} from '@openpurpose/contracts';
 
 export type {
   DocKind,
@@ -128,6 +134,10 @@ export interface Proposal {
   reviewed_at: string | null;
   review_note: string;
   result_section_id: string | null;
+  /** new_scope only: slug, paths, stacks and repositories of the scope to create. */
+  scope_spec: ScopeSpec | null;
+  /** new_scope only: the scope created on approval. */
+  result_scope_id: string | null;
   revision: number;
   updated_at: string;
 }

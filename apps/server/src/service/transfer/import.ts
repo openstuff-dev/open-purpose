@@ -19,6 +19,7 @@ import type {
   EditMode,
   ExportDocument,
   ExportFile,
+  ExportProposal,
   ExportSection,
   ImportChange,
   ImportChangePolicy,
@@ -999,6 +1000,11 @@ async function apply(run: Run): Promise<void> {
   // ── proposals, with their reviews
   let skippedGroup = 0;
   let orphaned = 0;
+  // A scope proposal names repositories by their id in the file; here they have new ids.
+  const scopeSpecIn = (spec: NonNullable<ExportProposal['scope_spec']>) => ({
+    ...spec,
+    repository_ids: spec.repository_ids.flatMap((k) => ids.repos.get(k) ?? []),
+  });
   for (const p of file.proposals) {
     const orgId = orgOf(p.organization);
     if (orgId === undefined) {
@@ -1024,8 +1030,9 @@ async function apply(run: Run): Promise<void> {
     const { rows } = await c.query<{ id: string }>(
       `INSERT INTO proposals (kind, status, organization_id, project_id, scope_id, document_id, section_id, result_section_id,
                               base_version, heading, body, rationale, context, revision, created_by, created_at, updated_at,
-                              reviewed_by, reviewed_at, review_note)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING id`,
+                              reviewed_by, reviewed_at, review_note, result_scope_id, scope_spec)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+       RETURNING id`,
       [
         p.kind,
         p.status,
@@ -1047,6 +1054,8 @@ async function apply(run: Run): Promise<void> {
         actor(p.reviewed_by),
         p.reviewed_at,
         p.review_note,
+        id(ids.scopes, p.result_scope ?? null),
+        p.scope_spec ? JSON.stringify(scopeSpecIn(p.scope_spec)) : null,
       ],
     );
     const proposalId = rows[0].id;

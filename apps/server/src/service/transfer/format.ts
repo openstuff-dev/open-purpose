@@ -167,7 +167,7 @@ const fileSchema = z.object({
   proposals: z.array(
     z.object({
       key,
-      kind: z.enum(['edit_section', 'new_section', 'learning']),
+      kind: z.enum(['edit_section', 'new_section', 'learning', 'new_scope']),
       status: z.enum(['pending', 'changes_requested', 'approved', 'rejected']),
       organization: ref,
       project: ref,
@@ -175,6 +175,17 @@ const fileSchema = z.object({
       document: ref,
       section: ref,
       result_section: ref,
+      // Files from before scope proposals don't have these.
+      result_scope: ref.optional(),
+      scope_spec: z
+        .object({
+          slug: z.string(),
+          path_globs: z.array(z.string()),
+          stacks: z.array(z.string()),
+          repository_ids: z.array(z.string()),
+        })
+        .nullable()
+        .optional(),
       base_version: z.number().int().nullable(),
       heading: z.string(),
       body: z.string(),

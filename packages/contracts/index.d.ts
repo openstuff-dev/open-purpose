@@ -15,7 +15,16 @@
 export type EditMode = 'locked' | 'propose' | 'open';
 export type DocKind =
   'purpose' | 'business_logic' | 'glossary' | 'guidelines' | 'reference' | 'learnings';
-export type ProposalKind = 'edit_section' | 'new_section' | 'learning';
+export type ProposalKind = 'edit_section' | 'new_section' | 'learning' | 'new_scope';
+
+/** What a new_scope proposal creates, besides its name (heading) and description (body). */
+export interface ScopeSpec {
+  slug: string;
+  path_globs: string[];
+  stacks: string[];
+  /** Repositories of the project the scope is bound to. */
+  repository_ids: string[];
+}
 export type ProposalStatus = 'pending' | 'changes_requested' | 'approved' | 'rejected';
 export type ActorKind = 'human' | 'agent';
 export type Role = 'admin' | 'editor' | 'viewer' | 'agent';
@@ -504,6 +513,10 @@ export interface ExportProposal {
   document: string | null;
   section: string | null;
   result_section: string | null;
+  /** new_scope proposals: the scope it created. Missing in files from before scope proposals. */
+  result_scope?: string | null;
+  /** new_scope proposals: the paths, stacks and repositories it asks for. */
+  scope_spec?: ScopeSpec | null;
   base_version: number | null;
   heading: string;
   body: string;
