@@ -1509,7 +1509,7 @@ definitions:`,
 
   it('runs a pull-request style review between a person and an agent', async () => {
     const jonas = await mcp(t.jonas);
-    await jonas.call('propose_learning', {
+    const proposed = await jonas.call('propose_learning', {
       heading: "Dates are shown in the user's time zone",
       body: 'Format every date with `formatLocal()`.\nNever show UTC to customers.\nStore dates in UTC.',
       rationale: 'User saw UTC times in the booking list.',
@@ -1521,6 +1521,9 @@ definitions:`,
     );
     expect(p.revision).toBe(1);
     expect(p.awaiting).toBe('review');
+    // Agents get the short id back and can use it in every review tool.
+    const short = /\(proposal ([0-9a-f]{8})\)/.exec(proposed.text)![1];
+    expect(p.id.startsWith(short)).toBe(true);
 
     // A reviewer comments on line 2 with a suggestion, and starts a general thread.
     const line = await api('POST', `/proposals/${p.id}/comments`, {
@@ -1553,14 +1556,14 @@ definitions:`,
     const ctx = await jonas.call('get_context', { remote_url: HTTPS_REMOTE });
     expect(ctx.text).toContain('## Review feedback waiting on you');
     expect(ctx.text).toContain(p.id);
-    const reviewText = (await jonas.call('get_review', { proposal_id: p.id })).text;
+    const reviewText = (await jonas.call('get_review', { proposal_id: short })).text;
     expect(reviewText).toContain('  2 | Never show UTC to customers.');
     expect(reviewText).toContain(
       'Last verdict: changes requested by Admin: "Please answer the question."',
     );
     const suggestionId = /apply_suggestion comment_id=([0-9a-f-]{36})/.exec(reviewText)![1];
     const reply = await jonas.call('reply_to_review', {
-      proposal_id: p.id,
+      proposal_id: short,
       thread_id: general.data.id,
       body: '`formatDuration()` in the same file.',
       resolve: true,
@@ -1569,8 +1572,14 @@ definitions:`,
     expect((await jonas.call('apply_suggestion', { comment_id: suggestionId })).text).toContain(
       'revision 2',
     );
+    const unknown = await jonas.call('revise_proposal', {
+      proposal_id: '00000000',
+      note: 'x',
+      body: 'x',
+    });
+    expect(unknown).toEqual({ text: 'not_found: Proposal not found', isError: true });
     const rev = await jonas.call('revise_proposal', {
-      proposal_id: p.id,
+      proposal_id: short,
       note: 'Mention durations',
       body: 'Format every date with `formatLocal()` and durations with `formatDuration()`.\nNever show UTC to customers, wherever they are.\nStore dates in UTC.',
     });

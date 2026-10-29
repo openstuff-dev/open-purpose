@@ -91,8 +91,28 @@ async function loadProposal(db: Queryable, id: string): Promise<Proposal> {
   return rows[0];
 }
 
+/**
+ * A proposal's full id from its id or the first 8 characters of it, as tools answer with.
+ * Prefixes only match proposals the actor can read.
+ */
+export async function resolveProposalRef(db: Queryable, a: Access, ref: string): Promise<string> {
+  const r = ref.trim().toLowerCase();
+  if (/^[0-9a-f-]{36}$/.test(r)) return r;
+  if (!/^[0-9a-f-]{8,35}$/.test(r)) throw notFound('Proposal');
+  const { rows } = await db.query<{ id: string }>(
+    `SELECT id FROM proposals
+      WHERE id::text LIKE $1 || '%' AND (organization_id IS NULL OR organization_id = ANY($2::uuid[]))
+      LIMIT 2`,
+    [r, a.readableOrgIds()],
+  );
+  if (rows.length === 0) throw notFound('Proposal');
+  if (rows.length > 1)
+    throw badRequest(`Proposal id prefix "${ref}" is ambiguous; use more characters`);
+  return rows[0].id;
+}
+
 export async function getProposal(db: Queryable, a: Access, id: string): Promise<Proposal> {
-  const p = await loadProposal(db, id);
+  const p = await loadProposal(db, await resolveProposalRef(db, a, id));
   a.requireRead(p.organization_id);
   return p;
 }
@@ -216,7 +236,7 @@ export async function getProposalDetail(
   a: Access,
   id: string,
 ): Promise<ProposalListItem> {
-  const p = (await listProposals(db, a, { id })).at(0);
+  const p = (await listProposals(db, a, { id: await resolveProposalRef(db, a, id) })).at(0);
   if (!p) throw notFound('Proposal');
   return p;
 }
