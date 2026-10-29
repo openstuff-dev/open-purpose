@@ -273,7 +273,7 @@ if ! docker info >/dev/null 2>&1; then
   say "Then log out and back in, and run this wizard again."
   exit 1
 fi
-docker compose version >/dev/null 2>&1 || { warn "The compose plugin is missing (docker-compose-plugin)."; exit 1; }
+docker compose version >/dev/null 2>&1 || { warn "'docker compose' doesn't work yet. Install the compose plugin, e.g. sudo apt install docker-compose-plugin"; exit 1; }
 printf '  %s✓%s Docker %s, compose plugin, curl, jq\n' "$GREEN" "$RESET" "$(docker version -f '{{.Server.Version}}')"
 if [[ ! -f "$ENV_FILE" ]]; then
   (umask 077 && cp .env.example "$ENV_FILE")
