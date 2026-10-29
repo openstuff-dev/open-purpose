@@ -474,7 +474,7 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
     ? `**${ctx.project.name}** (\`${ctx.organization ? ctx.organization.slug + '/' : ''}${ctx.project.slug}\`, found via ${ctx.resolution.via === 'project' ? 'project name' : 'git remote'})`
     : '_none resolved_';
   out.push('');
-  if (ctx.group.shown) out.push(`- Group: **${ctx.group.name}**`);
+  if (ctx.group.shown) out.push(`- Workspace: **${ctx.group.name}**`);
   out.push(
     `- Organization: ${ctx.organization ? `**${ctx.organization.name}**` : '_none_'}`,
     `- Project: ${projectLine}`,
@@ -512,9 +512,9 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
   if (!ctx.project) {
     const wide = ctx.organization
       ? ctx.group.shown
-        ? 'group and organization'
+        ? 'workspace and organization'
         : 'organization'
-      : 'group';
+      : 'workspace';
     out.push(
       `> **No project found for this repository.** Only ${wide}-wide context is included below.`,
     );
@@ -530,7 +530,7 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
   }
 
   out.push(
-    `How to read this: general rules come first (${ctx.group.shown ? 'group, then organization' : 'organization'}), specific ones last (project, then the part of the code you are in). When two rules conflict, the more specific one wins.`,
+    `How to read this: general rules come first (${ctx.group.shown ? 'workspace, then organization' : 'organization'}), specific ones last (project, then the part of the code you are in). When two rules conflict, the more specific one wins.`,
   );
   out.push('');
   out.push(

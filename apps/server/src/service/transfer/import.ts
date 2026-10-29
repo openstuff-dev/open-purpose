@@ -153,7 +153,7 @@ export async function importContent(
     if (choice.action === 'merge') {
       const into = a.org(choice.into);
       if (!into) {
-        entry.conflict = "That organization isn't in this group.";
+        entry.conflict = "That organization isn't in this workspace.";
       } else {
         a.requireAdmin(into.id);
         entry.into = { id: into.id, name: into.name };
@@ -232,7 +232,7 @@ export async function importAsGroup(
   const slug = (opts.slug ?? file.source.group.slug).trim().toLowerCase();
   const taken = async (s: string) =>
     (await pool.query('SELECT 1 FROM groups WHERE slug = $1', [s])).rowCount
-      ? `Another group already uses "${s}".`
+      ? `Another workspace already uses "${s}".`
       : null;
   const conflict = !SLUG.test(slug) ? `"${slug}" isn't a valid slug.` : await taken(slug);
   const suggested = conflict ? await freeSlug(SLUG.test(slug) ? slug : 'group', taken) : null;
@@ -331,7 +331,7 @@ async function apply(run: Run): Promise<void> {
   };
   const placeOf = (d: ExportDocument) =>
     [
-      d.organization ? names.org.get(d.organization) : 'Group',
+      d.organization ? names.org.get(d.organization) : 'Workspace',
       id(names.project, d.project),
       id(names.scope, d.scope),
       d.title,
@@ -452,7 +452,7 @@ async function apply(run: Run): Promise<void> {
     }
   }
   if (groupRoles)
-    warn(`${groupRoles} roles in the group itself are left out; this group sets its own.`);
+    warn(`${groupRoles} roles in the workspace itself are left out; this workspace sets its own.`);
   for (const g of file.read_grants) {
     const reader = ids.orgs.get(g.reader);
     const target = ids.orgs.get(g.target);
@@ -543,7 +543,7 @@ async function apply(run: Run): Promise<void> {
       }
       if (owner) {
         warn(
-          `The repository ${r.remote_url} is already registered in this group, so it is left out of ${p.name}.`,
+          `The repository ${r.remote_url} is already registered in this workspace, so it is left out of ${p.name}.`,
         );
         continue;
       }
@@ -1163,7 +1163,7 @@ async function apply(run: Run): Promise<void> {
       skippedGroup && `${skippedGroup} proposals`,
     ];
     warn(
-      `Group-wide content is left out (${parts.filter(Boolean).join(', ')}); this group keeps its own.`,
+      `Workspace-wide content is left out (${parts.filter(Boolean).join(', ')}); this workspace keeps its own.`,
     );
   }
   if (orphaned)

@@ -11,7 +11,7 @@ const MANIFEST = 'manifest.json';
 const README = `# OpenPurpose export
 
 Every document is a Markdown file, in a folder per organization, project and scope.
-\`group/\` holds group-wide content.
+\`workspace/\` holds workspace-wide content.
 
 To import this into OpenPurpose, use Settings › Export and import. The import reads
 only \`manifest.json\`; changes to the Markdown files are not imported.
@@ -30,7 +30,7 @@ function markdownFiles(file: ExportFile): Map<string, string> {
   const out = new Map<string, string>();
   for (const d of file.documents) {
     // Documents point at keys that format.ts has checked are in the file.
-    const parts = [d.organization ? (org.get(d.organization) ?? d.organization) : 'group'];
+    const parts = [d.organization ? (org.get(d.organization) ?? d.organization) : 'workspace'];
     if (d.project) parts.push(project.get(d.project) ?? d.project);
     const s = d.scope ? scope.get(d.scope) : undefined;
     if (s) {

@@ -46,7 +46,7 @@ export const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'organization' },
       {
         path: 'group',
-        title: 'Group',
+        title: 'Workspace',
         loadComponent: () => import('./pages/group').then((m) => m.GroupPage),
       },
       {

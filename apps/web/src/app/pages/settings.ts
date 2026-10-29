@@ -130,7 +130,7 @@ organization, the project and the part of the code you are in (a repository or a
         @if (session.isSuperadmin) {
           <div class="nav-label">Server</div>
           <a routerLink="/settings/server" routerLinkActive="active"
-            ><app-icon name="server" />All groups
+            ><app-icon name="server" />All workspaces
             @if (signups.pending().length; as n) {
               <span class="count" [attr.aria-label]="n + ' sign-ups waiting'">{{ n }}</span>
             }
@@ -365,11 +365,11 @@ organization, the project and the part of the code you are in (a repository or a
           @case ('group') {
             @if (session.canAdmin(null) && session.groupShown()) {
               <section>
-                <h2>Group</h2>
+                <h2>Workspace</h2>
                 <div class="os-setting-card">
                   <div class="os-setting-row" data-inline>
                     <div class="os-setting-text">
-                      <h3>Group name</h3>
+                      <h3>Workspace name</h3>
                       <p>
                         Shown to everyone in {{ session.group()?.name }}, and to agents as the top
                         layer of their context.
@@ -380,7 +380,7 @@ organization, the project and the part of the code you are in (a repository or a
                         os-input
                         name="gname"
                         [(ngModel)]="groupName"
-                        aria-label="Group name"
+                        aria-label="Workspace name"
                         required
                       />
                       <button
@@ -579,8 +579,8 @@ organization, the project and the part of the code you are in (a repository or a
                           /></os-field>
                           <p class="quiet full">
                             With a second organization, {{ session.org()?.name }} becomes one of
-                            several in a group. The group gets its own rules that reach every
-                            organization, and a page under this name.
+                            several in a workspace. The workspace gets its own rules that reach
+                            every organization, and a page under this name.
                           </p>
                         }
                         <p class="quiet full">
@@ -619,7 +619,7 @@ organization, the project and the part of the code you are in (a repository or a
                 <p class="quiet">
                   Tick a box to let members and agents of the organization on the left read the one
                   at the top. Reading only: agents never write outside their own organization.
-                  People with a role in the group read everything.
+                  People with a role in the workspace read everything.
                 </p>
                 <div class="os-setting-card">
                   <table class="matrix">
@@ -854,7 +854,7 @@ export class SettingsPage {
     await this.run(async () => {
       await this.api.updateGroup({ name: this.groupName.trim() });
       await this.reloadMe();
-    }, 'Renamed group');
+    }, 'Renamed workspace');
   }
 
   /** An empty number input gives null or ''; both mean no limit. */

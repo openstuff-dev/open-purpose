@@ -92,7 +92,7 @@ import { ScopeList } from '../shared/scope-list';
       <section class="block">
         <div class="block-head">
           <div>
-            <h2>Group documents</h2>
+            <h2>Workspace documents</h2>
             <p class="quiet">
               Purpose, rules and glossary that hold in every organization: security, privacy, legal,
               shared terms.
@@ -102,14 +102,14 @@ import { ScopeList } from '../shared/scope-list';
         <app-doc-list
           [organizationId]="null"
           [canEdit]="g.can_edit"
-          emptyTitle="No group documents yet"
+          emptyTitle="No workspace documents yet"
         />
       </section>
 
       <section class="block">
         <div class="block-head">
           <div>
-            <h2>Group-wide scopes</h2>
+            <h2>Workspace-wide scopes</h2>
             <p class="quiet">
               Rules for a kind of code in every organization, such as all .NET services. Matched by
               stack tags or paths.
@@ -119,7 +119,7 @@ import { ScopeList } from '../shared/scope-list';
         <app-scope-list
           [organizationId]="null"
           [canEdit]="g.can_edit"
-          emptyTitle="No group-wide scopes yet"
+          emptyTitle="No workspace-wide scopes yet"
           emptyText="A typical first one is “.NET services” with the stack tag dotnet."
         />
       </section>

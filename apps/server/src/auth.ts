@@ -115,7 +115,7 @@ export class Access {
     if (!this.canRead(orgId)) {
       const org = this.org(orgId);
       throw forbidden(
-        `You don't have access to ${org ? `the ${org.name} organization` : what}. Ask a group admin for read access.`,
+        `You don't have access to ${org ? `the ${org.name} organization` : what}. Ask a workspace admin for read access.`,
       );
     }
   }
@@ -134,7 +134,7 @@ export class Access {
     if (!this.canContribute(orgId)) {
       if (this.isAgent)
         throw forbidden(
-          'Agents can only write to their own organization and to group-wide content',
+          'Agents can only write to their own organization and to workspace-wide content',
         );
       throw forbidden(`Viewers are read-only in ${this.levelName(orgId)}`);
     }
@@ -216,14 +216,14 @@ export async function resolveAccess(
     throw new AppError(
       'forbidden',
       actor.is_superadmin
-        ? 'There are no groups yet. Create one first.'
-        : 'You are not a member of any group yet. Ask an admin to add you.',
+        ? 'There are no workspaces yet. Create one first.'
+        : 'You are not a member of any workspace yet. Ask an admin to add you.',
     );
   }
   const group = wantGroup
     ? groups.find((g) => g.id === wantGroup || g.slug === wantGroup.toLowerCase())
     : groups[0];
-  if (!group) throw new AppError('forbidden', 'You are not a member of that group');
+  if (!group) throw new AppError('forbidden', 'You are not a member of that workspace');
 
   return withScope(pool, { groupId: group.id }, async (c) => {
     const orgs = await c.query<OrgRef>(`SELECT o.id, o.slug, o.name, o.archived_at,

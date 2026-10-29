@@ -496,7 +496,7 @@ export class DocumentPage {
     if (d.project) return `All of ${d.project.name}`;
     return org
       ? `Every project in ${org}`
-      : `Every organization in ${this.session.group()?.name ?? 'the group'}`;
+      : `Every organization in ${this.session.group()?.name ?? 'the workspace'}`;
   });
 
   constructor() {

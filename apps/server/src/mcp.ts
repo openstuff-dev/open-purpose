@@ -56,7 +56,7 @@ const AUTO_APPROVED =
   'An admin lets you skip review, so it reaches other agents now. Tell the user in one line.';
 
 export const SERVER_INSTRUCTIONS = `OpenPurpose holds shared context: purpose, business logic, glossary, engineering
-guidelines and learnings. It is layered: your organization (and, in large companies, the group of
+guidelines and learnings. It is layered: your organization (and, in large companies, the workspace of
 organizations around it), the project, and the part of the project you work in: some of its
 repositories or folders (e.g. only the Angular frontend). Your token belongs to one organization; other
 organizations' content is private unless your organization was given read access.
@@ -253,7 +253,7 @@ export function createMcpServer(
     {
       title: 'Get context',
       description:
-        'Get the group, organization, project and scope-specific guidelines that apply to the code you are about to work on. Call this before starting a task. ' +
+        'Get the workspace, organization, project and scope-specific guidelines that apply to the code you are about to work on. Call this before starting a task. ' +
         "Over the organization's size budget, the most general sections are shortened to their first sentence; read_section gives the full text.",
       inputSchema: {
         ...locate,
@@ -326,7 +326,7 @@ export function createMcpServer(
     'list_organizations',
     {
       title: 'List organizations',
-      description: 'Organizations in your group and whether you can read them.',
+      description: 'Organizations in your workspace and whether you can read them.',
       inputSchema: {},
     },
     () =>
@@ -378,12 +378,12 @@ export function createMcpServer(
     {
       title: 'List scopes',
       description:
-        'List the scopes (parts of a project: some of its repositories and/or folders; or stacks across the organization or group) that guidelines and learnings can be filed under.',
+        'List the scopes (parts of a project: some of its repositories and/or folders; or stacks across the organization or workspace) that guidelines and learnings can be filed under.',
       inputSchema: {
         project: z
           .string()
           .optional()
-          .describe('Project slug. Omit for group and organization scopes only.'),
+          .describe('Project slug. Omit for workspace and organization scopes only.'),
       },
     },
     ({ project }) =>
@@ -555,7 +555,7 @@ export function createMcpServer(
         project: z
           .string()
           .optional()
-          .describe('Limit to this project plus its organization and group-wide content'),
+          .describe('Limit to this project plus its organization and workspace-wide content'),
       },
     },
     ({ query, project }) =>
@@ -610,7 +610,7 @@ export function createMcpServer(
     {
       title: 'Update section',
       description:
-        'Change a section in your organization or a group-wide one. "open" sections change immediately; "propose" sections create a proposal for a person to review; "locked" sections are refused. Send the complete new body, not a diff.',
+        'Change a section in your organization or a workspace-wide one. "open" sections change immediately; "propose" sections create a proposal for a person to review; "locked" sections are refused. Send the complete new body, not a diff.',
       inputSchema: {
         section_id: z.string(),
         body: z.string().describe('The complete new markdown body'),
@@ -683,7 +683,7 @@ export function createMcpServer(
     {
       title: 'Propose learning',
       description:
-        'Record something the user taught you so every agent gets it next time. It is filed under the most specific matching scope (e.g. only the Angular frontend of this project), and a person approves it first; they can also promote it to the whole organization or group. Pass the same remote_url/path/manifests you used for get_context.',
+        'Record something the user taught you so every agent gets it next time. It is filed under the most specific matching scope (e.g. only the Angular frontend of this project), and a person approves it first; they can also promote it to the whole organization or workspace. Pass the same remote_url/path/manifests you used for get_context.',
       inputSchema: {
         heading: z
           .string()
@@ -705,7 +705,7 @@ export function createMcpServer(
           .enum(['auto', 'project', 'organization', 'group'])
           .optional()
           .describe(
-            'auto (default): most specific scope. project: whole project. organization: your whole organization. group: every organization (a reviewer must agree).',
+            'auto (default): most specific scope. project: whole project. organization: your whole organization. group: the whole workspace, every organization (a reviewer must agree).',
           ),
       },
     },

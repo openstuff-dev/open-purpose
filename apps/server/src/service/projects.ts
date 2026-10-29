@@ -362,7 +362,7 @@ export async function resolveProject(
       if (!a.canRead(rows[0].organization_id)) {
         throw new AppError(
           'forbidden',
-          `This repository belongs to a project in ${a.org(rows[0].organization_id)?.name}, which you can't read. Ask a group admin for read access.`,
+          `This repository belongs to a project in ${a.org(rows[0].organization_id)?.name}, which you can't read. Ask a workspace admin for read access.`,
         );
       }
       return { project: rows[0], via: 'remote', remote, renamed: null, suggestions: [] };

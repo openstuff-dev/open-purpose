@@ -325,9 +325,9 @@ export class MapPage implements AfterViewInit, OnDestroy {
   typeLabel(n: GraphNode): string {
     const where = n.organization_id
       ? this.session.orgName(n.organization_id)
-      : (this.session.group()?.name ?? 'the group');
+      : (this.session.group()?.name ?? 'the workspace');
     return {
-      group: 'Group',
+      group: 'Workspace',
       organization: 'Organization',
       project: `Project in ${where}`,
       term: `Term in ${where}`,

@@ -144,12 +144,12 @@ const REVIEW_OPTIONS: { value: AgentReview; label: string; hint: string }[] = [
         <p class="quiet full">
           @if (kind === 'agent') {
             One agent per developer and tool makes history readable: you see whose agent proposed
-            what. It can read the group, its own organization and organizations shared with it, and
-            write only to its own.
+            what. It can read the workspace, its own organization and organizations shared with it,
+            and write only to its own.
           } @else {
             Editors change rules and review the inbox; viewers read; admins also manage people. A
-            role in the group reaches every organization: admins administer all of them, editors and
-            viewers read all of them and edit group-wide rules.
+            role in the workspace reaches every organization: admins administer all of them, editors
+            and viewers read all of them and edit workspace-wide rules.
           }
         </p>
         <div class="form-actions full">
@@ -367,7 +367,7 @@ const REVIEW_OPTIONS: { value: AgentReview; label: string; hint: string }[] = [
           <div os-dialog-body class="permissions">
             <p class="quiet">
               What {{ m.name }} may do in {{ agentOrgName(m) }} without a person's review. Locked
-              sections stay locked, and group-wide changes always wait for a group editor.
+              sections stay locked, and workspace-wide changes always wait for a workspace editor.
             </p>
             <fieldset os-fieldset>
               <legend class="os-label">Changes this agent makes</legend>

@@ -20,8 +20,8 @@ import { Notices } from './notice';
 import { splitList } from './scope-list';
 
 const LAYER: Record<string, string> = {
-  group: 'Group',
-  'group-scope': 'Group scope',
+  group: 'Workspace',
+  'group-scope': 'Workspace scope',
   organization: 'Organization',
   'organization-scope': 'Organization scope',
   project: 'Project',

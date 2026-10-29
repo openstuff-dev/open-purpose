@@ -131,7 +131,7 @@ const TABS: Tab[] = [
         @if (session.groupShown()) {
           <li>
             <a routerLink="/group"
-              ><span class="lp-kind">Group</span
+              ><span class="lp-kind">Workspace</span
               ><span class="lp-name">{{ session.group()?.name }}</span></a
             >
           </li>

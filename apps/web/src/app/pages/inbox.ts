@@ -1390,7 +1390,7 @@ export class InboxPage {
 
   /** Every place this reviewer may file the learning, narrowest first. */
   private async targetsFor(p: Proposal): Promise<Target[]> {
-    const group = this.session.group()?.name ?? 'Group';
+    const group = this.session.group()?.name ?? 'Workspace';
     const targets: Target[] = [];
     const orgId = p.organization_id;
     if (orgId && this.session.canEdit(orgId)) {
