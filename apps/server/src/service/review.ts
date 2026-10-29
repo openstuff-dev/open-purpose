@@ -14,6 +14,7 @@ import {
   getProposal,
   insertRevision,
   isOpen,
+  resolveProposalRef,
 } from './proposals.js';
 import type { Proposal } from './types.js';
 import type {
@@ -282,11 +283,10 @@ export async function reviseProposal(
   input: ReviseInput,
 ): Promise<Proposal> {
   return tx(db, async (c) => {
-    const { rows } = await c.query('SELECT 1 FROM proposals WHERE id = $1 FOR UPDATE', [
-      proposalId,
-    ]);
+    const id = await resolveProposalRef(c, a, proposalId);
+    const { rows } = await c.query('SELECT 1 FROM proposals WHERE id = $1 FOR UPDATE', [id]);
     if (!rows[0]) throw notFound('Proposal');
-    const p = await openProposal(c, a, proposalId);
+    const p = await openProposal(c, a, id);
     if (!isOpen(p.status)) throw new AppError('conflict', `Proposal is already ${p.status}`);
     if (!canRevise(a, p)) throw forbidden('Only the author or a reviewer can revise this proposal');
     const heading = input.heading?.trim() || p.heading;

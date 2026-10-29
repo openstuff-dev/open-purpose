@@ -1081,7 +1081,9 @@ export function createMcpServer(
       title: 'Get review',
       description:
         "Read the review of a proposal: current text with line numbers, open comment threads, suggested replacements and the reviewers' verdict.",
-      inputSchema: { proposal_id: z.string().describe('Proposal id') },
+      inputSchema: {
+        proposal_id: z.string().describe('Proposal id, or its first 8 characters'),
+      },
     },
     ({ proposal_id }) =>
       run('get_review', async (db) => {
@@ -1097,7 +1099,7 @@ export function createMcpServer(
       description:
         'Answer a review thread (thread_id), or start a new comment on lines of the current text (line_start/line_end) or on the whole proposal. Use this to explain, ask the reviewer something, or say what you changed.',
       inputSchema: {
-        proposal_id: z.string(),
+        proposal_id: z.string().describe('Proposal id, or its first 8 characters'),
         body: z.string().describe('Your reply, in markdown'),
         thread_id: z.string().optional().describe('Thread to answer; omit to start a new thread'),
         line_start: z
@@ -1129,7 +1131,7 @@ export function createMcpServer(
       description:
         'Replace the proposed text with a new revision after review feedback. Send the complete new text. If changes were requested, this hands it back to the reviewers.',
       inputSchema: {
-        proposal_id: z.string(),
+        proposal_id: z.string().describe('Proposal id, or its first 8 characters'),
         body: z.string().describe('The complete new text'),
         heading: z.string().optional(),
         note: z.string().describe('What you changed and why, shown in the review timeline'),
