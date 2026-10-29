@@ -526,7 +526,8 @@ stage "Cloudflare: the tunnel"
 open_url "https://one.dash.cloudflare.com/"
 step "Networks › Tunnels › Create a tunnel › Cloudflared. Name: openpurpose-home."
 step "On the install page, copy the token: the long eyJ... string after --token."
-step "Don't run the install command: cloudflared runs in the stack here."
+step "Don't run the install command: cloudflared runs in the stack here, and the next stage"
+step "starts it. Continue stays greyed out until then."
 ask_valid TUNNEL_TOKEN "Paste the tunnel token:" '^eyJ[A-Za-z0-9_=-]+$' \
   "The token is the eyJ... string, without 'cloudflared service install'" secret
 write_env TUNNEL_TOKEN "$TUNNEL_TOKEN"
@@ -534,7 +535,21 @@ pause
 
 # ── 13 ────────────────────────────────────────────────────────────────────
 stage "Cloudflare: the address"
-step "Click Next to the public hostname (newer dashboards: Published application routes):"
+say "Starting the tunnel connector alone (not the app yet), so Cloudflare sees it online..."
+if docker compose up -d --no-deps cloudflared >/dev/null 2>&1; then
+  for _ in $(seq 30); do
+    docker compose logs cloudflared 2>&1 | grep -q 'Registered tunnel connection' && break
+    sleep 2
+  done
+  if docker compose logs cloudflared 2>&1 | grep -q 'Registered tunnel connection'; then
+    printf '  %s✓ connected%s: the dashboard shows the connector, and Continue works\n' "$GREEN" "$RESET"
+  else
+    warn "Not connected yet. Check: docker compose logs cloudflared"
+  fi
+else
+  warn "Couldn't start cloudflared. Check: docker compose logs cloudflared"
+fi
+step "Click Continue (or Next) to the public hostname (newer dashboards: Published application routes):"
 step "  Subdomain purpose, domain openstuff.app, path empty"
 step "  Service type HTTP, URL openpurpose:8080"
 step "Save. Cloudflare adds the DNS record for purpose.openstuff.app itself."
