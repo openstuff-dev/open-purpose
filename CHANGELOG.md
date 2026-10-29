@@ -3,6 +3,14 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.3.3
+
+- The web app now loads who-am-I (`/api/me`, the heaviest request) only at startup and when you
+  change something (switching, settings, import), instead of on every page change. The Inbox
+  and Findings badges come from the new, small `GET /api/me/counts`, refreshed at most every
+  30 seconds while you move around and right after you decide on a proposal or sort a finding.
+  `pending_proposals` and `new_findings` are no longer part of `/api/me`.
+
 ## 0.3.2
 
 - Made every request much faster against a remote database such as Supabase: the server keeps
