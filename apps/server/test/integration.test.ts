@@ -7,6 +7,8 @@ import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 import { createPool, migrate, withScope, type Pool } from '../src/db.js';
 import { bootstrap } from '../src/service/admin.js';
+import { createSession, issueAuthCode } from '../src/service/signin.js';
+import { hashToken } from '../src/auth.js';
 import { createServer } from 'node:http';
 import { BILLING_SWAGGER_YAML, ORDER_API } from '../src/demo-specs.js';
 
@@ -2346,6 +2348,81 @@ function comparable(file: any): unknown {
     people: people.map(({ memberships: _____, ...p }: any) => p),
   });
 }
+
+describe('browser sessions', () => {
+  let adminId = '';
+  const days = 30;
+
+  beforeAll(async () => {
+    adminId = (await api('GET', '/me')).data.actor.id;
+  });
+
+  it('serves the sign-in config without a token', async () => {
+    const res = await fetch(`${base}/api/auth/config`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ signup: 'off', methods: [], site_url: null });
+  });
+
+  it('swaps a one-time code for a session, once', async () => {
+    const code = await issueAuthCode(pool, adminId);
+    const first = await api('POST', '/auth/exchange', { code }, { token: '' });
+    expect(first.status).toBe(200);
+    expect((await api('GET', '/me', undefined, { token: first.data.token })).data.actor.id).toBe(
+      adminId,
+    );
+    expect((await api('POST', '/auth/exchange', { code }, { token: '' })).status).toBe(401);
+  });
+
+  it('refuses a code after 60 seconds', async () => {
+    const code = await issueAuthCode(pool, adminId);
+    await pool.query("UPDATE auth_codes SET expires_at = now() - interval '1 second'");
+    expect((await api('POST', '/auth/exchange', { code }, { token: '' })).status).toBe(401);
+  });
+
+  it('refuses an expired session', async () => {
+    const token = await createSession(pool, adminId, days);
+    expect((await api('GET', '/me', undefined, { token })).status).toBe(200);
+    await pool.query(
+      "UPDATE api_tokens SET expires_at = now() - interval '1 second' WHERE token_hash = $1",
+      [hashToken(token)],
+    );
+    expect((await api('GET', '/me', undefined, { token })).status).toBe(401);
+  });
+
+  it('signs out by revoking the session only', async () => {
+    const token = await createSession(pool, adminId, days);
+    expect((await api('POST', '/auth/sign-out', undefined, { token })).status).toBe(204);
+    expect((await api('GET', '/me', undefined, { token })).status).toBe(401);
+    // Signing out with an API token leaves the token working.
+    expect((await api('POST', '/auth/sign-out')).status).toBe(204);
+    expect((await api('GET', '/me')).status).toBe(200);
+  });
+
+  it('leaves sessions out of token lists', async () => {
+    await createSession(pool, adminId, days);
+    const mine = await api('GET', '/me/tokens');
+    expect(mine.data.length).toBeGreaterThan(0);
+    expect(mine.data.every((x: any) => x.label !== 'browser session')).toBe(true);
+    const members = await api('GET', '/members');
+    const me = members.data.find((m: any) => m.id === adminId);
+    expect(me.tokens.every((x: any) => x.label !== 'browser session')).toBe(true);
+  });
+
+  it('checks the sign-in settings at startup', () => {
+    expect(loadConfig({}).auth).toMatchObject({ provider: '', signup: 'off', sessionDays: 30 });
+    expect(() => loadConfig({ OPENPURPOSE_SIGNUP: 'maybe' })).toThrow(/OPENPURPOSE_SIGNUP/);
+    expect(() => loadConfig({ OPENPURPOSE_AUTH_PROVIDER: 'supabase' })).toThrow(
+      /OPENPURPOSE_PUBLIC_URL/,
+    );
+    expect(
+      loadConfig({
+        OPENPURPOSE_AUTH_PROVIDER: 'supabase',
+        OPENPURPOSE_PUBLIC_URL: 'https://purpose.example.com',
+        OPENPURPOSE_SIGNUP: 'approval',
+      }).auth,
+    ).toMatchObject({ provider: 'supabase', signup: 'approval' });
+  });
+});
 
 describe('upgrade from v1', () => {
   it('moves a v1 database into one group and organization', async () => {

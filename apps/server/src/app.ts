@@ -35,13 +35,18 @@ import * as projects from './service/projects.js';
 import * as proposals from './service/proposals.js';
 import * as findings from './service/findings.js';
 import * as review from './service/review.js';
+import * as signin from './service/signin.js';
 import { deleteAlias, listAliases } from './service/aliases.js';
 import { renameSlug } from './service/slugs.js';
 import { DEFAULT_INCLUDES, exportContent } from './service/transfer/export.js';
 import { importAsGroup, importContent } from './service/transfer/import.js';
 import { exportZip, readExportZip } from './service/transfer/markdown.js';
 import { DOC_KINDS, EDIT_MODES } from './service/types.js';
-import type { ExportIncludes, ImportReport } from '@openpurpose/contracts';
+import type {
+  AuthConfig as AuthConfigDto,
+  ExportIncludes,
+  ImportReport,
+} from '@openpurpose/contracts';
 
 export const VERSION = '0.2.0';
 
@@ -59,6 +64,8 @@ declare module 'fastify' {
     serverLevel?: boolean;
     /** A POST that only reads (e.g. /context takes a body), so agent mode allows it. */
     readOnly?: boolean;
+    /** Needs no token at all (the sign-in routes). */
+    public?: boolean;
   }
 }
 
@@ -181,6 +188,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       // Every group-level request runs in one transaction that row-level security scopes to the
       // caller's group.
       api.addHook('preHandler', async (req) => {
+        if (req.routeOptions.config.public) return;
         req.actor = await actorFromToken(pool, bearer(req.headers.authorization));
         if (req.routeOptions.config.serverLevel) return;
         req.access = await resolveAccess(
@@ -216,6 +224,24 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       api.addHook('onRequestAbort', async (req) => close(req, false));
 
       const server = { config: { serverLevel: true } };
+      const open = { config: { public: true } };
+
+      // signing in (no token needed)
+      api.get('/auth/config', open, (): AuthConfigDto => ({
+        signup: config.auth.signup,
+        // The providers arrive with the sign-in adapter; until then only tokens sign in.
+        methods: [],
+        site_url: config.auth.siteUrl || null,
+      }));
+      api.post('/auth/exchange', open, async (req) => {
+        const body = parse(z.object({ code: z.string().min(1).max(200) }), req.body);
+        return { token: await signin.exchangeAuthCode(pool, body.code, config.auth.sessionDays) };
+      });
+      api.post('/auth/sign-out', server, async (req, reply) => {
+        const token = bearer(req.headers.authorization);
+        if (token) await signin.signOut(pool, token);
+        return reply.status(204).send();
+      });
 
       // who am I
       api.get('/me', async (req) => {

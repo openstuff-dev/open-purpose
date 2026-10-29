@@ -171,7 +171,8 @@ export async function actorFromToken(pool: Pool, token: string | undefined): Pro
   const { rows } = await pool.query<Actor & { token_id: string }>(
     `SELECT a.id, a.name, a.kind, a.is_superadmin, t.id AS token_id
        FROM api_tokens t JOIN actors a ON a.id = t.actor_id
-      WHERE t.token_hash = $1 AND t.revoked_at IS NULL AND a.disabled_at IS NULL`,
+      WHERE t.token_hash = $1 AND t.revoked_at IS NULL AND a.disabled_at IS NULL
+        AND (t.expires_at IS NULL OR t.expires_at > now())`,
     [hashToken(token)],
   );
   const row = rows.at(0);
