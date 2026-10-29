@@ -218,6 +218,11 @@ forced on the owner instead. Either way works without configuration.
 | `OPENPURPOSE_API_MAX_MB` | `20` | largest API spec accepted |
 | `OPENPURPOSE_IMPORT_MAX_MB` | `100` | largest export file accepted by an import |
 | `OPENPURPOSE_TRUST_PROXY` | off | behind a reverse proxy: `true`, or the proxy's addresses (`10.0.0.0/8,127.0.0.1`) |
+| `OPENPURPOSE_AUTH_PROVIDER` | empty | `supabase` for sign-in by email link and GitHub; empty = access tokens only. See [Sign-up and sign-in](#sign-up-and-sign-in) |
+| `OPENPURPOSE_SIGNUP` | `off` | `off`, `approval` or `open` |
+| `OPENPURPOSE_SUPABASE_URL`, `OPENPURPOSE_SUPABASE_KEY` | empty | the Supabase project URL and its publishable key |
+| `OPENPURPOSE_SITE_URL` | empty | your public website, linked from the sign-in page |
+| `OPENPURPOSE_SESSION_DAYS` | `30` | how long a browser stays signed in |
 
 Migrations run automatically on start.
 
@@ -232,6 +237,44 @@ Linked API specs are fetched by the server, so it must be able to reach those UR
 Only editors can add a link, and only http(s) URLs without credentials are accepted;
 if the server sits next to things editors shouldn't be able to probe, set
 `OPENPURPOSE_API_FETCH=off` and upload spec files instead.
+
+### Sign-up and sign-in
+
+Out of the box, people and agents sign in with access tokens. To let people sign
+in with an email link or GitHub, and sign up on their own, connect a
+[Supabase](https://supabase.com) project:
+
+1. In Supabase, open **Authentication → Sign In / Providers**. Email is on by
+   default. To offer GitHub, turn it on there and paste the client ID and secret of a
+   GitHub OAuth app whose callback URL is `https://<project>.supabase.co/auth/v1/callback`.
+2. Under **Authentication → URL Configuration**, add
+   `<OPENPURPOSE_PUBLIC_URL>/api/auth/callback` to the redirect URLs, e.g.
+   `https://purpose.example.com/api/auth/callback`.
+3. Copy the project URL and the publishable key from **Project Settings → API Keys**, and set:
+
+```bash
+OPENPURPOSE_AUTH_PROVIDER=supabase
+OPENPURPOSE_SUPABASE_URL=https://<project>.supabase.co
+OPENPURPOSE_SUPABASE_KEY=sb_publishable_...
+OPENPURPOSE_PUBLIC_URL=https://purpose.example.com   # required with a provider
+OPENPURPOSE_SIGNUP=approval
+```
+
+`OPENPURPOSE_SIGNUP` decides what happens to someone who isn't known yet:
+
+| Value | |
+|---|---|
+| `off` (default) | they can't get in. Only people who signed in this way before can |
+| `approval` | they wait until a server admin approves them under **Settings → Server**; approving gives them their own workspace |
+| `open` | they get their own workspace right away |
+
+To go from approval to open, change `OPENPURPOSE_SIGNUP` to `open` and restart.
+People who are already waiting stay on the list until you approve them.
+
+Sign-in links work only in the browser that asked for them. Access tokens keep
+working next to a provider, for people and for agents. Behind a reverse proxy, set
+[`OPENPURPOSE_TRUST_PROXY`](#without-docker) too, so the limit on sign-in emails
+counts each visitor on their own.
 
 ## Connect an agent
 
@@ -302,7 +345,7 @@ ESLint and Stylelint.
 
 ## Not in this version
 
-- Sign-in through Entra ID / OIDC (tokens only for now)
+- Sign-in through Entra ID / OIDC (Supabase is the only sign-in provider for now)
 - Notifications when something lands in the inbox
 - Importing edited Markdown (exports include a Markdown copy, but imports read only its `manifest.json`)
 - Tracking which tasks agents are working on right now, and sending findings to issue trackers
