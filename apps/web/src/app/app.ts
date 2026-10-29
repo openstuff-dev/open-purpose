@@ -35,6 +35,9 @@ import { Palette } from './shared/palette';
 import { PendingPage } from './pages/pending';
 import { SignInPage } from './pages/sign-in';
 
+/** How old /me may get before moving to another page reloads it. */
+const ME_MAX_AGE_MS = 60_000;
+
 @Component({
   selector: 'app-root',
   imports: [
@@ -402,8 +405,22 @@ export class App {
     this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe((e) => {
       this.railOpen.set(false);
       this.publicPage.set(isPublicUrl(e.urlAfterRedirects));
-      if (this.session.token() && !this.publicPage()) void this.refreshMe();
+      this.refreshStaleMe();
     });
+    // Back on the tab after a while: pick up what others changed meanwhile.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') this.refreshStaleMe();
+    });
+  }
+
+  /**
+   * The badges and organizations in /me change when others act, so they're refreshed while
+   * someone moves around, but at most once a minute: it's the heaviest request, and pages that
+   * change something reload it themselves.
+   */
+  private refreshStaleMe(): void {
+    if (!this.session.token() || this.publicPage()) return;
+    if (Date.now() - this.meLoadedAt > ME_MAX_AGE_MS) void this.refreshMe();
   }
 
   onKey(ev: KeyboardEvent): void {
@@ -447,9 +464,21 @@ export class App {
     return org?.role ? `${ROLE_LABEL[org.role]}, ${org.name}` : '';
   }
 
-  async refreshMe(): Promise<void> {
+  private meLoadedAt = 0;
+  private meLoading: Promise<void> | null = null;
+
+  /** Reloads /me; calls while one is running share it. */
+  refreshMe(): Promise<void> {
+    this.meLoading ??= this.loadMe().finally(() => {
+      this.meLoading = null;
+    });
+    return this.meLoading;
+  }
+
+  private async loadMe(): Promise<void> {
     try {
       this.session.me.set(await this.api.me());
+      this.meLoadedAt = Date.now();
       this.pending.set(null);
       this.loadError.set('');
     } catch (err) {
@@ -464,6 +493,7 @@ export class App {
         this.forgetChoices();
         try {
           this.session.me.set(await this.api.me());
+          this.meLoadedAt = Date.now();
           return;
         } catch (again) {
           err = again;
