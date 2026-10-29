@@ -1,0 +1,77 @@
+# OpenPurpose on a home server: the app, a Cloudflare Tunnel in front of it and a nightly backup.
+# The database is Supabase, so nothing here keeps state except ./backups. See README.md.
+#
+#   cp .env.example .env && chmod 600 .env   # then fill it in
+#   docker compose up -d                     # .env sets COMPOSE_FILE to this file
+name: openpurpose
+
+services:
+  openpurpose:
+    image: ghcr.io/openstuff-dev/open-purpose:${OPENPURPOSE_IMAGE_TAG:?set OPENPURPOSE_IMAGE_TAG in .env}
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
+      OPENPURPOSE_ORG_NAME: ${OPENPURPOSE_ORG_NAME:-OpenStuff}
+      OPENPURPOSE_PUBLIC_URL: ${OPENPURPOSE_PUBLIC_URL:?set OPENPURPOSE_PUBLIC_URL in .env}
+      OPENPURPOSE_SITE_URL: ${OPENPURPOSE_SITE_URL:-}
+      OPENPURPOSE_BOOTSTRAP_TOKEN: ${OPENPURPOSE_BOOTSTRAP_TOKEN:-}
+      OPENPURPOSE_AUTH_PROVIDER: ${OPENPURPOSE_AUTH_PROVIDER:-}
+      OPENPURPOSE_SUPABASE_URL: ${OPENPURPOSE_SUPABASE_URL:-}
+      OPENPURPOSE_SUPABASE_KEY: ${OPENPURPOSE_SUPABASE_KEY:-}
+      OPENPURPOSE_SIGNUP: ${OPENPURPOSE_SIGNUP:-approval}
+      OPENPURPOSE_SESSION_DAYS: ${OPENPURPOSE_SESSION_DAYS:-30}
+      # Only cloudflared may set X-Forwarded-For, so rate limits see each visitor's own address.
+      OPENPURPOSE_TRUST_PROXY: 172.30.47.2
+    networks:
+      - openpurpose
+    # No ports: visitors come in through the tunnel only.
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:${CLOUDFLARED_TAG:-latest}
+    # The tunnel's public hostname (purpose.openstuff.app → http://openpurpose:8080) is set in
+    # Cloudflare Zero Trust, not here.
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env}
+    depends_on:
+      - openpurpose
+    networks:
+      openpurpose:
+        ipv4_address: 172.30.47.2
+    restart: unless-stopped
+
+  backup:
+    # The app image (for the export) plus pg_dump and rclone, built here on the same tag.
+    build:
+      context: backup
+      args:
+        OPENPURPOSE_IMAGE_TAG: ${OPENPURPOSE_IMAGE_TAG}
+    pull_policy: build
+    user: ${BACKUP_USER:-1000:1000}
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      BACKUP_HOUR: ${BACKUP_HOUR:-3}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_PING_URL: ${BACKUP_PING_URL:-}
+      R2_BUCKET: ${R2_BUCKET:-}
+      RCLONE_CONFIG_R2_TYPE: s3
+      RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+      RCLONE_CONFIG_R2_ENDPOINT: ${R2_ENDPOINT:-}
+      RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      # A token for one bucket may not list or create buckets.
+      RCLONE_CONFIG_R2_NO_CHECK_BUCKET: 'true'
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - ./backups:/backups
+    networks:
+      - openpurpose
+    restart: unless-stopped
+
+networks:
+  openpurpose:
+    ipam:
+      config:
+        - subnet: 172.30.47.0/24
+          # Other containers get addresses from here, so 172.30.47.2 stays free for cloudflared.
+          ip_range: 172.30.47.128/25

@@ -161,6 +161,9 @@ and `:edge` is the newest commit on master. To upgrade, back up first (migration
 only move forward), then `docker compose pull && docker compose up -d`. See
 [CHANGELOG.md](CHANGELOG.md) for what changed.
 
+To run it behind a Cloudflare Tunnel with Supabase and nightly backups, as
+purpose.openstuff.app does, see [deploy/README.md](deploy/README.md).
+
 ### Upgrading from v0.1
 
 Just start the new version. The migration moves everything into one workspace with
