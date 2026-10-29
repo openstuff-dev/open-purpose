@@ -3,7 +3,7 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
-## Unreleased
+## 0.3.0
 
 - Added sign-in with GitHub or an email link (Supabase), browser sessions that expire, and
   sign-up behind approval (`OPENPURPOSE_SIGNUP=approval`): server admins approve each person
