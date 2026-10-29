@@ -152,6 +152,15 @@ services, learnings and pending proposals). This wipes the database:
 docker compose exec openpurpose node dist/seed-demo.js --reset
 ```
 
+### Published images
+
+Instead of building it yourself, use the published image: replace `build: .` in
+`docker-compose.yml` with `image: ghcr.io/openstuff-dev/open-purpose:latest`.
+`:latest` is the newest release, `:0.3` follows patch releases of 0.3, `:0.3.0` stays put,
+and `:edge` is the newest commit on master. To upgrade, back up first (migrations
+only move forward), then `docker compose pull && docker compose up -d`. See
+[CHANGELOG.md](CHANGELOG.md) for what changed.
+
 ### Upgrading from v0.1
 
 Just start the new version. The migration moves everything into one workspace with
@@ -351,6 +360,17 @@ npm test
 
 `npm run typecheck` checks the shared types, the server and the web app. `npm run lint` runs
 ESLint and Stylelint.
+
+To release, move the `Unreleased` entries in `CHANGELOG.md` under `## 0.3.0`, then:
+
+```bash
+npm version 0.3.0 --workspaces --include-workspace-root --no-git-tag-version
+git commit -am "Released 0.3.0" && git tag v0.3.0 && git push origin master v0.3.0
+```
+
+The Release workflow runs CI first (every project, on a tag), refuses a tag that doesn't
+match every `package.json` or has no CHANGELOG entry, starts the image against a fresh
+Postgres, and only then pushes it. Pushes to master go through the same checks before `:edge`.
 
 ## Not in this version
 

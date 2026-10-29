@@ -1,10 +1,14 @@
 name: CI
 
+# Pushes to master and tags run this through release.yml, before the image is published.
 on:
-  push:
-    branches:
-      - master
   pull_request:
+  workflow_call:
+    inputs:
+      all:
+        description: Run every project instead of only the affected ones (for releases).
+        type: boolean
+        default: false
 
 permissions:
   actions: read
@@ -41,6 +45,10 @@ jobs:
 
       - run: npm ci
       - uses: nrwl/nx-set-shas@v4
+        if: ${{ !inputs.all }}
 
       # Lint reports warnings only for now; it fails on errors.
       - run: npx nx affected -t lint stylelint typecheck test build
+        if: ${{ !inputs.all }}
+      - run: npx nx run-many -t lint stylelint typecheck test build
+        if: ${{ inputs.all }}
