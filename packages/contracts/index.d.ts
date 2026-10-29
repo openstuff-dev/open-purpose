@@ -38,6 +38,26 @@ export interface Actor {
   is_superadmin: boolean;
 }
 
+// ───────────────────────────── signing in ─────────────────────────────
+
+/**
+ * What happens to someone the server doesn't know yet. off: they can't sign in; approval: they
+ * wait for a server admin; open: they get their own workspace at once.
+ */
+export type SignupMode = 'off' | 'approval' | 'open';
+
+/** One way to sign in that the server's provider offers. */
+export type AuthMethod = { kind: 'magic_link' } | { kind: 'oauth'; provider: string; label: string };
+
+/** GET /api/auth/config: what the sign-in page shows. Needs no token. */
+export interface AuthConfig {
+  signup: SignupMode;
+  /** Empty when no provider is set up: then only access tokens sign in. */
+  methods: AuthMethod[];
+  /** The marketing site, for a "Back to …" link. */
+  site_url: string | null;
+}
+
 /**
  * How much review an agent's writes get. edit_modes: follow each section's edit mode.
  * always_propose: propose even in open sections. auto_approve: approve its proposals in its

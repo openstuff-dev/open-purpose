@@ -407,7 +407,7 @@ export async function listMembers(db: Queryable, pool: Pool, a: Access): Promise
                      ORDER BY m.organization_id NULLS FIRST) AS memberships,
             COALESCE((SELECT json_agg(json_build_object('id', t.id, 'prefix', t.prefix, 'label', t.label,
                        'created_at', t.created_at, 'last_used_at', t.last_used_at, 'revoked_at', t.revoked_at) ORDER BY t.created_at)
-                        FROM api_tokens t WHERE t.actor_id = a.id), '[]') AS tokens,
+                        FROM api_tokens t WHERE t.actor_id = a.id AND t.kind = 'api'), '[]') AS tokens,
             CASE WHEN a.kind = 'agent' THEN json_build_object('review', a.review, 'accept_findings', a.accept_findings,
                    'set_by_name', pb.name, 'set_at', a.permissions_at) END AS permissions
        FROM memberships m JOIN actors a ON a.id = m.actor_id
@@ -649,7 +649,8 @@ export async function myTokens(pool: Pool, actor: Actor) {
     last_used_at: string | null;
     revoked_at: string | null;
   }>(
-    'SELECT id, prefix, label, created_at, last_used_at, revoked_at FROM api_tokens WHERE actor_id = $1 ORDER BY created_at',
+    `SELECT id, prefix, label, created_at, last_used_at, revoked_at FROM api_tokens
+      WHERE actor_id = $1 AND kind = 'api' ORDER BY created_at`,
     [actor.id],
   );
   return rows;

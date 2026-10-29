@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { SignupMode } from '@openpurpose/contracts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -22,6 +23,23 @@ export interface Config {
   apiSpecs: ApiSpecConfig;
   /** Largest export file accepted by an import. */
   importMaxBytes: number;
+  /** Sign-in through an external provider and self sign-up. Off by default: tokens only. */
+  auth: AuthConfig;
+}
+
+const SIGNUP_MODES: SignupMode[] = ['off', 'approval', 'open'];
+
+export interface AuthConfig {
+  /** External sign-in provider, e.g. 'supabase'. Empty = tokens only. */
+  provider: string;
+  signup: SignupMode;
+  supabaseUrl: string;
+  /** The Supabase project's publishable (anon) key. */
+  supabaseKey: string;
+  /** The marketing site, for the "Back to …" link on the sign-in page. */
+  siteUrl: string;
+  /** How long a browser session lasts. */
+  sessionDays: number;
 }
 
 export interface ApiSpecConfig {
@@ -42,6 +60,7 @@ export interface ApiSpecConfig {
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const port = Number(env.PORT ?? 8080);
+  const auth = loadAuthConfig(env);
   return {
     port,
     host: env.HOST ?? '0.0.0.0',
@@ -60,5 +79,36 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       timeoutMs: 15_000,
     },
     importMaxBytes: Number(env.OPENPURPOSE_IMPORT_MAX_MB ?? 100) * 1024 * 1024,
+    auth,
+  };
+}
+
+function loadAuthConfig(env: NodeJS.ProcessEnv): AuthConfig {
+  const provider = (env.OPENPURPOSE_AUTH_PROVIDER ?? '').trim().toLowerCase();
+  const signup = (env.OPENPURPOSE_SIGNUP || 'off').trim().toLowerCase() as SignupMode;
+  if (!SIGNUP_MODES.includes(signup)) {
+    throw new Error(
+      `OPENPURPOSE_SIGNUP must be one of ${SIGNUP_MODES.join(', ')} (got "${env.OPENPURPOSE_SIGNUP}")`,
+    );
+  }
+  // The provider sends people back to <public url>/api/auth/callback, so it must be the real one.
+  if (provider && !env.OPENPURPOSE_PUBLIC_URL) {
+    throw new Error(
+      `OPENPURPOSE_AUTH_PROVIDER=${provider} needs OPENPURPOSE_PUBLIC_URL, e.g. https://purpose.example.com`,
+    );
+  }
+  const sessionDays = Number(env.OPENPURPOSE_SESSION_DAYS || 30);
+  if (!(sessionDays > 0)) {
+    throw new Error(
+      `OPENPURPOSE_SESSION_DAYS must be a positive number (got "${env.OPENPURPOSE_SESSION_DAYS}")`,
+    );
+  }
+  return {
+    provider,
+    signup,
+    supabaseUrl: env.OPENPURPOSE_SUPABASE_URL ?? '',
+    supabaseKey: env.OPENPURPOSE_SUPABASE_KEY ?? '',
+    siteUrl: env.OPENPURPOSE_SITE_URL ?? '',
+    sessionDays,
   };
 }
