@@ -4,6 +4,7 @@
  */
 import type {
   Actor,
+  AgentPermissions,
   DocumentActivity,
   SectionActivity,
   DocKind,
@@ -22,6 +23,8 @@ import type {
 export type {
   Actor,
   ActorKind,
+  AgentPermissions,
+  AgentReview,
   DocKind,
   EditMode,
   Graph,
@@ -305,6 +308,8 @@ export interface Proposal {
   scope_spec: ScopeSpec | null;
   /** new_scope only: the scope created on approval. */
   result_scope_id: string | null;
+  /** Approved without review: an admin lets the agent who made it skip review. */
+  auto_approved: boolean;
   project_slug: string | null;
   project_name: string | null;
   scope_slug: string | null;
@@ -382,6 +387,8 @@ export interface Member extends Actor {
     last_used_at: string | null;
     revoked_at: string | null;
   }[];
+  /** Agents only: what they may do without a person's review. */
+  permissions: AgentPermissions | null;
   manageable: boolean;
 }
 

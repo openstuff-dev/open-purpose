@@ -45,6 +45,12 @@ const fileSchema = z.object({
       name: z.string().min(1).max(200),
       kind: z.enum(['human', 'agent']),
       memberships: z.array(z.object({ organization: ref, role })),
+      permissions: z
+        .object({
+          review: z.enum(['edit_modes', 'always_propose', 'auto_approve']),
+          accept_findings: z.boolean(),
+        })
+        .optional(),
     }),
   ),
   organizations: z.array(
@@ -198,6 +204,7 @@ const fileSchema = z.object({
       reviewed_by: ref,
       reviewed_at: time.nullable(),
       review_note: z.string(),
+      auto_approved: z.boolean().optional(),
       revisions: z.array(
         z.object({
           revision: z.number().int().min(1),

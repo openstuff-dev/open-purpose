@@ -2218,6 +2218,107 @@ definitions:`,
       file.documents.flatMap((d: any) => d.sections).every((s: any) => s.versions.length === 0),
     ).toBe(true);
   });
+
+  it('lets admins choose how much review each agent gets', async () => {
+    const created = await api('POST', '/members', {
+      name: 'Agent Mona',
+      kind: 'agent',
+      organization_id: o.logistics,
+    });
+    const mona = created.data.actor.id as string;
+    const member = async () =>
+      (await api('GET', '/members')).data.find((m: any) => m.id === mona);
+    expect((await member()).permissions).toMatchObject({
+      review: 'edit_modes',
+      accept_findings: false,
+      set_by_name: null,
+    });
+    // Only admins of the agent's organization set them, and only agents have them.
+    expect(
+      (await api('PATCH', `/members/${mona}`, { review: 'auto_approve' }, { token: t.anders }))
+        .status,
+    ).toBe(403);
+    expect((await api('PATCH', `/members/${mona}`, { review: 'everything' })).status).toBe(400);
+    const me = (await api('GET', '/me')).data.actor.id;
+    expect((await api('PATCH', `/members/${me}`, { accept_findings: true })).status).toBe(400);
+
+    const orgDocs = await api('GET', `/documents?organization_id=${o.logistics}`);
+    const doc = orgDocs.data[1];
+    const locked = (await api('GET', `/documents/${orgDocs.data[0].id}`)).data.sections[0];
+    const open = (
+      await api('POST', `/documents/${doc.id}/sections`, {
+        heading: 'Shipment',
+        body: 'A parcel.',
+        mode: 'open',
+      })
+    ).data.section;
+    const { client, call } = await mcp(created.data.token);
+    const edit = (body: string) =>
+      call('update_section', { section_id: open.id, body, reason: 'Clearer' });
+
+    // Always propose: even open sections wait for a person.
+    await api('PATCH', `/members/${mona}`, { review: 'always_propose' });
+    expect((await edit('A parcel on its way.')).text).toContain('Proposed for review');
+
+    // Approve automatically: proposals in its organization apply at once and say so.
+    expect((await api('PATCH', `/members/${mona}`, { review: 'auto_approve' })).status).toBe(200);
+    expect((await member()).permissions).toMatchObject({
+      review: 'auto_approve',
+      set_by_name: expect.any(String),
+    });
+    await api('PATCH', `/sections/${open.id}`, { mode: 'propose' });
+    const applied = await edit('A parcel, tracked.');
+    expect(applied.text).toContain('Approved automatically');
+    const proposalRef = /proposal ([0-9a-f]{8})/.exec(applied.text)![1];
+    const approved = (await api('GET', '/proposals?status=approved')).data.find((p: any) =>
+      p.id.startsWith(proposalRef),
+    );
+    expect(approved).toMatchObject({ auto_approved: true, status: 'approved' });
+    expect(approved.review_note).toContain('lets Agent Mona skip review');
+    const versions = (await api('GET', `/sections/${open.id}/versions`)).data;
+    expect(versions[0]).toMatchObject({ body: 'A parcel, tracked.' });
+    expect(versions[0].note).toContain('Approved automatically');
+
+    const learning = await call('propose_learning', {
+      heading: 'Parcels carry a tracking id',
+      body: 'Always show it.',
+      rationale: 'Corrected by Mona.',
+      remote_url: HTTPS_REMOTE,
+      path: 'frontend/src/app/parcel.ts',
+    });
+    expect(learning.text).toContain('Learning approved automatically');
+    // Locked stays locked, and group-wide content still waits for a group editor.
+    expect(
+      (await call('update_section', { section_id: locked.id, body: 'x', reason: 'x' })).text,
+    ).toContain('locked');
+    const groupGuidelines = (await api('GET', '/documents?organization_id=group')).data.find(
+      (d: any) => d.kind === 'guidelines',
+    );
+    expect(
+      (
+        await call('add_section', {
+          document_id: groupGuidelines.id,
+          heading: 'Mona idea',
+          body: 'x',
+          reason: 'y',
+        })
+      ).text,
+    ).toContain('Proposed for review');
+
+    // Accept findings: filed as to do instead of new.
+    await api('PATCH', `/members/${mona}`, { accept_findings: true });
+    const finding = await call('report_finding', {
+      remote_url: SSH_REMOTE,
+      file: 'frontend/src/app/parcel-label.ts',
+      title: 'Parcel labels print upside down on Zebra printers',
+      problem: 'Rotation is applied twice.',
+      proposed_fix: 'Rotate once, in LabelPrinter.',
+    });
+    expect(finding.text).toContain('filed as to do');
+
+    await api('PATCH', `/members/${mona}`, { review: 'edit_modes', accept_findings: false });
+    await client.close();
+  });
 });
 
 /**

@@ -14,11 +14,15 @@ import {
   DialogHeader,
   DialogTitle,
   Field,
+  Fieldset,
   Callout,
+  Check,
+  Checkbox,
   EmptyState,
+  Radio,
 } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
-import { ROLE_LABEL, type Member, type Role } from '../core/models';
+import { ROLE_LABEL, type AgentReview, type Member, type Role } from '../core/models';
 import { Session } from '../core/session';
 import { Notices } from '../shared/notice';
 import { Icon } from '../shared/icon';
@@ -32,6 +36,24 @@ interface NewToken {
 
 const GROUP = 'group';
 
+const REVIEW_OPTIONS: { value: AgentReview; label: string; hint: string }[] = [
+  {
+    value: 'edit_modes',
+    label: 'Follow edit modes',
+    hint: 'Open sections change right away; propose sections become proposals in the inbox.',
+  },
+  {
+    value: 'always_propose',
+    label: 'Always propose',
+    hint: 'Every change goes to the inbox, even in open sections and documents.',
+  },
+  {
+    value: 'auto_approve',
+    label: 'Approve automatically',
+    hint: 'Proposals are approved the moment they arrive. Nobody reviews them.',
+  },
+];
+
 @Component({
   selector: 'app-people',
   imports: [
@@ -43,6 +65,10 @@ const GROUP = 'group';
     Icon,
     Button,
     Field,
+    Fieldset,
+    Check,
+    Checkbox,
+    Radio,
     Control,
     Badge,
     Chip,
@@ -168,8 +194,27 @@ const GROUP = 'group';
           @if (m.disabled_at) {
             <span os-badge tone="warning">Disabled</span>
           }
+          @if (m.permissions?.review === 'auto_approve') {
+            <span os-badge tone="danger">Approves automatically</span>
+          } @else if (m.permissions?.review === 'always_propose') {
+            <span os-chip>Always proposes</span>
+          }
+          @if (m.permissions?.accept_findings) {
+            <span os-badge tone="warning">Accepts findings</span>
+          }
           @if (m.manageable) {
             <span class="actor-actions">
+              @if (m.kind === 'agent') {
+                <button
+                  os-button
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  (click)="startPermissions(m)"
+                >
+                  <app-icon name="shield" [size]="13" />Permissions
+                </button>
+              }
               <button os-button variant="ghost" size="sm" type="button" (click)="issuing.set(m)">
                 <app-icon name="key" [size]="13" />New token
               </button>
@@ -312,6 +357,98 @@ const GROUP = 'group';
         </form>
       }
     </dialog>
+
+    <dialog os-dialog [open]="!!permitting()" (openChange)="$event || permitting.set(null)">
+      @if (permitting(); as m) {
+        <form (ngSubmit)="savePermissions(m)">
+          <header os-dialog-header>
+            <h2 os-dialog-title>Permissions for {{ m.name }}</h2>
+          </header>
+          <div os-dialog-body class="permissions">
+            <p class="quiet">
+              What {{ m.name }} may do in {{ agentOrgName(m) }} without a person's review. Locked
+              sections stay locked, and group-wide changes always wait for a group editor.
+            </p>
+            <fieldset os-fieldset>
+              <legend class="os-label">Changes this agent makes</legend>
+              @for (o of reviewOptions; track o.value) {
+                <label os-check
+                  ><input
+                    os-radio
+                    type="radio"
+                    name="review"
+                    [value]="o.value"
+                    [(ngModel)]="review"
+                  />
+                  <span class="permission-option"
+                    ><span>{{ o.label }}</span
+                    ><span class="os-hint">{{ o.hint }}</span></span
+                  ></label
+                >
+              }
+            </fieldset>
+            @if (review === 'auto_approve') {
+              <os-callout
+                tone="danger"
+                role="alert"
+                title="Nobody reviews what this agent writes"
+                level="3"
+              >
+                <p>
+                  Normally a learning never reaches another agent before a person approves it. With
+                  this on, {{ m.name }}'s learnings, section edits, new sections and scopes reach
+                  every agent in {{ agentOrgName(m) }} the moment they arrive.
+                </p>
+                <ul>
+                  <li>
+                    A misread correction becomes a rule, and other agents follow it until someone
+                    notices.
+                  </li>
+                  <li>
+                    If its token leaks, whoever holds it can rewrite every section that isn't
+                    locked.
+                  </li>
+                  <li>
+                    Lock the sections that must never change this way. Every change is marked
+                    "Approved automatically" in History, where you can restore the old version.
+                  </li>
+                </ul>
+              </os-callout>
+            }
+            <fieldset os-fieldset>
+              <legend class="os-label">Findings</legend>
+              <label os-check
+                ><input os-checkbox type="checkbox" name="accept" [(ngModel)]="acceptFindings" />
+                <span class="permission-option"
+                  ><span>Accept findings automatically</span
+                  ><span class="os-hint">File them as To do instead of New.</span></span
+                ></label
+              >
+            </fieldset>
+            @if (acceptFindings) {
+              <os-callout tone="warning" role="alert" title="Findings skip sorting" level="3">
+                <p>
+                  {{ m.name }}'s findings land in To do, where agents may pick them up and fix them
+                  when someone asks, including ones a person would have dismissed.
+                </p>
+              </os-callout>
+            }
+            @if (m.permissions; as perm) {
+              @if (perm.set_at) {
+                <p class="quiet">
+                  Last changed by {{ perm.set_by_name ?? 'someone' }} on
+                  {{ perm.set_at | date: 'd MMM y' }}.
+                </p>
+              }
+            }
+          </div>
+          <footer os-dialog-footer>
+            <button os-button type="button" os-dialog-close>Cancel</button>
+            <button os-button variant="primary" type="submit">Save permissions</button>
+          </footer>
+        </form>
+      }
+    </dialog>
   `,
 })
 export class PeoplePage {
@@ -328,6 +465,11 @@ export class PeoplePage {
   /** Whose new token is being labelled. */
   readonly issuing = signal<Member | null>(null);
   tokenLabel = 'laptop';
+  /** Whose permissions are being changed. */
+  readonly permitting = signal<Member | null>(null);
+  readonly reviewOptions = REVIEW_OPTIONS;
+  review: AgentReview = 'edit_modes';
+  acceptFindings = false;
   readonly adding = signal<string | null>(null);
   /** Levels this admin manages: the group (group admins) and each organization they administer. */
   readonly levels = computed(() => {
@@ -474,6 +616,36 @@ export class PeoplePage {
     } catch (e) {
       this.notices.error(e);
     }
+  }
+
+  agentOrgName(m: Member): string {
+    const own = m.memberships.find((x) => x.organization_id);
+    return this.session.orgName(own?.organization_id ?? null);
+  }
+
+  startPermissions(m: Member): void {
+    this.review = m.permissions?.review ?? 'edit_modes';
+    this.acceptFindings = m.permissions?.accept_findings ?? false;
+    this.permitting.set(m);
+  }
+
+  async savePermissions(m: Member): Promise<void> {
+    const review = this.review;
+    const acceptFindings = this.acceptFindings;
+    if (review === 'auto_approve' && m.permissions?.review !== 'auto_approve') {
+      const sure = await this.confirmDialog.confirm({
+        title: `Approve everything ${m.name} proposes?`,
+        message: `Its changes reach every agent in ${this.agentOrgName(m)} without review. You can turn this off again at any time.`,
+        confirmLabel: 'Approve automatically',
+        danger: true,
+      });
+      if (!sure) return;
+    }
+    this.permitting.set(null);
+    await this.run(
+      () => this.api.updateMember(m.id, { review, accept_findings: acceptFindings }),
+      `Saved permissions for ${m.name}`,
+    );
   }
 
   async revoke(id: string): Promise<void> {

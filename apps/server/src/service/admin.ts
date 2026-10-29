@@ -16,7 +16,9 @@ import { slugify } from '../domain/remote.js';
 import { claimSlug } from './aliases.js';
 import { insertDocument, insertSection } from './content.js';
 import type { Group, Organization } from './types.js';
-import type { SlugAlias } from '@openpurpose/contracts';
+import type { AgentPermissions, AgentReview, SlugAlias } from '@openpurpose/contracts';
+
+export const AGENT_REVIEWS: AgentReview[] = ['edit_modes', 'always_propose', 'auto_approve'];
 
 // ───────────────────────────── tokens ─────────────────────────────
 
@@ -386,6 +388,8 @@ export interface MemberRow {
     last_used_at: string | null;
     revoked_at: string | null;
   }[];
+  /** Agents only: what they may do without a person's review. */
+  permissions: AgentPermissions | null;
   /** Whether the viewer may manage this person's or agent's tokens and account. */
   manageable: boolean;
 }
@@ -403,10 +407,13 @@ export async function listMembers(db: Queryable, pool: Pool, a: Access): Promise
                      ORDER BY m.organization_id NULLS FIRST) AS memberships,
             COALESCE((SELECT json_agg(json_build_object('id', t.id, 'prefix', t.prefix, 'label', t.label,
                        'created_at', t.created_at, 'last_used_at', t.last_used_at, 'revoked_at', t.revoked_at) ORDER BY t.created_at)
-                        FROM api_tokens t WHERE t.actor_id = a.id), '[]') AS tokens
+                        FROM api_tokens t WHERE t.actor_id = a.id), '[]') AS tokens,
+            CASE WHEN a.kind = 'agent' THEN json_build_object('review', a.review, 'accept_findings', a.accept_findings,
+                   'set_by_name', pb.name, 'set_at', a.permissions_at) END AS permissions
        FROM memberships m JOIN actors a ON a.id = m.actor_id
+       LEFT JOIN actors pb ON pb.id = a.permissions_by
       WHERE $1 OR m.organization_id = ANY($2::uuid[])
-      GROUP BY a.id ORDER BY a.kind DESC, a.name`,
+      GROUP BY a.id, pb.name ORDER BY a.kind DESC, a.name`,
     [a.canAdmin(null), adminOrgs],
   );
   const out: MemberRow[] = [];
@@ -580,15 +587,33 @@ export async function updateActor(
   pool: Pool,
   a: Access,
   actorId: string,
-  input: { name?: string; disabled?: boolean },
+  input: { name?: string; disabled?: boolean; review?: AgentReview; accept_findings?: boolean },
 ): Promise<void> {
-  await requireManage(db, pool, a, actorId);
+  const m = await requireManage(db, pool, a, actorId);
   if (actorId === a.actor.id && input.disabled) throw badRequest('You cannot disable yourself');
+  const permissions = input.review !== undefined || input.accept_findings !== undefined;
+  if (permissions) {
+    if (m.kind !== 'agent') throw badRequest('Only agents have permissions; people have roles');
+    if (input.review !== undefined && !AGENT_REVIEWS.includes(input.review))
+      throw badRequest(`review must be one of ${AGENT_REVIEWS.join(', ')}`);
+  }
   await db.query(
     `UPDATE actors SET name = COALESCE($2, name),
-            disabled_at = CASE WHEN $3::boolean IS NULL THEN disabled_at WHEN $3 THEN now() ELSE NULL END
+            disabled_at = CASE WHEN $3::boolean IS NULL THEN disabled_at WHEN $3 THEN now() ELSE NULL END,
+            review = COALESCE($4::agent_review, review),
+            accept_findings = COALESCE($5::boolean, accept_findings),
+            permissions_by = CASE WHEN $6 THEN $7::uuid ELSE permissions_by END,
+            permissions_at = CASE WHEN $6 THEN now() ELSE permissions_at END
       WHERE id = $1`,
-    [actorId, input.name?.trim() || null, input.disabled ?? null],
+    [
+      actorId,
+      input.name?.trim() || null,
+      input.disabled ?? null,
+      input.review ?? null,
+      input.accept_findings ?? null,
+      permissions,
+      a.actor.id,
+    ],
   );
 }
 

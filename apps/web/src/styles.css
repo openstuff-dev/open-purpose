@@ -1691,6 +1691,17 @@ mark {
   gap: 0.25rem;
 }
 
+/* Agent permissions: each choice has its name and a line on what it does. */
+.permissions {
+  display: grid;
+  gap: var(--os-space-4);
+}
+
+.permission-option {
+  display: grid;
+  gap: var(--os-space-1);
+}
+
 .tokens {
   list-style: none;
   margin: 0.55rem 0 0 2.35rem;

@@ -25,6 +25,7 @@ import type {
   Proposal,
   ProposalStatus,
   Role,
+  AgentReview,
   Scope,
   ScopeDetail,
   SearchHit,
@@ -386,7 +387,10 @@ export class Api {
     role?: Role;
   }) => this.send<{ actor: Member; token: string }>('POST', '/members', body);
 
-  updateMember = (id: string, body: { name?: string; disabled?: boolean }) =>
+  updateMember = (
+    id: string,
+    body: { name?: string; disabled?: boolean; review?: AgentReview; accept_findings?: boolean },
+  ) =>
     this.send('PATCH', `/members/${id}`, body);
 
   addMembership = (actorId: string, body: { organization_id: string | null; role: Role }) =>

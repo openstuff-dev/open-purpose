@@ -1177,7 +1177,12 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       });
       api.patch('/members/:id', async (req) => {
         const body = parse(
-          z.object({ name: z.string().min(1).optional(), disabled: z.boolean().optional() }),
+          z.object({
+            name: z.string().min(1).optional(),
+            disabled: z.boolean().optional(),
+            review: z.enum(admin.AGENT_REVIEWS).optional(),
+            accept_findings: z.boolean().optional(),
+          }),
           req.body,
         );
         await admin.updateActor(req.db, pool, req.access, (req.params as { id: string }).id, body);

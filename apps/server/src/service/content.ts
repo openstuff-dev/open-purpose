@@ -169,6 +169,11 @@ export async function createScope(
 ): Promise<Scope> {
   const lv = await resolveLevel(db, level);
   a.requireEdit(lv.organization_id);
+  return insertScope(db, lv, input);
+}
+
+/** createScope without the permission check, for proposals that were approved automatically. */
+export async function insertScope(db: Db, lv: Level, input: ScopeInput): Promise<Scope> {
   if (!input.name.trim()) throw badRequest('name is required');
   const slug = input.slug || slugify(input.name);
   return wrap(

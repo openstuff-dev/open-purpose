@@ -3,6 +3,7 @@ import type { Queryable } from '../db.js';
 import { tx } from '../db.js';
 import { AppError, badRequest, forbidden, notFound } from '../errors.js';
 import { normalizePath } from '../domain/scopes.js';
+import { agentRules } from './permissions.js';
 import type { Finding, FindingCounts, FindingStatus } from '@openpurpose/contracts';
 
 export type { Finding, FindingCounts, FindingStatus } from '@openpurpose/contracts';
@@ -208,8 +209,9 @@ export async function similarFindings(
 }
 
 /**
- * File a finding as new. When open findings look like the same problem, nothing is
- * filed unless `evenIfSimilar`: they come back instead, so the agent can check them first.
+ * File a finding as new, or as to do when an admin lets the agent skip sorting. When open
+ * findings look like the same problem, nothing is filed unless `evenIfSimilar`: they come back
+ * instead, so the agent can check them first.
  */
 export async function reportFinding(
   db: Queryable,
@@ -227,10 +229,12 @@ export async function reportFinding(
   a.requireContribute(input.organization_id);
   const similar = await similarFindings(db, a, { ...input, file });
   if (similar.length && !opts.evenIfSimilar) return { finding: null, similar };
+  const rules = await agentRules(db, a);
+  const accept = rules.accept_findings;
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO findings (organization_id, project_id, scope_id, file, line_start, line_end, title, problem, proposed_fix,
-                           commit_sha, remote, context, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+                           commit_sha, remote, context, created_by, status, status_by, status_at, status_note)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`,
     [
       input.organization_id,
       input.project_id,
@@ -245,6 +249,12 @@ export async function reportFinding(
       input.remote ?? null,
       JSON.stringify(input.context ?? {}),
       a.actor.id,
+      accept ? 'todo' : 'new',
+      accept ? a.actor.id : null,
+      accept ? new Date() : null,
+      accept
+        ? `Accepted automatically: ${rules.set_by_name ?? 'an admin'} lets ${a.actor.name} skip sorting`
+        : '',
     ],
   );
   return { finding: await getFinding(db, a, rows[0].id), similar };
