@@ -1,5 +1,6 @@
 export type ErrorCode =
-  'bad_request' | 'unauthorized' | 'forbidden' | 'not_found' | 'conflict' | 'locked';
+  'bad_request' | 'unauthorized' | 'forbidden' | 'not_found' | 'conflict' | 'locked' |
+  'too_many_requests';
 
 const STATUS: Record<ErrorCode, number> = {
   bad_request: 400,
@@ -8,6 +9,7 @@ const STATUS: Record<ErrorCode, number> = {
   not_found: 404,
   conflict: 409,
   locked: 423,
+  too_many_requests: 429,
 };
 
 export class AppError extends Error {

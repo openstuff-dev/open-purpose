@@ -8,6 +8,11 @@ import { loadConfig } from '../src/config.js';
 import { createPool, migrate, withScope, type Pool } from '../src/db.js';
 import { bootstrap } from '../src/service/admin.js';
 import { createSession, issueAuthCode } from '../src/service/signin.js';
+import {
+  type ExternalIdentity,
+  registerProvider,
+  SignInError,
+} from '../src/auth/providers/index.js';
 import { hashToken } from '../src/auth.js';
 import { createServer } from 'node:http';
 import { BILLING_SWAGGER_YAML, ORDER_API } from '../src/demo-specs.js';
@@ -2421,6 +2426,220 @@ describe('browser sessions', () => {
         OPENPURPOSE_SIGNUP: 'approval',
       }).auth,
     ).toMatchObject({ provider: 'supabase', signup: 'approval' });
+    expect(loadConfig({}).trustProxy).toBe(false);
+    expect(loadConfig({ OPENPURPOSE_TRUST_PROXY: 'true' }).trustProxy).toBe(true);
+    expect(loadConfig({ OPENPURPOSE_TRUST_PROXY: '10.0.0.0/8' }).trustProxy).toBe('10.0.0.0/8');
+  });
+});
+
+describe('sign-up and sign-in through a provider', () => {
+  // A fake provider: the callback's ?code= names the identity, and it checks the PKCE verifier.
+  const people = new Map<string, ExternalIdentity>();
+  registerProvider('fake', () => ({
+    id: 'fake',
+    methods: () => [{ kind: 'magic_link' }, { kind: 'oauth', provider: 'github', label: 'GitHub' }],
+    start: async ({ method, callbackUrl }) => ({
+      ...(method.kind === 'oauth'
+        ? { redirect: `https://fake.example/authorize?redirect_to=${callbackUrl}` }
+        : { emailSent: true }),
+      verifier: 'pkce-verifier',
+    }),
+    finish: async ({ query, verifier }) => {
+      if (verifier !== 'pkce-verifier') throw new SignInError('other-browser', 'No verifier');
+      const who = people.get(query.code);
+      if (!who) throw new SignInError('failed', 'Unknown code');
+      return who;
+    },
+  }));
+
+  const config = {
+    ...loadConfig({}),
+    databaseUrl: DATABASE_URL,
+    webDir: '/nonexistent',
+    publicUrl: 'https://purpose.example.com',
+  };
+  config.auth = { ...config.auth, provider: 'fake', signup: 'off' };
+  let signupApp: FastifyInstance;
+  let signupBase = '';
+
+  beforeAll(async () => {
+    signupApp = await buildApp(pool, config);
+    await signupApp.listen({ port: 0, host: '127.0.0.1' });
+    const addr = signupApp.server.address();
+    signupBase = `http://127.0.0.1:${typeof addr === 'object' && addr ? addr.port : 0}`;
+  });
+  afterAll(async () => {
+    await (signupApp as FastifyInstance | undefined)?.close();
+  });
+
+  const call = async (method: string, path: string, body?: unknown, token = '') => {
+    const res = await fetch(`${signupBase}/api${path}`, {
+      method,
+      headers: {
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...(body ? { 'content-type': 'application/json' } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const text = await res.text();
+    return { status: res.status, headers: res.headers, data: text ? JSON.parse(text) : undefined };
+  };
+
+  /** Start with GitHub, come back on the callback, and swap the code. A token or the error. */
+  async function signIn(identity: ExternalIdentity): Promise<{ token?: string; error?: string }> {
+    const start = await call('POST', '/auth/start', {
+      method: { kind: 'oauth', provider: 'github' },
+    });
+    expect(start.status).toBe(200);
+    const cookie = start.headers.get('set-cookie') ?? '';
+    expect(cookie).toMatch(/op_auth_verifier=pkce-verifier;.*HttpOnly/);
+    people.set(identity.subject, identity);
+    const back = await fetch(`${signupBase}/api/auth/callback?code=${identity.subject}`, {
+      headers: { cookie: cookie.split(';')[0] },
+      redirect: 'manual',
+    });
+    expect(back.status).toBe(302);
+    const to = new URL(back.headers.get('location') ?? '', signupBase);
+    if (to.pathname === '/sign-in') return { error: to.searchParams.get('error') ?? '' };
+    expect(to.pathname).toBe('/auth/done');
+    const swapped = await call('POST', '/auth/exchange', { code: to.searchParams.get('code') });
+    expect(swapped.status).toBe(200);
+    return { token: swapped.data.token };
+  }
+
+  const person = (subject: string, name: string): ExternalIdentity => ({
+    provider: 'fake',
+    subject,
+    name,
+    email: `${subject}@example.com`,
+  });
+
+  it('offers the provider\'s methods and starts a sign-in', async () => {
+    expect((await call('GET', '/auth/config')).data).toEqual({
+      signup: 'off',
+      methods: [{ kind: 'magic_link' }, { kind: 'oauth', provider: 'github', label: 'GitHub' }],
+      site_url: null,
+    });
+    const github = await call('POST', '/auth/start', {
+      method: { kind: 'oauth', provider: 'github' },
+    });
+    expect(github.data).toEqual({
+      redirect: 'https://fake.example/authorize?redirect_to=https://purpose.example.com/api/auth/callback',
+      email_sent: false,
+    });
+    const link = await call('POST', '/auth/start', {
+      method: { kind: 'magic_link' },
+      email: 'start@example.com',
+    });
+    expect(link.data).toEqual({ redirect: null, email_sent: true });
+    expect((await call('POST', '/auth/start', { method: { kind: 'magic_link' } })).status).toBe(400);
+    expect(
+      (await call('POST', '/auth/start', { method: { kind: 'oauth', provider: 'gitlab' } })).status,
+    ).toBe(400);
+  });
+
+  it('limits magic links per email', async () => {
+    const send = () =>
+      call('POST', '/auth/start', { method: { kind: 'magic_link' }, email: 'Spam@example.com' });
+    for (let i = 0; i < 5; i++) expect((await send()).status).toBe(200);
+    expect((await send()).status).toBe(429);
+  });
+
+  it('refuses an unknown identity when sign-up is off', async () => {
+    config.auth.signup = 'off';
+    expect(await signIn(person('nobody', 'Nobody'))).toEqual({ error: 'no-account' });
+    const { rows } = await pool.query('SELECT 1 FROM identities WHERE subject = $1', ['nobody']);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('says so when the link is opened in another browser', async () => {
+    people.set('elsewhere', person('elsewhere', 'Elsewhere'));
+    const back = await fetch(`${signupBase}/api/auth/callback?code=elsewhere`, {
+      redirect: 'manual',
+    });
+    expect(back.headers.get('location')).toBe('/sign-in?error=other-browser');
+  });
+
+  it('puts a new person on the list, and a server admin approves them', async () => {
+    config.auth.signup = 'approval';
+    const { token } = await signIn(person('maja', 'Maja Berg'));
+    expect(token).toBeTruthy();
+    expect((await call('GET', '/auth/status', undefined, token)).data).toEqual({
+      name: 'Maja Berg',
+      email: 'maja@example.com',
+      signup: 'pending',
+    });
+    expect((await call('GET', '/me', undefined, token)).status).toBe(403);
+    // Only server admins see and approve sign-ups.
+    expect((await call('GET', '/signups', undefined, token)).status).toBe(403);
+    const list = await call('GET', '/signups', undefined, ADMIN);
+    const maja = list.data.find((s: any) => s.email === 'maja@example.com');
+    expect(maja).toMatchObject({ name: 'Maja Berg', provider: 'fake', signup: 'pending' });
+
+    const ok = await call('POST', `/signups/${maja.id}/approve`, { workspace: 'Berg Studio' }, ADMIN);
+    expect(ok.status).toBe(200);
+    expect(ok.data.group).toMatchObject({ name: 'Berg Studio', slug: 'berg-studio' });
+    expect((await call('POST', `/signups/${maja.id}/approve`, { workspace: 'Again' }, ADMIN)).status)
+      .toBe(409);
+
+    // The same session now reaches the new workspace, as its admin.
+    const me = await call('GET', '/me', undefined, token);
+    expect(me.status).toBe(200);
+    expect(me.data.group).toMatchObject({ name: 'Berg Studio', role: 'admin' });
+    expect(me.data.organizations.map((o: any) => o.name)).toEqual(['Berg Studio']);
+    expect((await call('GET', '/auth/status', undefined, token)).data.signup).toBe('approved');
+  });
+
+  it('signs a known identity straight in, even with sign-up off', async () => {
+    config.auth.signup = 'off';
+    const { token } = await signIn(person('maja', 'Maja Berg'));
+    expect((await call('GET', '/me', undefined, token)).data.actor.name).toBe('Maja Berg');
+    const { rows } = await pool.query('SELECT count(*)::int AS n FROM actors WHERE email = $1', [
+      'maja@example.com',
+    ]);
+    expect(rows[0].n).toBe(1);
+  });
+
+  it('blocks a rejected sign-up and ends their session', async () => {
+    config.auth.signup = 'approval';
+    const { token } = await signIn(person('spammer', 'Spammer'));
+    const { rows } = await pool.query('SELECT actor_id FROM identities WHERE subject = $1', [
+      'spammer',
+    ]);
+    const id = rows[0].actor_id;
+    expect((await call('POST', `/signups/${id}/reject`, undefined, ADMIN)).status).toBe(204);
+    expect((await call('GET', '/auth/status', undefined, token)).status).toBe(401);
+    expect(await signIn(person('spammer', 'Spammer'))).toEqual({ error: 'rejected' });
+    const rejected = await call('GET', '/signups?status=rejected', undefined, ADMIN);
+    expect(rejected.data.map((s: any) => s.id)).toContain(id);
+  });
+
+  it('gives a new person their own workspace at once when sign-up is open', async () => {
+    config.auth.signup = 'open';
+    const { token } = await signIn(person('ola', 'Ola'));
+    const me = await call('GET', '/me', undefined, token);
+    expect(me.status).toBe(200);
+    expect(me.data.group).toMatchObject({ name: 'Ola', role: 'admin' });
+    // Another Ola gets a workspace of their own, under a free slug.
+    const { token: other } = await signIn(person('ola2', 'Ola'));
+    const second = await call('GET', '/me', undefined, other);
+    expect(second.data.group.id).not.toBe(me.data.group.id);
+    expect(second.data.group.slug).toBe(`${me.data.group.slug}-2`);
+  });
+
+  it('leaves agent and API tokens alone', async () => {
+    const org = (await call('GET', '/me', undefined, ADMIN)).data.organizations[0].id;
+    const agent = await call(
+      'POST',
+      '/members',
+      { name: 'Sign-up check agent', kind: 'agent', organization_id: org },
+      ADMIN,
+    );
+    expect(agent.status).toBe(201);
+    expect((await call('GET', '/me', undefined, agent.data.token)).status).toBe(200);
+    const { client, call: tool } = await mcp(agent.data.token);
+    expect((await tool('list_projects', {})).isError).toBe(false);
+    await client.close();
   });
 });
 

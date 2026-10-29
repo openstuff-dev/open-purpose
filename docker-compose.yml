@@ -26,6 +26,8 @@ services:
       OPENPURPOSE_PUBLIC_URL: ${OPENPURPOSE_PUBLIC_URL:-http://localhost:8080}
       # Optional: fix the first admin's token instead of reading it from the log.
       OPENPURPOSE_BOOTSTRAP_TOKEN: ${OPENPURPOSE_BOOTSTRAP_TOKEN:-}
+      # Behind a reverse proxy: true, or the proxy's addresses. See the README.
+      OPENPURPOSE_TRUST_PROXY: ${OPENPURPOSE_TRUST_PROXY:-}
     ports:
       - "8080:8080"
     restart: unless-stopped

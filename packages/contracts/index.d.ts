@@ -58,6 +58,48 @@ export interface AuthConfig {
   site_url: string | null;
 }
 
+/** POST /api/auth/start. Needs no token. */
+export interface AuthStartRequest {
+  method: AuthMethod;
+  /** Required for a magic link. */
+  email?: string;
+}
+
+/** Either go to `redirect` (OAuth), or tell the person to check their inbox (magic link). */
+export interface AuthStartResult {
+  redirect: string | null;
+  email_sent: boolean;
+}
+
+/**
+ * Why the sign-in callback sent someone back to /sign-in?error=…
+ * no-account: unknown and sign-up is off. rejected: an admin turned their sign-up down.
+ * disabled: their account is turned off. other-browser: the link was opened in another browser.
+ * failed: the provider said no, or something else went wrong.
+ */
+export type SignInErrorCode = 'no-account' | 'rejected' | 'disabled' | 'other-browser' | 'failed';
+
+/** Where someone who signed up is. null = an admin added them. */
+export type SignupStatus = 'pending' | 'approved' | 'rejected';
+
+/** GET /api/auth/status: works without a workspace, so a pending person can see where they are. */
+export interface AuthStatus {
+  name: string;
+  email: string | null;
+  signup: SignupStatus | null;
+}
+
+/** GET /api/signups: someone who signed up, for server admins. */
+export interface PendingSignup {
+  id: string;
+  name: string;
+  email: string | null;
+  /** The provider they first signed in with, e.g. 'supabase'. */
+  provider: string;
+  signup: SignupStatus;
+  signup_at: string;
+}
+
 /**
  * How much review an agent's writes get. edit_modes: follow each section's edit mode.
  * always_propose: propose even in open sections. auto_approve: approve its proposals in its

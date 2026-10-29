@@ -25,6 +25,12 @@ export interface Config {
   importMaxBytes: number;
   /** Sign-in through an external provider and self sign-up. Off by default: tokens only. */
   auth: AuthConfig;
+  /**
+   * Behind a reverse proxy, trust its X-Forwarded-For so rate limits see the real client.
+   * OPENPURPOSE_TRUST_PROXY: true, or the proxy addresses (e.g. 10.0.0.0/8,127.0.0.1). Off by
+   * default.
+   */
+  trustProxy: boolean | string;
 }
 
 const SIGNUP_MODES: SignupMode[] = ['off', 'approval', 'open'];
@@ -80,7 +86,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     },
     importMaxBytes: Number(env.OPENPURPOSE_IMPORT_MAX_MB ?? 100) * 1024 * 1024,
     auth,
+    trustProxy: trustProxy(env.OPENPURPOSE_TRUST_PROXY),
   };
+}
+
+function trustProxy(value: string | undefined): boolean | string {
+  const v = (value ?? '').trim();
+  if (!v || v === 'false' || v === 'off') return false;
+  return v === 'true' || v === 'on' ? true : v;
 }
 
 function loadAuthConfig(env: NodeJS.ProcessEnv): AuthConfig {
