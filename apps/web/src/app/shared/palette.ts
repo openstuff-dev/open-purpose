@@ -204,7 +204,7 @@ export class Palette {
               icon: 'building',
               label: s.group()?.name ?? 'Workspace',
               hint: 'Workspace overview',
-              run: this.go(['/group']),
+              run: this.go(['/workspace']),
             },
           ]
         : []),
@@ -253,7 +253,7 @@ export class Palette {
         group: 'Settings',
         icon: 'building',
         label: s.groupShown() ? 'Workspace and organizations' : 'Organizations',
-        run: this.go(['/settings', 'group']),
+        run: this.go(['/settings', 'workspace']),
       });
     if (s.adminsAnything)
       pages.push({

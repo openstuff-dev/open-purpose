@@ -28,7 +28,7 @@ import { ScopeList } from '../shared/scope-list';
         </div>
         <div class="os-page-actions">
           @if (g.can_admin) {
-            <a os-button routerLink="/settings/group"><app-icon name="settings" />Manage</a>
+            <a os-button routerLink="/settings/workspace"><app-icon name="settings" />Manage</a>
           }
         </div>
       </header>

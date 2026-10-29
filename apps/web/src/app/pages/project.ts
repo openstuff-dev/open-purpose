@@ -75,7 +75,7 @@ const TABS: Tab[] = [
             <ol>
               @if (session.groupShown()) {
                 <li>
-                  <a routerLink="/group">{{ session.group()?.name }}</a>
+                  <a routerLink="/workspace">{{ session.group()?.name }}</a>
                 </li>
               }
               <li>
@@ -130,7 +130,7 @@ const TABS: Tab[] = [
       <ol class="layer-path" aria-label="Where this project's rules sit">
         @if (session.groupShown()) {
           <li>
-            <a routerLink="/group"
+            <a routerLink="/workspace"
               ><span class="lp-kind">Workspace</span
               ><span class="lp-name">{{ session.group()?.name }}</span></a
             >

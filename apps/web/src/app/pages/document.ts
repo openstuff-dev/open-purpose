@@ -77,7 +77,7 @@ interface Draft {
             <ol>
               @if (session.groupShown() || !d.organization) {
                 <li>
-                  <a routerLink="/group">{{ session.group()?.name }}</a>
+                  <a routerLink="/workspace">{{ session.group()?.name }}</a>
                 </li>
               }
               @if (d.organization; as o) {
@@ -373,7 +373,7 @@ interface Draft {
                           r.source.type === 'project'
                             ? ['/projects', r.source.project_id]
                             : r.source.type === 'group'
-                              ? ['/group']
+                              ? ['/workspace']
                               : ['/organization']
                         "
                         >{{ r.source.label }}</a
@@ -691,7 +691,7 @@ export class DocumentPage {
             ? ['/projects', d.project.id]
             : d.organization
               ? ['/organization']
-              : ['/group'],
+              : ['/workspace'],
       );
     } catch (e) {
       this.notices.error(e);

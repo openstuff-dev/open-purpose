@@ -58,7 +58,7 @@ function readPeriod(): ActivityPeriod {
             <nav os-breadcrumbs>
               <ol>
                 <li>
-                  <a routerLink="/group">{{ session.group()?.name }}</a>
+                  <a routerLink="/workspace">{{ session.group()?.name }}</a>
                 </li>
               </ol>
             </nav>
@@ -81,7 +81,7 @@ function readPeriod(): ActivityPeriod {
         </div>
         <div class="os-page-actions">
           @if (session.canAdmin(org.id)) {
-            <a os-button routerLink="/settings/group"><app-icon name="settings" />Manage</a>
+            <a os-button routerLink="/settings/workspace"><app-icon name="settings" />Manage</a>
           }
           @if (session.canEdit(org.id)) {
             <a os-button variant="primary" routerLink="/projects"
@@ -277,7 +277,7 @@ function readPeriod(): ActivityPeriod {
           <h1 class="os-page-title">Choose an organization</h1>
           <p class="os-page-description">
             Pick one in the switcher at the top of the menu, or start from
-            <a routerLink="/group">{{ session.group()?.name }}</a
+            <a routerLink="/workspace">{{ session.group()?.name }}</a
             >.
           </p>
         </div>
