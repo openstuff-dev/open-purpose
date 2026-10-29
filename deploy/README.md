@@ -49,7 +49,7 @@ Then:
 3. Check that rate limits see each visitor's own address, not the tunnel's: open the site
    from your phone on mobile data, then run
    `docker compose logs openpurpose | grep remoteAddress | tail`. You should see your
-   phone's public address, not `172.30.47.2`.
+   phone's public address, not cloudflared's (`<OPENPURPOSE_NETWORK>.2`).
 
 ## Backups
 

@@ -20,7 +20,7 @@ services:
       OPENPURPOSE_SIGNUP: ${OPENPURPOSE_SIGNUP:-approval}
       OPENPURPOSE_SESSION_DAYS: ${OPENPURPOSE_SESSION_DAYS:-30}
       # Only cloudflared may set X-Forwarded-For, so rate limits see each visitor's own address.
-      OPENPURPOSE_TRUST_PROXY: 172.30.47.2
+      OPENPURPOSE_TRUST_PROXY: ${OPENPURPOSE_NETWORK:-172.30.47}.2
     networks:
       - openpurpose
     # No ports: visitors come in through the tunnel only.
@@ -37,7 +37,7 @@ services:
       - openpurpose
     networks:
       openpurpose:
-        ipv4_address: 172.30.47.2
+        ipv4_address: ${OPENPURPOSE_NETWORK:-172.30.47}.2
     restart: unless-stopped
 
   backup:
@@ -72,6 +72,7 @@ networks:
   openpurpose:
     ipam:
       config:
-        - subnet: 172.30.47.0/24
-          # Other containers get addresses from here, so 172.30.47.2 stays free for cloudflared.
-          ip_range: 172.30.47.128/25
+        # OPENPURPOSE_NETWORK is the first three numbers of a /24 no other Docker network uses.
+        - subnet: ${OPENPURPOSE_NETWORK:-172.30.47}.0/24
+          # Other containers get addresses from here, so .2 stays free for cloudflared.
+          ip_range: ${OPENPURPOSE_NETWORK:-172.30.47}.128/25
