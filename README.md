@@ -201,7 +201,7 @@ For a backup of the whole server, every workspace at once, use `pg_dump`.
 
 ### Without Docker
 
-Requires Node 22.22+ (or 24.15+) and Postgres 14+. The repository is one npm
+Requires Node 22.22.3+ (or 24.15+) and Postgres 14+. The repository is one npm
 workspace, so a single install at the root covers the server, the web app and
 the shared types:
 
@@ -367,7 +367,8 @@ same targets for every project.
 
 The colours, spacing and fonts come from `@openstuff-dev/tokens`, generated from the
 `primaryColor` in `apps/web/tokens.config.json` (`npx nx tokens web`, run before every build).
-Lint uses `@openstuff-dev/lint` and reports warnings only for now.
+Lint uses `@openstuff-dev/lint`; rules report errors and CI runs `lint` and `stylelint`,
+so run `npm run lint` before you push.
 
 Run the tests with a Postgres available at `TEST_DATABASE_URL`
 (default `postgres://openpurpose:openpurpose@localhost:5432/openpurpose_test`; the test
