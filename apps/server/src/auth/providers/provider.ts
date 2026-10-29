@@ -11,6 +11,8 @@ export interface ExternalIdentity {
   subject: string;
   email: string | null;
   name: string | null;
+  /** How they proved it, e.g. 'github' or 'email'; shown to the admin who approves them. */
+  method?: string | null;
 }
 
 export interface AuthProvider {

@@ -51,7 +51,7 @@ import { Notices } from '../shared/notice';
                 <div class="os-setting-text">
                   <h3>{{ s.name }}</h3>
                   <p>
-                    {{ s.email ?? 'No email' }} · {{ providerLabel(s.provider) }} · signed up
+                    {{ s.email ?? 'No email' }} · {{ signedInWith(s) }} · signed up
                     {{ s.signup_at | date: 'd MMM y, HH:mm' }}
                   </p>
                 </div>
@@ -123,7 +123,10 @@ export class SignupsList {
     });
   }
 
-  providerLabel(p: string): string {
+  signedInWith(s: PendingSignup): string {
+    if (s.method === 'email') return 'Email link';
+    if (s.method === 'github') return 'GitHub';
+    const p = s.method ?? s.provider;
     return p.charAt(0).toUpperCase() + p.slice(1);
   }
 
