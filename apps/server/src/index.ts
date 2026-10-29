@@ -1,3 +1,4 @@
+import pg from 'pg';
 import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { createPool, migrate } from './db.js';
@@ -7,10 +8,13 @@ async function main() {
   const config = loadConfig();
   const db = createPool(config.databaseUrl);
 
-  // Postgres may still be starting when the container comes up.
+  // Postgres may still be starting when the container comes up. Wait with a plain client:
+  // pool connections drop privileges, which needs the role the migrations create.
   for (let attempt = 1; ; attempt++) {
+    const probe = new pg.Client({ connectionString: config.databaseUrl });
     try {
-      await db.query('SELECT 1');
+      await probe.connect();
+      await probe.end();
       break;
     } catch (err) {
       if (attempt >= 30) throw err;

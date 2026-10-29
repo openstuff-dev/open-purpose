@@ -8,13 +8,22 @@ export type Db = pg.Pool | pg.PoolClient;
 export type Queryable = Db;
 
 /**
- * Superusers ignore row-level security. When OpenPurpose connects as one (the
- * Docker default), every connection drops to the openpurpose_app role first.
+ * Superusers and BYPASSRLS roles ignore row-level security. When OpenPurpose
+ * connects as one (the Docker default, or Supabase's postgres user), every
+ * connection drops to the openpurpose_app role first. If it can't, the
+ * connection fails, so the server refuses to start rather than mix workspaces.
  */
 const DROP_PRIVILEGES = `DO $$ BEGIN
-  IF current_setting('is_superuser') = 'on' AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'openpurpose_app') THEN
-    EXECUTE 'SET ROLE openpurpose_app';
+  IF current_setting('is_superuser') <> 'on'
+     AND NOT (SELECT rolbypassrls FROM pg_roles WHERE rolname = current_user) THEN
+    RETURN;
   END IF;
+  BEGIN
+    EXECUTE 'SET ROLE openpurpose_app';
+  EXCEPTION WHEN invalid_parameter_value OR insufficient_privilege THEN
+    RAISE EXCEPTION 'The database user % skips row-level security (superuser or BYPASSRLS) and can''t switch to the openpurpose_app role, so workspaces could see each other''s data.', current_user
+      USING HINT = format('Run the migrations as %I, or have an admin run: GRANT openpurpose_app TO %I', current_user, current_user);
+  END;
 END $$`;
 
 const ready = new WeakSet<pg.PoolClient>();
@@ -172,15 +181,23 @@ export async function migrate(databaseUrl: string, dir: string): Promise<string[
     // Keep the unprivileged role's grants in step with the schema.
     const role = await client.query('SELECT 1 FROM pg_roles WHERE rolname = \'openpurpose_app\'');
     if (role.rowCount) {
-      await client
-        .query(
-          `
+      await client.query(`
         GRANT USAGE ON SCHEMA public TO openpurpose_app;
         GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO openpurpose_app;
         GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO openpurpose_app;
-        GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO openpurpose_app;`,
+        GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO openpurpose_app;`);
+      // A non-superuser that created the role (Supabase's postgres user) may administer it
+      // without being allowed to SET ROLE to it yet. If granting fails too, the pool's
+      // DROP_PRIVILEGES says so when it matters.
+      await client
+        .query(
+          `DO $$ BEGIN
+            SET ROLE openpurpose_app;
+            RESET ROLE;
+          EXCEPTION WHEN insufficient_privilege THEN
+            EXECUTE format('GRANT openpurpose_app TO %I', current_user);
+          END $$`,
         )
-        // Grants fail on databases where the role doesn't exist; that setup doesn't need them.
         .catch(() => undefined);
     }
   } finally {
