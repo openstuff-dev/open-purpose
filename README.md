@@ -317,6 +317,23 @@ The server sends its workflow as MCP instructions, but agents follow it more
 reliably when the repo says so too: copy [`agent/AGENTS.snippet.md`](agent/AGENTS.snippet.md)
 into your repo's `AGENTS.md` or `CLAUDE.md`.
 
+### First run
+
+New to OpenPurpose? The [`openpurpose-start`](agent/skills/openpurpose-start/SKILL.md) skill
+gives a guided first run in your own repository: it checks the connection, connects the
+repository to a project, adds the snippet above, shows what an agent sees there, fills one
+gap (usually the project purpose) and turns one rule you keep repeating into your first
+learning. For Claude Code, run this in the repository and then type `/openpurpose-start`:
+
+```bash
+mkdir -p .claude/skills/openpurpose-start && curl -fsSL \
+  https://raw.githubusercontent.com/openstuff-dev/open-purpose/master/agent/skills/openpurpose-start/SKILL.md \
+  -o .claude/skills/openpurpose-start/SKILL.md
+```
+
+Use `~/.claude/skills/` instead to have it in every repository. Other agents that read skills
+(Codex, Cursor, ...) can use the same file.
+
 ### MCP tools
 
 | Tool | What it does |
@@ -340,7 +357,7 @@ into your repo's `AGENTS.md` or `CLAUDE.md`.
 apps/server/          Fastify + TypeScript 7 + pg. REST API, MCP endpoint, migrations, tests
 apps/web/             Angular 22 + TypeScript 6 (standalone components, signals)
 packages/contracts/   Types the server sends and the web reads, defined once (declarations only)
-agent/                Instruction snippet and .openpurpose.json example for repos
+agent/                Instruction snippet, .openpurpose.json example and first-run skill for repos
 ```
 
 The repository is an Nx workspace. The projects are `server`, `web` and `contracts`:
