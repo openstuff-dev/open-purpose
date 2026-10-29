@@ -154,7 +154,7 @@ const RADIUS: Record<GraphNode['type'], number> = {
                 >Open term</a
               >
             } @else if (n.type === 'group') {
-              <a os-button routerLink="/group">Open {{ n.label }}</a>
+              <a os-button routerLink="/workspace">Open {{ n.label }}</a>
             } @else if (n.type === 'organization' && !n.restricted) {
               <button os-button type="button" (click)="openOrg(n.organization_id!)">
                 Open {{ n.label }}

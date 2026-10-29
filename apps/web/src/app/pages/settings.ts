@@ -33,7 +33,7 @@ import { SignupsList } from './signups';
 import { TransferPage } from './transfer';
 
 type Tab =
-  'account' | 'appearance' | 'connect' | 'test' | 'group' | 'people' | 'transfer' | 'server';
+  'account' | 'appearance' | 'connect' | 'test' | 'workspace' | 'people' | 'transfer' | 'server';
 
 const AGENTS_SNIPPET = `## OpenPurpose (shared rules and learnings)
 
@@ -117,7 +117,7 @@ organization, the project and the part of the code you are in (a repository or a
           <div class="nav-label">
             {{ session.groupShown() ? session.group()?.name : session.org()?.name }}
           </div>
-          <a routerLink="/settings/group" routerLinkActive="active"
+          <a routerLink="/settings/workspace" routerLinkActive="active"
             ><app-icon name="building" />Organizations</a
           >
           <a routerLink="/settings/people" routerLinkActive="active"
@@ -362,7 +362,7 @@ organization, the project and the part of the code you are in (a repository or a
             </section>
           }
 
-          @case ('group') {
+          @case ('workspace') {
             @if (session.canAdmin(null) && session.groupShown()) {
               <section>
                 <h2>Workspace</h2>
@@ -696,7 +696,7 @@ export class SettingsPage {
   readonly current = computed<Tab>(() => {
     const t = (this.tab() ?? 'account') as Tab;
     const allowed: Tab[] = ['account', 'appearance', 'connect', 'test'];
-    if (this.session.adminsAnything) allowed.push('group', 'people', 'transfer');
+    if (this.session.adminsAnything) allowed.push('workspace', 'people', 'transfer');
     if (this.session.isSuperadmin) allowed.push('server');
     return allowed.includes(t) ? t : 'account';
   });

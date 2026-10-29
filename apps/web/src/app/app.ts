@@ -182,7 +182,7 @@ import { SignInPage } from './pages/sign-in';
                 }
                 @if (session.canAdmin(null)) {
                   <hr os-menu-separator />
-                  <a os-menu-item routerLink="/settings/group"
+                  <a os-menu-item routerLink="/settings/workspace"
                     ><app-icon name="settings" />{{
                       session.groupShown() ? 'Manage organizations' : 'Add an organization'
                     }}</a
@@ -232,7 +232,7 @@ import { SignInPage } from './pages/sign-in';
             <ul>
               @if (session.groupShown()) {
                 <li>
-                  <a routerLink="/group" routerLinkActive="active"
+                  <a routerLink="/workspace" routerLinkActive="active"
                     ><app-icon name="building" />Workspace-wide rules</a
                   >
                 </li>

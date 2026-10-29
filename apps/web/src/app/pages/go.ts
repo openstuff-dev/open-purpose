@@ -18,7 +18,7 @@ import { Session } from '../core/session';
           r.org
         }}, which you can't read. A workspace admin can share it with your organization."
       ></header>
-      <p><a routerLink="/group">See who can read what</a></p>
+      <p><a routerLink="/workspace">See who can read what</a></p>
     } @else if (missing()) {
       <header
         os-page-header

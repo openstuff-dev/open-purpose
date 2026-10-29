@@ -36,7 +36,7 @@ import { SlugRenameField } from '../shared/slug-rename';
             <ol>
               @if (session.groupShown()) {
                 <li>
-                  <a routerLink="/group">{{ session.group()?.name }}</a>
+                  <a routerLink="/workspace">{{ session.group()?.name }}</a>
                 </li>
               }
               @if (s.organization; as o) {
@@ -263,7 +263,7 @@ export class ScopePage {
       await this.api.deleteScope(s.id);
       this.notices.ok(`Deleted ${s.name}`);
       await this.router.navigate(
-        s.project ? ['/projects', s.project.id] : s.organization ? ['/organization'] : ['/group'],
+        s.project ? ['/projects', s.project.id] : s.organization ? ['/organization'] : ['/workspace'],
       );
     } catch (e) {
       this.notices.error(e);

@@ -174,7 +174,7 @@ export class GroupsPage {
   async open(id: string): Promise<void> {
     try {
       await this.switcher.group(id);
-      await this.router.navigate(['/group']);
+      await this.router.navigate(['/workspace']);
     } catch (e) {
       this.notices.error(e);
     }

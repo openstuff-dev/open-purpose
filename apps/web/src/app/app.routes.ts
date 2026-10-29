@@ -45,7 +45,7 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'organization' },
       {
-        path: 'group',
+        path: 'workspace',
         title: 'Workspace',
         loadComponent: () => import('./pages/group').then((m) => m.GroupPage),
       },
@@ -97,6 +97,7 @@ export const routes: Routes = [
         children: [],
       },
       { path: 'settings', pathMatch: 'full', redirectTo: 'settings/account' },
+      { path: 'settings/group', redirectTo: 'settings/workspace' },
       {
         path: 'settings/:tab',
         title: 'Settings',
@@ -104,6 +105,8 @@ export const routes: Routes = [
       },
       { path: 'people', redirectTo: 'settings/people' },
       { path: 'groups', redirectTo: 'settings/server' },
+      // Old addresses, from before "group" became "workspace".
+      { path: 'group', redirectTo: 'workspace' },
       { path: 'go/:target', loadComponent: () => import('./pages/go').then((m) => m.GoPage) },
       { path: '**', redirectTo: 'organization' },
     ],
