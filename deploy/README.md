@@ -12,7 +12,9 @@ server dies, the same `.env` starts the stack on any other machine.
 
 ## Before you start
 
-You need:
+`./setup-wizard.sh` walks you through all of this and the next section, step by step, and
+fills in `.env` as you go. Run it on the server as your normal user; re-running it keeps the
+values you already entered. To do it by hand, you need:
 
 - Docker Engine with the compose plugin, run as a normal user in the `docker` group.
 - A Supabase project for production (database and sign-in), in a region near the server.
