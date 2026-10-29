@@ -21,6 +21,7 @@ import {
 import { Api } from '../core/api';
 import type { Organization, TokenRow } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
+import { Signups } from '../core/signups';
 import { Theme, initials, type ThemeChoice } from '../core/theme';
 import { Icon } from '../shared/icon';
 import { Notices } from '../shared/notice';
@@ -28,6 +29,7 @@ import { SlugRenameField } from '../shared/slug-rename';
 import { GroupsPage } from './groups';
 import { PeoplePage } from './people';
 import { PreviewPage } from './preview';
+import { SignupsList } from './signups';
 import { TransferPage } from './transfer';
 
 type Tab =
@@ -83,6 +85,7 @@ organization, the project and the part of the code you are in (a repository or a
     PeoplePage,
     GroupsPage,
     PreviewPage,
+    SignupsList,
     SlugRenameField,
     TransferPage,
     Button,
@@ -127,8 +130,11 @@ organization, the project and the part of the code you are in (a repository or a
         @if (session.isSuperadmin) {
           <div class="nav-label">Server</div>
           <a routerLink="/settings/server" routerLinkActive="active"
-            ><app-icon name="server" />All groups</a
-          >
+            ><app-icon name="server" />All groups
+            @if (signups.pending().length; as n) {
+              <span class="count" [attr.aria-label]="n + ' sign-ups waiting'">{{ n }}</span>
+            }
+          </a>
         }
       </nav>
 
@@ -668,7 +674,8 @@ organization, the project and the part of the code you are in (a repository or a
             <app-transfer />
           }
           @case ('server') {
-            <app-groups />
+            <app-signups (approved)="groups.load()" />
+            <app-groups #groups />
           }
         }
       </div>
@@ -680,6 +687,7 @@ export class SettingsPage {
   readonly session = inject(Session);
   private readonly confirmDialog = inject(ConfirmDialog);
   readonly theme = inject(Theme);
+  readonly signups = inject(Signups);
   private api = inject(Api);
   private notices = inject(Notices);
   private router = inject(Router);
@@ -744,6 +752,7 @@ export class SettingsPage {
   );
 
   constructor() {
+    this.signups.load().catch(() => undefined);
     effect(() => {
       const me = this.session.me();
       if (me) {
