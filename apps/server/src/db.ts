@@ -186,6 +186,20 @@ export async function migrate(databaseUrl: string, dir: string): Promise<string[
         GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO openpurpose_app;
         GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO openpurpose_app;
         GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO openpurpose_app;`);
+      // Supabase can turn on row-level security for every new table in public. On the tables
+      // we leave without it (groups, actors, tokens, ...) that denies the app everything. Let
+      // the app in there, and nobody else: Supabase's Data API roles stay locked out.
+      await client.query(`DO $$
+        DECLARE t text;
+        BEGIN
+          FOR t IN SELECT c.relname FROM pg_class c
+                   WHERE c.relnamespace = 'public'::regnamespace AND c.relkind = 'r'
+                     AND c.relrowsecurity
+                     AND NOT EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid)
+          LOOP
+            EXECUTE format('CREATE POLICY openpurpose_app ON %I TO openpurpose_app USING (true) WITH CHECK (true)', t);
+          END LOOP;
+        END $$`);
       // A non-superuser that created the role (Supabase's postgres user) may administer it
       // without being allowed to SET ROLE to it yet. If granting fails too, the pool's
       // DROP_PRIVILEGES says so when it matters.

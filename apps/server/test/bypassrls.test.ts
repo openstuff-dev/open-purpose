@@ -19,9 +19,11 @@ function urlFor(user: string, password: string, database: string): string {
   return url.toString();
 }
 const DATABASE_URL = urlFor(ROLE, 'bypass', DATABASE);
+// The superuser, in the test database.
+const ADMIN_DB_URL = Object.assign(new URL(ADMIN_URL), { pathname: `/${DATABASE}` }).toString();
 
-async function asAdmin(sql: string): Promise<void> {
-  const admin = new pg.Client({ connectionString: ADMIN_URL });
+async function asAdmin(sql: string, url = ADMIN_URL): Promise<void> {
+  const admin = new pg.Client({ connectionString: url });
   await admin.connect();
   try {
     await admin.query(sql);
@@ -42,6 +44,20 @@ beforeAll(async () => {
   END $$`);
   await asAdmin(`CREATE ROLE ${ROLE} LOGIN PASSWORD 'bypass' NOSUPERUSER BYPASSRLS CREATEROLE`);
   await asAdmin(`CREATE DATABASE ${DATABASE} OWNER ${ROLE}`);
+  // Like Supabase's "automatic RLS": every new table in public gets row-level security.
+  await asAdmin(
+    `CREATE FUNCTION rls_auto_enable() RETURNS event_trigger LANGUAGE plpgsql AS $$
+    DECLARE r record;
+    BEGIN
+      FOR r IN SELECT * FROM pg_event_trigger_ddl_commands()
+               WHERE command_tag = 'CREATE TABLE' AND schema_name = 'public'
+      LOOP
+        EXECUTE format('ALTER TABLE %s ENABLE ROW LEVEL SECURITY', r.object_identity);
+      END LOOP;
+    END $$;
+    CREATE EVENT TRIGGER ensure_rls ON ddl_command_end EXECUTE FUNCTION rls_auto_enable();`,
+    ADMIN_DB_URL,
+  );
 });
 
 afterAll(async () => {
@@ -95,5 +111,26 @@ describe('a database user with BYPASSRLS', () => {
     expect(await orgs(other.group.id)).toEqual(['Other']);
     expect(await orgs(null)).toEqual([]);
     expect((await pool.query('SELECT count(*)::int AS n FROM organizations')).rows[0].n).toBe(0);
+  });
+
+  it('lets only the app into tables that got row-level security without a policy', async () => {
+    await asAdmin(
+      `DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+      END $$;
+      GRANT USAGE ON SCHEMA public TO anon;
+      GRANT SELECT ON groups, api_tokens TO anon;
+      GRANT anon TO ${ROLE};`,
+      ADMIN_DB_URL,
+    );
+    const anon = new pg.Client({ connectionString: DATABASE_URL });
+    await anon.connect();
+    try {
+      await anon.query('SET ROLE anon');
+      expect((await anon.query('SELECT count(*)::int AS n FROM groups')).rows[0].n).toBe(0);
+      expect((await anon.query('SELECT count(*)::int AS n FROM api_tokens')).rows[0].n).toBe(0);
+    } finally {
+      await anon.end();
+    }
   });
 });
