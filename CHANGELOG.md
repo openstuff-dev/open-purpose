@@ -3,12 +3,19 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
-## Unreleased
+## 0.3.5
 
 - Added the `openpurpose-start` skill for a guided first run in your own repository: it
   connects the repository to a project, shows what an agent sees there and turns one rule you
   keep repeating into your first learning. Settings › Connect an agent and the README show how
   to install it.
+- Organization dots in the map legend, project rows, findings, the inbox and people chips are
+  round again; the activity grid's square cells were overriding them.
+- `get_review`, `reply_to_review` and `revise_proposal` accept the 8-character proposal id that
+  `add_section`, `update_section` and `propose_learning` answer with. An unknown id now answers
+  "Proposal not found" instead of a database error.
+- The README says which Node version you need (22.22.3+ or 24.15+), the repository pins Node 24
+  in `.nvmrc`, and npm warns on older versions. The README also says that lint problems fail CI.
 
 ## 0.3.4
 
