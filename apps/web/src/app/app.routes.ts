@@ -9,8 +9,30 @@ const openSearch = (route: ActivatedRouteSnapshot) => {
   return inject(Router).parseUrl('/organization');
 };
 const notInAgentMode = () => !inject(Session).agentMode() || inject(Router).parseUrl('/agent');
+const signedOut = () => !inject(Session).token() || inject(Router).parseUrl('/organization');
+
+/** Pages that show on their own, signed in or not. Every other page needs someone signed in. */
+export const isPublicUrl = (url: string) => /^\/(sign-in|sign-up|auth\/done)(?=[/?#]|$)/.test(url);
 
 export const routes: Routes = [
+  {
+    path: 'sign-in',
+    title: 'Sign in',
+    canActivate: [signedOut],
+    loadComponent: () => import('./pages/sign-in').then((m) => m.SignInPage),
+  },
+  {
+    path: 'sign-up',
+    title: 'Sign up',
+    canActivate: [signedOut],
+    data: { mode: 'sign-up' },
+    loadComponent: () => import('./pages/sign-in').then((m) => m.SignInPage),
+  },
+  {
+    path: 'auth/done',
+    title: 'Signing in',
+    loadComponent: () => import('./pages/auth-done').then((m) => m.AuthDonePage),
+  },
   {
     path: 'agent',
     title: 'Agent mode',

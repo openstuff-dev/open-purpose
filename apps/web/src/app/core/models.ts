@@ -64,6 +64,14 @@ export type {
   OrgActivity,
   SectionActivity,
   Staleness,
+  AuthConfig,
+  AuthMethod,
+  AuthStartResult,
+  AuthStatus,
+  SignInErrorCode,
+  SignupMode,
+  SignupStatus,
+  PendingSignup,
 } from '@openpurpose/contracts';
 
 export const EDIT_MODES: EditMode[] = ['locked', 'propose', 'open'];

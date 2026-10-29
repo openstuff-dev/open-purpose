@@ -47,6 +47,10 @@ import type {
   FindingStatus,
   ImportOptions,
   ImportReport,
+  AuthConfig,
+  AuthMethod,
+  AuthStartResult,
+  AuthStatus,
 } from './models';
 
 /** An export to import: parsed JSON, or a zip as base64. */
@@ -77,6 +81,18 @@ export class Api {
     const obs: Observable<T> = this.http.request<T>(method, `/api${path}`, { body });
     return firstValueFrom(obs);
   }
+
+  // signing in: config, start and exchange need no token
+  authConfig = () => this.get<AuthConfig>('/auth/config');
+  startSignIn = (method: AuthMethod, email?: string) =>
+    this.send<AuthStartResult>('POST', '/auth/start', { method, email });
+
+  /** Swaps the one-time code from /auth/done for a session token. */
+  exchangeCode = (code: string) => this.send<{ token: string }>('POST', '/auth/exchange', { code });
+  /** Ends a browser session; an access token stays valid. */
+  signOut = () => this.send<undefined>('POST', '/auth/sign-out');
+  /** Works without a workspace: tells a pending person they're waiting. */
+  authStatus = () => this.get<AuthStatus>('/auth/status');
 
   me = () => this.get<Me>('/me');
   /** Agent mode: run one read-only MCP tool as the agent and get its text exactly. */

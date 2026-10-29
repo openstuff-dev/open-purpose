@@ -244,6 +244,11 @@ kbd {
   margin: -0.4rem 0 0.5rem;
 }
 
+.signin-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
 .signin-mark {
   width: 40px;
   height: 40px;

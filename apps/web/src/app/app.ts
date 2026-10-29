@@ -14,7 +14,6 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter } from 'rxjs';
 import {
   Button,
-  Control,
   Field,
   IconButton,
   Menu,
@@ -25,13 +24,16 @@ import {
 } from '@openstuff-dev/ui-angular';
 import { positionAnchors } from '@openstuff-dev/ui';
 import { Api } from './core/api';
-import { ROLE_LABEL } from './core/models';
+import { isPublicUrl } from './app.routes';
+import { type AuthStatus, ROLE_LABEL } from './core/models';
 import { Session, errorMessage } from './core/session';
 import { ContextSwitch } from './core/switch';
 import { Theme, initials } from './core/theme';
 import { Icon } from './shared/icon';
 import { Notices } from './shared/notice';
 import { Palette } from './shared/palette';
+import { PendingPage } from './pages/pending';
+import { SignInPage } from './pages/sign-in';
 
 @Component({
   selector: 'app-root',
@@ -45,47 +47,23 @@ import { Palette } from './shared/palette';
     Button,
     IconButton,
     Field,
-    Control,
     Menu,
     MenuItem,
     MenuLabel,
     MenuSeparator,
     PopoverTrigger,
+    SignInPage,
+    PendingPage,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown)': 'onKey($event)' },
   template: `
-    @if (!session.token()) {
-      <main class="signin">
-        <form class="signin-card" (ngSubmit)="signIn()">
-          <svg class="signin-mark" viewBox="0 0 40 40" aria-hidden="true">
-            <use href="#openpurpose-mark" />
-          </svg>
-          <h1>Sign in to OpenPurpose</h1>
-          <p>The shared rules, purpose and learnings your people and coding agents work from.</p>
-          <label for="token">Access token</label>
-          <input
-            os-input
-            id="token"
-            name="token"
-            type="password"
-            autocomplete="current-password"
-            [(ngModel)]="tokenInput"
-            placeholder="chr_…"
-            required
-          />
-          @if (signinError()) {
-            <p class="os-error" role="alert">{{ signinError() }}</p>
-          }
-          <button os-button variant="primary" type="submit" [disabled]="!tokenInput.trim()">
-            Sign in
-          </button>
-          <p class="quiet">
-            An admin creates tokens under Settings. The first admin token is printed in the server
-            log on first start.
-          </p>
-        </form>
-      </main>
+    @if (publicPage()) {
+      <router-outlet />
+    } @else if (!session.token()) {
+      <app-sign-in />
+    } @else if (pending(); as status) {
+      <app-pending [status]="status" (check)="refreshMe()" (signOut)="signOut()" />
     } @else if (session.me(); as me) {
       @if (me.agent_view) {
         <!-- Agent mode: only what the agent itself gets back, nothing of the regular UI. -->
@@ -391,11 +369,13 @@ export class App {
   private switcher = inject(ContextSwitch);
   readonly theme = inject(Theme);
   readonly railOpen = signal(false);
-  readonly signinError = signal('');
   readonly loadError = signal('');
+  /** Set while the person signed in is waiting for a server admin to approve their sign-up. */
+  readonly pending = signal<AuthStatus | null>(null);
+  /** Sign-in, sign-up and the sign-in callback show on their own, signed in or not. */
+  readonly publicPage = signal(isPublicUrl(location.pathname));
   readonly initials = initials;
   readonly mac = /Mac|iPhone|iPad/.test(navigator.platform);
-  tokenInput = '';
 
   constructor() {
     // Agent mode restyles the whole document (drawers and dialogs live outside the shell).
@@ -411,6 +391,7 @@ export class App {
     });
     effect(() => {
       if (this.session.token()) untracked(() => void this.refreshMe());
+      else this.pending.set(null);
     });
     // The agent tip is anchored in CSS; the polyfill (where needed) has to see it once it renders.
     effect(() => {
@@ -418,9 +399,10 @@ export class App {
       const tip = this.agentTip()?.nativeElement;
       if (trigger && tip) void positionAnchors([trigger, tip]);
     });
-    this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => {
+    this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe((e) => {
       this.railOpen.set(false);
-      if (this.session.token()) void this.refreshMe();
+      this.publicPage.set(isPublicUrl(e.urlAfterRedirects));
+      if (this.session.token() && !this.publicPage()) void this.refreshMe();
     });
   }
 
@@ -468,9 +450,12 @@ export class App {
   async refreshMe(): Promise<void> {
     try {
       this.session.me.set(await this.api.me());
+      this.pending.set(null);
       this.loadError.set('');
     } catch (err) {
       const status = (err as HttpErrorResponse).status;
+      // Someone who signed up has no workspace until a server admin approves them.
+      if (status === 403 && (await this.signupPending())) return;
       // A remembered group or organization that no longer applies: forget it and try once more.
       if (
         (status === 400 || status === 403 || status === 404) &&
@@ -516,30 +501,23 @@ export class App {
     }
   }
 
-  async signIn(): Promise<void> {
-    this.signinError.set('');
-    this.session.setToken(this.tokenInput.trim());
+  private async signupPending(): Promise<boolean> {
     try {
-      const me = await this.api.me();
-      if (me.actor.kind === 'agent') {
-        this.session.setToken(null);
-        this.signinError.set(
-          'That is an agent token. Agents connect over MCP; sign in with a personal token.',
-        );
-        return;
-      }
-      this.session.me.set(me);
-      this.tokenInput = '';
-    } catch (err) {
-      const msg = errorMessage(err);
-      this.session.setToken(null);
-      this.signinError.set(
-        msg === 'Invalid or revoked token' ? 'That token is not valid or has been revoked.' : msg,
-      );
+      const status = await this.api.authStatus();
+      this.pending.set(status.signup === 'pending' ? status : null);
+    } catch {
+      this.pending.set(null);
     }
+    return !!this.pending();
   }
 
-  signOut(): void {
+  /** Ends a browser session on the server too; an access token stays valid. */
+  async signOut(): Promise<void> {
+    try {
+      await this.api.signOut();
+    } catch {
+      /* signed out here either way */
+    }
     this.session.setToken(null);
     this.loadError.set('');
   }
