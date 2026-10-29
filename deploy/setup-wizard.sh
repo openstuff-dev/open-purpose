@@ -284,6 +284,30 @@ supabase_auth() {
   rm -f "$headers" "$out"
 }
 
+# free_network [PREFERRED]: prints the first a.b.c whose /24 overlaps no other Docker network
+# (the stack's own network doesn't count, so re-runs keep its subnet).
+free_network() {
+  local ids taken cand net base bits start end s e a b c d
+  ids=$(docker network ls -q)
+  # shellcheck disable=SC2086 # one argument per network id
+  taken=$(docker network inspect -f '{{.Name}} {{range .IPAM.Config}}{{.Subnet}} {{end}}' $ids |
+    grep -v '^openpurpose_openpurpose ' |
+    grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+' || true)
+  for cand in "$@" 172.30.47 172.31.247 10.247.47 192.168.247 10.123.47; do
+    [[ "$cand" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+    IFS=. read -r a b c <<<"$cand"; s=$(( (a<<24) + (b<<16) + (c<<8) )); e=$((s + 255))
+    for net in $taken; do
+      base="${net%/*}" bits="${net#*/}"
+      IFS=. read -r a b c d <<<"$base"
+      start=$(( ((a<<24) + (b<<16) + (c<<8) + d) & ~((1<<(32-bits)) - 1) & 0xFFFFFFFF ))
+      end=$(( start + (1<<(32-bits)) - 1 ))
+      (( s <= end && start <= e )) && continue 2
+    done
+    printf '%s' "$cand"; return 0
+  done
+  return 1
+}
+
 # has_txt NAME PATTERN: whether a TXT record matches, when dig is installed.
 has_txt() {
   command -v dig >/dev/null 2>&1 || return 2
@@ -326,6 +350,14 @@ if [[ ! -f "$ENV_FILE" ]]; then
   printf '  %s✓ created%s %s/%s from .env.example (mode 600)\n' "$GREEN" "$RESET" "$PWD" "$ENV_FILE"
 fi
 chmod 600 "$ENV_FILE"
+if net=$(free_network "$(_existing OPENPURPOSE_NETWORK || true)"); then
+  [[ "$net" == "$(_existing OPENPURPOSE_NETWORK || true)" ]] || write_env OPENPURPOSE_NETWORK "$net"
+  printf '  %s✓%s Docker network %s.0/24 is free\n' "$GREEN" "$RESET" "$net"
+else
+  warn "Every subnet I tried overlaps another Docker network. Set OPENPURPOSE_NETWORK in $ENV_FILE"
+  warn "to the first three numbers of a free /24 (see: docker network inspect \$(docker network ls -q))."
+  exit 1
+fi
 note "If your router can, put this server on its own network (a guest network or VLAN),"
 note "away from the other devices at home."
 pause
