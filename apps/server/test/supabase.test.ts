@@ -87,6 +87,21 @@ describe('supabase provider', () => {
     });
     expect(request().body.create_user).toBe(false);
     expect(started.emailSent).toBe(true);
+    expect(started.notice?.level).toBe('info');
+  });
+
+  it('warns in the log when Supabase refuses sign-ups that OpenPurpose allows', async () => {
+    answer(422, { code: 'signup_disabled', msg: 'Signups not allowed for this instance' });
+    const started = await createSupabaseProvider(config).start({
+      method: magicLink,
+      email: 'new@example.com',
+      callbackUrl,
+    });
+    expect(started.emailSent).toBe(true);
+    expect(started.notice).toMatchObject({
+      level: 'warn',
+      message: expect.stringContaining('Allow new users to sign up'),
+    });
   });
 
   it('passes on rate limits and bad emails', async () => {

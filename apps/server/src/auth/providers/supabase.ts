@@ -75,9 +75,23 @@ export function createSupabaseProvider(config: AuthConfig): AuthProvider {
         });
       } catch (err) {
         if (!(err instanceof SupabaseRequestError)) throw err;
-        // Answer the same as for a sent link, so the form doesn't tell who has an account.
-        if (err.code === 'otp_disabled' || err.code === 'signup_disabled')
-          return { emailSent: true, verifier };
+        // Answer the same as for a sent link, so the form doesn't tell who has an account. Only
+        // the log says why no email went out.
+        if (err.code === 'otp_disabled' || err.code === 'signup_disabled') {
+          const notice =
+            config.signup === 'off'
+              ? {
+                  level: 'info' as const,
+                  message: 'No sign-in link sent: Supabase has no user with this email and OPENPURPOSE_SIGNUP=off',
+                }
+              : {
+                  level: 'warn' as const,
+                  message:
+                    `No sign-in link sent: Supabase refused a new user (${err.code}). ` +
+                    `Turn on "Allow new users to sign up" in the Supabase project, or set OPENPURPOSE_SIGNUP=off`,
+                };
+          return { emailSent: true, verifier, notice };
+        }
         if (err.status === 429)
           throw new AppError('too_many_requests', 'Too many sign-in emails. Try again in a few minutes.');
         if (err.status < 500) throw badRequest(err.message);
