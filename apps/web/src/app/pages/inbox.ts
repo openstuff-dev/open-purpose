@@ -75,6 +75,7 @@ const KIND: Record<Proposal['kind'], { label: string; icon: string }> = {
   learning: { label: 'Learning', icon: 'bot' },
   edit_section: { label: 'Change', icon: 'pencil' },
   new_section: { label: 'New section', icon: 'plus' },
+  new_scope: { label: 'New scope', icon: 'layers' },
 };
 
 const STATUS_TONE: Record<ProposalStatus, Tone> = {
@@ -192,6 +193,7 @@ function ago(iso: string): string {
           <option value="learning">Learnings</option>
           <option value="edit_section">Changes</option>
           <option value="new_section">New sections</option>
+          <option value="new_scope">New scopes</option>
         </select>
         <select os-select aria-label="Where" [ngModel]="level()" (ngModelChange)="setLevel($event)">
           <option value="all">Everywhere I can see</option>
@@ -477,6 +479,42 @@ function ago(iso: string): string {
                 }
               </dd>
             }
+            @if (p.scope_spec; as spec) {
+              <dt>Slug</dt>
+              <dd>
+                @if (p.result_scope_id) {
+                  <a [routerLink]="['/scopes', p.result_scope_id]"
+                    ><code>{{ p.result_scope_slug ?? spec.slug }}</code></a
+                  >
+                } @else {
+                  <code>{{ spec.slug }}</code>
+                }
+              </dd>
+              <dt>Paths</dt>
+              <dd>
+                @for (g of spec.path_globs; track g) {
+                  <span os-chip tone="brand">{{ g }}</span>
+                } @empty {
+                  <span class="quiet">Any</span>
+                }
+              </dd>
+              <dt>Stacks</dt>
+              <dd>
+                @for (t of spec.stacks; track t) {
+                  <span os-chip>{{ t }}</span>
+                } @empty {
+                  <span class="quiet">Any</span>
+                }
+              </dd>
+              @if (p.scope_repositories?.length) {
+                <dt>Repositories</dt>
+                <dd>
+                  @for (r of p.scope_repositories; track r) {
+                    <code class="wrap">{{ r }}</code>
+                  }
+                </dd>
+              }
+            }
             @if (p.context.path) {
               <dt>File</dt>
               <dd>
@@ -521,7 +559,9 @@ function ago(iso: string): string {
                     ? 'What changed'
                     : p.kind === 'learning'
                       ? 'The learning'
-                      : 'The new section'
+                      : p.kind === 'new_scope'
+                        ? 'The new scope'
+                        : 'The new section'
                 }}
                 @if (p.revision > 1) {
                   <span os-chip>Revision {{ p.revision }}</span>
@@ -536,13 +576,13 @@ function ago(iso: string): string {
             </div>
             @if (r.editing) {
               <div class="section-edit">
-                <os-field label="Heading"
+                <os-field [label]="p.kind === 'new_scope' ? 'Name' : 'Heading'"
                   ><input os-input [(ngModel)]="r.heading" name="heading"
                 /></os-field>
                 <app-md-editor
                   [(value)]="r.body"
                   [rows]="12"
-                  label="Text"
+                  [label]="p.kind === 'new_scope' ? 'Description' : 'Text'"
                   [fromProject]="p.project_id"
                   [fromOrganization]="p.organization_id"
                 />
@@ -764,7 +804,7 @@ function ago(iso: string): string {
                 }
               }
               <div class="foot-row">
-                @if (p.kind !== 'edit_section') {
+                @if (p.kind === 'new_section' || p.kind === 'learning') {
                   <div class="doc-mode">
                     <span>Agents may</span>
                     <app-mode-picker
@@ -809,8 +849,10 @@ function ago(iso: string): string {
                   </button>
                 }
                 <button os-button variant="danger" type="button" (click)="reject(p)">Reject</button>
-                @if (p.kind !== 'edit_section') {
+                @if (p.kind === 'new_section' || p.kind === 'learning') {
                   <span class="quiet foot-hint">{{ modeLabel[r.mode] }} after approval</span>
+                } @else if (p.kind === 'new_scope') {
+                  <span class="quiet foot-hint">Approving creates the scope</span>
                 }
               </div>
             </footer>
@@ -1416,7 +1458,7 @@ export class InboxPage {
         heading: r.heading !== (p.heading || p.current_heading) ? r.heading : undefined,
         body: r.body !== p.body ? r.body : undefined,
         note: r.note || undefined,
-        mode: p.kind === 'edit_section' ? undefined : r.mode,
+        mode: p.kind === 'new_section' || p.kind === 'learning' ? r.mode : undefined,
         target:
           p.kind === 'learning' && t
             ? { organization_id: t.organization_id, project_id: t.project_id, scope_id: t.scope_id }
@@ -1425,7 +1467,9 @@ export class InboxPage {
       this.notices.ok(
         p.kind === 'learning'
           ? `Approved. Agents in ${t?.label ?? 'that scope'} get it from now on.`
-          : 'Approved',
+          : p.kind === 'new_scope'
+            ? `Created the scope ${p.heading}`
+            : 'Approved',
       );
       await this.afterDecision(p);
     } catch (e) {

@@ -251,6 +251,7 @@ into your repo's `AGENTS.md` or `CLAUDE.md`.
 |---|---|
 | `get_context` | The rules for a repo + path + manifest, from group to scope, with section ids and modes |
 | `propose_learning` | File a correction as a learning under the most specific matching scope (or `level`: project, organization, group) |
+| `create_scope` | Suggest a scope for a part of the project (paths, stacks, one repository) or a kind of code across the organization; a person approves it, editors' tokens create it right away |
 | `resolve_project`, `register_repository`, `create_project` | Find or register the project for a repo |
 | `get_related` | Projects and terms linked to/from a project, with their purpose where readable |
 | `search`, `read_section` | Full-text search, read one section with its version |

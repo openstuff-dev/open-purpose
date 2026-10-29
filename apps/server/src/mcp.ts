@@ -27,6 +27,7 @@ import {
   getProposalDetail,
   listProposals,
   proposeLearning,
+  proposeScope,
 } from './service/proposals.js';
 import {
   folderOf,
@@ -68,7 +69,8 @@ Workflow:
    (or create_project), and write .openpurpose.json with {"project": "<slug>"} in the repo root.
 3. When the user corrects you in a way that should also apply next time, call propose_learning with the
    same remote/path/manifests. A person reviews it before it becomes a rule. Keep it to one rule, stated
-   positively, with the reason.
+   positively, with the reason. When a part of the code (a package, a folder, a stack) keeps collecting
+   rules of its own and list_scopes has no scope for it, suggest one with create_scope.
    Reviewers may comment on lines, suggest wording or request changes. get_context tells you when feedback
    is waiting on you; read it with get_review, then answer with reply_to_review, revise_proposal or
    apply_suggestion. Mention it to the user if their input is needed.
@@ -147,6 +149,7 @@ const WRITE_TOOLS = [
   'apply_suggestion',
   'register_repository',
   'create_project',
+  'create_scope',
   'report_finding',
   'update_finding',
   'resolve_finding',
@@ -1168,6 +1171,99 @@ export function createMcpServer(
         return text(
           `Mapped ${repo.remote_key} to project "${x.project}". Also write .openpurpose.json with {"project": "${x.project}"} in the repo root.${note}`,
         );
+      }),
+  );
+
+  server.registerTool(
+    'create_scope',
+    {
+      title: 'Create scope',
+      description:
+        "Suggest a new scope: a part of a project (some folders, stacks or one of its repositories) that needs its own guidelines and learnings, e.g. \"Lint package\" for packages/lint/**. Call list_scopes first so you don't repeat one. A person approves it before it exists; if your token can edit the organization, it's created right away. Pass the same project/remote_url you used for get_context.",
+      inputSchema: {
+        name: z.string().describe('Short name a person recognises, e.g. "Angular frontend"'),
+        slug: z.string().optional().describe('Lower-case, dashes; derived from name when omitted'),
+        description: z
+          .string()
+          .describe('What this part of the code is, and which rules belong here and not elsewhere'),
+        paths: z
+          .array(z.string())
+          .optional()
+          .describe('Repo-relative path globs it covers, e.g. ["packages/lint/**"]'),
+        stacks: z
+          .array(z.string())
+          .optional()
+          .describe('Stack tags it covers, e.g. ["angular"]. Matches when any path or stack does.'),
+        this_repository_only: z
+          .boolean()
+          .optional()
+          .describe('Bind it to the repository of remote_url, for a project with several repositories'),
+        reason: z.string().describe('Why it needs its own scope, in a sentence or two'),
+        project: locate.project,
+        remote_url: locate.remote_url,
+        level: z
+          .enum(['project', 'organization'])
+          .optional()
+          .describe(
+            'project (default): a part of this project. organization: a kind of code across every project in your organization.',
+          ),
+      },
+    },
+    (x) =>
+      run('create_scope', async (db, track) => {
+        const r = await resolveProject(db, a, { project: x.project, remote_url: x.remote_url });
+        const project = r.project;
+        track.projectId = project?.id;
+        let level: { organization_id: string | null; project_id: string | null };
+        let label: string;
+        if (x.level === 'organization') {
+          const orgId = project?.organization_id ?? a.orgId;
+          if (!orgId)
+            throw new AppError('bad_request', 'No organization known; pass project or remote_url.');
+          level = { organization_id: orgId, project_id: null };
+          label = a.org(orgId)?.name ?? orgId;
+        } else {
+          if (!project)
+            throw new AppError(
+              'bad_request',
+              'No project resolved; pass project or remote_url, or use level "organization".',
+            );
+          level = { organization_id: project.organization_id, project_id: project.id };
+          label = project.name;
+        }
+        let repositoryIds: string[] | undefined;
+        if (x.this_repository_only) {
+          if (!level.project_id || !r.remote)
+            throw new AppError('bad_request', 'this_repository_only needs a project and remote_url.');
+          const { rows } = await db.query<{ id: string }>(
+            'SELECT id FROM repositories WHERE project_id = $1 AND remote_key = $2',
+            [level.project_id, r.remote.key],
+          );
+          const repo = rows.at(0);
+          if (!repo)
+            throw new AppError(
+              'not_found',
+              `${r.remote.key} isn't a repository of ${label}; call register_repository first.`,
+            );
+          repositoryIds = [repo.id];
+        }
+        const result = await proposeScope(db, a, level, {
+          name: x.name,
+          slug: x.slug,
+          description: x.description,
+          path_globs: x.paths,
+          stacks: x.stacks,
+          repository_ids: repositoryIds,
+          rationale: x.reason,
+          context: { remote: r.remote?.key ?? null },
+        });
+        return result.status === 'applied'
+          ? text(
+              `Created scope \`${result.scope.slug}\` in **${label}**. File guidelines under it with propose_learning (scope="${result.scope.slug}").`,
+            )
+          : text(
+              `Scope \`${result.proposal.scope_spec?.slug}\` proposed for **${label}** (proposal ${result.proposal.id}). It exists once a person approves it; until then, file learnings at the project level.`,
+            );
       }),
   );
 

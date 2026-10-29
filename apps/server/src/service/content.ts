@@ -102,7 +102,7 @@ export interface ScopeInput {
 const SCOPE_COLS = `id, organization_id, project_id, slug, name, description, path_globs, stacks, position,
   ARRAY(SELECT sr.repository_id FROM scope_repositories sr WHERE sr.scope_id = scopes.id ORDER BY sr.created_at) AS repository_ids`;
 
-function cleanGlobs(globs: string[] | undefined): string[] {
+export function cleanGlobs(globs: string[] | undefined): string[] {
   return [...new Set((globs ?? []).map(normalizePath).filter(Boolean))];
 }
 

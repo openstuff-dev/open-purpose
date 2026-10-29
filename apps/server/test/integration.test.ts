@@ -415,6 +415,71 @@ describe('OpenPurpose with groups and organizations', () => {
     await client.close();
   });
 
+  it('lets agents suggest scopes that a person creates by approving', async () => {
+    const { client, call } = await mcp(t.jonas);
+    const r = await call('create_scope', {
+      name: 'Lint package',
+      description: 'The shared ESLint config.',
+      paths: ['packages/lint/**'],
+      stacks: ['ESLint'],
+      reason: 'Its rules kept landing at the project level.',
+      remote_url: HTTPS_REMOTE,
+    });
+    expect(r.text).toContain('Scope `lint-package` proposed for **Customer Portal**');
+    const p = (await api('GET', '/proposals?status=pending')).data.find(
+      (x: any) => x.kind === 'new_scope' && x.heading === 'Lint package',
+    );
+    expect(p).toMatchObject({
+      project_id: projectId,
+      body: 'The shared ESLint config.',
+      scope_spec: { slug: 'lint-package', path_globs: ['packages/lint/**'], stacks: ['eslint'] },
+    });
+    expect((await call('get_review', { proposal_id: p.id })).text).toContain(
+      '- Paths: packages/lint/**',
+    );
+    // Nothing exists until a person approves it.
+    const before = await call('get_context', { remote_url: HTTPS_REMOTE, path: 'packages/lint/x.js' });
+    expect(before.text).not.toContain('Lint package');
+
+    const ok = await api('POST', `/proposals/${p.id}/approve`, { body: 'Shared ESLint config.' });
+    expect(ok.status).toBe(200);
+    const done = (await api('GET', `/proposals/${p.id}`)).data;
+    expect(done).toMatchObject({ status: 'approved', result_scope_slug: 'lint-package' });
+    const scope = (await api('GET', `/scopes/${done.result_scope_id}`)).data;
+    expect(scope).toMatchObject({
+      project_id: projectId,
+      name: 'Lint package',
+      description: 'Shared ESLint config.',
+      path_globs: ['packages/lint/**'],
+    });
+    const after = await call('get_context', { remote_url: HTTPS_REMOTE, path: 'packages/lint/x.js' });
+    expect(after.text).toContain('Customer Portal › Lint package');
+
+    const again = await call('create_scope', {
+      name: 'Lint package',
+      description: 'Again.',
+      reason: 'Forgot.',
+      remote_url: HTTPS_REMOTE,
+    });
+    expect(again.isError).toBe(true);
+    expect(again.text).toContain('already is a scope "lint-package"');
+    await client.close();
+
+    // An editor's token creates it right away.
+    const admin = await mcp(ADMIN);
+    const direct = await admin.call('create_scope', {
+      name: 'Scripts',
+      description: 'Build scripts.',
+      paths: ['scripts/**'],
+      reason: 'Own conventions.',
+      remote_url: HTTPS_REMOTE,
+    });
+    expect(direct.text).toContain('Created scope `scripts` in **Customer Portal**');
+    await admin.client.close();
+    for (const s of (await api('GET', `/scopes?project_id=${projectId}`)).data)
+      if (s.slug === 'lint-package' || s.slug === 'scripts') await api('DELETE', `/scopes/${s.id}`);
+  });
+
   it('promotes a learning from one organization to the whole group', async () => {
     const lars = await mcp(t.lars);
     const r = await lars.call('propose_learning', {

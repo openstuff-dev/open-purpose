@@ -11,6 +11,7 @@ import type {
   GraphNode,
   GroupRef,
   ProposalKind,
+  ScopeSpec,
   ProposalStatus,
   Repository,
   Role,
@@ -300,6 +301,10 @@ export interface Proposal {
   reviewed_at: string | null;
   review_note: string;
   result_section_id: string | null;
+  /** new_scope only: slug, paths, stacks and repositories of the scope to create. */
+  scope_spec: ScopeSpec | null;
+  /** new_scope only: the scope created on approval. */
+  result_scope_id: string | null;
   project_slug: string | null;
   project_name: string | null;
   scope_slug: string | null;
@@ -311,6 +316,9 @@ export interface Proposal {
   created_by_kind: 'human' | 'agent' | null;
   reviewed_by_name: string | null;
   result_document_id: string | null;
+  /** new_scope only: the remote keys of the repositories it would be bound to. */
+  scope_repositories: string[] | null;
+  result_scope_slug: string | null;
   section_mode: EditMode | null;
   document_mode: EditMode | null;
   revision: number;

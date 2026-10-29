@@ -445,7 +445,19 @@ export function renderReviewForAgent(
     '',
     `- Status: **${p.status.replace('_', ' ')}** (revision ${p.revision})`,
   );
-  out.push(`- Kind: ${p.kind.replace('_', ' ')}`, `- Heading: ${p.heading}`);
+  out.push(`- Kind: ${p.kind.replace('_', ' ')}`);
+  const spec = p.scope_spec;
+  if (spec) {
+    const list = (xs: string[]) => (xs.length ? xs.join(', ') : 'any');
+    out.push(
+      `- Name: ${p.heading}`,
+      `- Slug: ${spec.slug}`,
+      `- Paths: ${list(spec.path_globs)}`,
+      `- Stacks: ${list(spec.stacks)}`,
+    );
+  } else {
+    out.push(`- Heading: ${p.heading}`);
+  }
   const lastVerdict = [...r.events]
     .reverse()
     .find((e) => e.kind === 'changes_requested' || e.kind === 'approved' || e.kind === 'rejected');
