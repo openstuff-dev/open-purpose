@@ -10,6 +10,7 @@ import {
   Field,
   Radio,
   SegmentedControl,
+  Skeleton,
   Callout,
 } from '@openstuff-dev/ui-angular';
 import { Api, type ImportUpload } from '../core/api';
@@ -97,6 +98,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
     Radio,
     Badge,
     SegmentedControl,
+    Skeleton,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -184,9 +186,10 @@ async function readUpload(file: File): Promise<ImportUpload> {
             variant="primary"
             type="button"
             (click)="exportNow()"
-            [disabled]="busy()"
+            [disabled]="busy() && phase() !== 'exporting'"
+            [loading]="phase() === 'exporting'"
           >
-            <app-icon name="download" />Download
+            <app-icon name="download" />{{ phase() === 'exporting' ? 'Preparing…' : 'Download' }}
           </button>
         </div>
       </div>
@@ -225,7 +228,13 @@ async function readUpload(file: File): Promise<ImportUpload> {
         <div class="os-setting-row" data-inline>
           <div class="os-setting-text">
             <h3>File</h3>
-            <p>{{ fileName() || 'An OpenPurpose export, .json or .zip' }}</p>
+            <p role="status">
+              @if (phase() === 'checking' && !report()) {
+                Checking {{ fileName() }}…
+              } @else {
+                {{ fileName() || 'An OpenPurpose export, .json or .zip' }}
+              }
+            </p>
           </div>
           <label class="os-button">
             <app-icon name="upload" />{{ fileName() ? 'Choose another' : 'Choose file' }}
@@ -261,6 +270,12 @@ async function readUpload(file: File): Promise<ImportUpload> {
           </div>
         }
       </div>
+
+      @if (phase() === 'checking' && !report()) {
+        <div class="transfer-loading" aria-busy="true">
+          <os-skeleton [lines]="4" />
+        </div>
+      }
 
       @if (report(); as r) {
         <p class="quiet transfer-source">
@@ -409,7 +424,9 @@ async function readUpload(file: File): Promise<ImportUpload> {
         }
 
         <h3 class="list-label">What will happen</h3>
-        <p>{{ summary(r) }}</p>
+        <p role="status" [attr.aria-busy]="phase() === 'checking'">
+          {{ phase() === 'checking' ? 'Updating the preview…' : summary(r) }}
+        </p>
         @if (r.warnings.length) {
           <ul class="transfer-warnings">
             @for (w of r.warnings; track $index) {
@@ -461,11 +478,14 @@ async function readUpload(file: File): Promise<ImportUpload> {
             variant="primary"
             type="button"
             (click)="run()"
-            [disabled]="busy() || !r.ok || nothingChosen(r)"
+            [disabled]="(busy() && phase() !== 'importing') || !r.ok || nothingChosen(r)"
+            [loading]="phase() === 'importing'"
           >
-            <app-icon name="upload" />Import
+            <app-icon name="upload" />{{ phase() === 'importing' ? 'Importing…' : 'Import' }}
           </button>
-          <button os-button type="button" (click)="reset()">Cancel</button>
+          <button os-button type="button" (click)="reset()" [disabled]="phase() === 'importing'">
+            Cancel
+          </button>
           @if (!r.ok) {
             <span class="quiet">Fix the slugs above first.</span>
           }
@@ -488,7 +508,9 @@ export class TransferPage {
     this.session.orgs().filter((o) => this.session.canAdmin(o.id)),
   );
 
-  readonly busy = signal(false);
+  /** What's running, so the page can say so: large files take a while on a slow connection. */
+  readonly phase = signal<'exporting' | 'checking' | 'importing' | null>(null);
+  readonly busy = computed(() => this.phase() !== null);
 
   what = this.session.canAdmin(null) ? '' : (this.adminOrgs()[0]?.id ?? '');
   format: 'json' | 'zip' = 'json';
@@ -528,7 +550,7 @@ export class TransferPage {
   groupSlug = '';
 
   async exportNow(): Promise<void> {
-    this.busy.set(true);
+    this.phase.set('exporting');
     try {
       const { blob, name } = await this.api.exportFile({
         organizationId: this.what || null,
@@ -539,7 +561,7 @@ export class TransferPage {
     } catch (e) {
       this.notices.error(e);
     } finally {
-      this.busy.set(false);
+      this.phase.set(null);
     }
   }
 
@@ -548,14 +570,17 @@ export class TransferPage {
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
+    this.reset();
+    this.fileName.set(file.name);
+    this.phase.set('checking');
     try {
-      const upload = await readUpload(file);
-      this.reset();
-      this.upload.set(upload);
-      this.fileName.set(file.name);
+      this.upload.set(await readUpload(file));
       await this.refresh(true);
     } catch (e) {
+      this.reset();
       this.notices.error(e instanceof Error && !('status' in e) ? e.message : e);
+    } finally {
+      this.phase.set(null);
     }
   }
 
@@ -605,7 +630,7 @@ export class TransferPage {
   async refresh(first = false): Promise<void> {
     const upload = this.upload();
     if (!upload) return;
-    this.busy.set(true);
+    this.phase.set('checking');
     try {
       if (this.asGroup()) {
         const r = await this.api.previewGroupImport(upload, this.groupOptions());
@@ -625,14 +650,14 @@ export class TransferPage {
     } catch (e) {
       this.notices.error(e);
     } finally {
-      this.busy.set(false);
+      this.phase.set(null);
     }
   }
 
   async run(): Promise<void> {
     const upload = this.upload();
     if (!upload) return;
-    this.busy.set(true);
+    this.phase.set('importing');
     try {
       const r = this.asGroup()
         ? await this.api.runGroupImport(upload, this.groupOptions())
@@ -643,7 +668,7 @@ export class TransferPage {
     } catch (e) {
       this.notices.error(e);
     } finally {
-      this.busy.set(false);
+      this.phase.set(null);
     }
   }
 
