@@ -21,6 +21,7 @@ import {
   IconButton,
   StatusDot,
   type Tone, PageHeader } from '@openstuff-dev/ui-angular';
+import { Badges } from '../core/badges';
 import { Api } from '../core/api';
 import type { Finding, FindingCounts, FindingStatus } from '../core/models';
 import { Session } from '../core/session';
@@ -435,6 +436,7 @@ function lines(f: Finding): string {
 export class FindingsPage {
   readonly api = inject(Api);
   readonly session = inject(Session);
+  private badges = inject(Badges);
   private notices = inject(Notices);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -616,7 +618,7 @@ export class FindingsPage {
         remind_after: status === 'ask_later' ? this.remindAfter || null : null,
       });
       this.notices.ok(`"${updated.title}" is now ${STATUS[status].toLowerCase()}`);
-      this.session.me.set(await this.api.me());
+      await this.badges.refresh();
       await this.load();
       // Moved out of the current filters: go on to the next one.
       if (!this.all().some((x) => x.id === f.id)) {

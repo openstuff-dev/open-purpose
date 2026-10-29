@@ -1710,7 +1710,7 @@ definitions:`,
       can_triage: true,
     });
     const codes = list.find((f: any) => f.title === 'Cart total ignores discount codes');
-    expect((await api('GET', '/me')).data.new_findings).toBe(3);
+    expect((await api('GET', '/me/counts')).data.new_findings).toBe(3);
     // Payments may read Logistics, so Ida sees them, but only Logistics' editors sort them.
     expect(
       (await api('GET', `/findings/${cart.id}`, undefined, { token: t.ida })).data.can_triage,
@@ -1747,7 +1747,7 @@ definitions:`,
       remind_after: '2999-01-01',
       status_by_name: 'Admin',
     });
-    expect((await api('GET', '/me')).data.new_findings).toBe(1);
+    expect((await api('GET', '/me/counts')).data.new_findings).toBe(1);
 
     let text = (await ctx()).text;
     expect(text).toContain('## Known findings here');

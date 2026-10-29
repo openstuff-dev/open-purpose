@@ -25,6 +25,7 @@ import {
   StatusDot,
   type Tone, PageHeader } from '@openstuff-dev/ui-angular';
 import { DialogTitle, Drawer, SegmentedControl } from '@openstuff-dev/ui-angular';
+import { Badges } from '../core/badges';
 import { Api } from '../core/api';
 import {
   MODE_LABEL,
@@ -924,6 +925,7 @@ function ago(iso: string): string {
 })
 export class InboxPage {
   readonly session = inject(Session);
+  private badges = inject(Badges);
   private api = inject(Api);
   private notices = inject(Notices);
   private router = inject(Router);
@@ -1458,7 +1460,7 @@ export class InboxPage {
     const rows = this.rows();
     const i = rows.findIndex((x) => x.id === p.id);
     const next = rows.at(i + 1) ?? (i > 0 ? rows.at(i - 1) : undefined);
-    this.session.me.set(await this.api.me());
+    await this.badges.refresh();
     await this.load();
     if (next && this.all().some((x) => x.id === next.id)) this.open(next.id);
     else if (!this.all().some((x) => x.id === p.id)) this.close();

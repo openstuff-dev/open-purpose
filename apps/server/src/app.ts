@@ -395,12 +395,16 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
                   .map((o) => o.id),
               }
             : null,
-          pending_proposals: await proposals.countReviewable(req.db, a),
-          new_findings: await findings.countToSort(req.db, a),
           public_url: config.publicUrl,
           version: VERSION,
         };
       });
+
+      // the sidebar badges: refreshed far more often than /me, so kept apart and cheap
+      api.get('/me/counts', async (req) => ({
+        pending_proposals: await proposals.countReviewable(req.db, req.access),
+        new_findings: await findings.countToSort(req.db, req.access),
+      }));
 
       // your own account
       api.patch('/me', async (req) => {
