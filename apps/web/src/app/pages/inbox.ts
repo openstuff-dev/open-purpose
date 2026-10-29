@@ -314,6 +314,9 @@ function ago(iso: string): string {
               </td>
               <td role="cell" class="col-status" data-label="Status">
                 <span os-status-dot [tone]="statusTone[p.status]">{{ statusLabel[p.status] }}</span>
+                @if (p.auto_approved) {
+                  <span os-badge tone="warning">Automatically</span>
+                }
                 @if (p.awaiting === 'author') {
                   <span
                     class="awaiting"
@@ -367,6 +370,9 @@ function ago(iso: string): string {
             ><app-icon [name]="kind[p.kind].icon" [size]="13" />{{ kind[p.kind].label }}</span
           >
           <span os-status-dot [tone]="statusTone[p.status]">{{ statusLabel[p.status] }}</span>
+          @if (p.auto_approved) {
+            <span os-badge tone="warning">Approved automatically</span>
+          }
           <span class="drawer-nav">
             <button
               os-icon-button
@@ -765,13 +771,21 @@ function ago(iso: string): string {
             <section class="drawer-section decision-box" [attr.data-status]="p.status">
               <h3>
                 <app-icon [name]="p.status === 'approved' ? 'check' : 'x'" />{{
-                  p.status === 'approved' ? 'Approved' : 'Rejected'
+                  p.auto_approved
+                    ? 'Approved automatically'
+                    : p.status === 'approved'
+                      ? 'Approved'
+                      : 'Rejected'
                 }}
               </h3>
-              <p>
-                By <strong>{{ p.reviewed_by_name ?? 'unknown' }}</strong
-                >, {{ p.reviewed_at | date: 'd MMM y, HH:mm' }}
-              </p>
+              @if (p.auto_approved) {
+                <p>Nobody reviewed it, {{ p.reviewed_at | date: 'd MMM y, HH:mm' }}</p>
+              } @else {
+                <p>
+                  By <strong>{{ p.reviewed_by_name ?? 'unknown' }}</strong
+                  >, {{ p.reviewed_at | date: 'd MMM y, HH:mm' }}
+                </p>
+              }
               @if (p.review_note) {
                 <p>“{{ p.review_note }}”</p>
               }

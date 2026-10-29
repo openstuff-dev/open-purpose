@@ -51,6 +51,10 @@ import {
 } from './service/review.js';
 import type { Level, Scope } from './service/types.js';
 
+/** Said after a write an admin let the agent skip review for. */
+const AUTO_APPROVED =
+  'An admin lets you skip review, so it reaches other agents now. Tell the user in one line.';
+
 export const SERVER_INSTRUCTIONS = `OpenPurpose holds shared context: purpose, business logic, glossary, engineering
 guidelines and learnings. It is layered: your organization (and, in large companies, the group of
 organizations around it), the project, and the part of the project you work in: some of its
@@ -630,6 +634,10 @@ export function createMcpServer(
         });
         track.documentId = r.status === 'applied' ? r.section.document_id : r.proposal.document_id;
         track.projectId = r.status === 'applied' ? null : r.proposal.project_id;
+        if (r.status === 'applied' && r.proposal)
+          return text(
+            `Approved automatically (proposal ${r.proposal.id.slice(0, 8)}). Section is now at version ${r.section.version}. ${AUTO_APPROVED}`,
+          );
         return r.status === 'applied'
           ? text(`Applied. Section is now at version ${r.section.version}.`)
           : text(
@@ -660,6 +668,10 @@ export function createMcpServer(
           rationale: x.reason,
         });
         track.documentId = r.status === 'applied' ? r.section.document_id : r.proposal.document_id;
+        if (r.status === 'applied' && r.proposal)
+          return text(
+            `Approved automatically (proposal ${r.proposal.id.slice(0, 8)}): added section ${r.section.id.slice(0, 8)}. ${AUTO_APPROVED}`,
+          );
         return r.status === 'applied'
           ? text(`Added section ${r.section.id.slice(0, 8)}.`)
           : text(`Proposed for review (proposal ${r.proposal.id.slice(0, 8)}).`);
@@ -765,6 +777,10 @@ export function createMcpServer(
             manifests: (x.manifests ?? []).map((m) => m.path),
           },
         });
+        if (p.auto_approved)
+          return text(
+            `Learning approved automatically for **${target.label}** (proposal ${p.id.slice(0, 8)}). ${AUTO_APPROVED}`,
+          );
         return text(
           `Learning proposed for **${target.label}** (proposal ${p.id.slice(0, 8)}). It applies once a person approves it.`,
         );
@@ -914,6 +930,10 @@ export function createMcpServer(
             'Read them with `list_findings` (status "open"). If yours is one of them, tell the user and leave it. If it is a different problem, call `report_finding` again with `even_if_similar: true`.',
           );
         }
+        if (finding.status === 'todo')
+          return text(
+            `Finding \`${finding.id.slice(0, 8)}\` filed as to do under **${finding.where}**: an admin lets you skip sorting. Tell the user in one line that you reported it.`,
+          );
         return text(
           `Finding \`${finding.id.slice(0, 8)}\` filed under **${finding.where}**. A person will sort it; tell the user in one line that you reported it.`,
         );
@@ -1257,6 +1277,10 @@ export function createMcpServer(
           rationale: x.reason,
           context: { remote: r.remote?.key ?? null },
         });
+        if (result.status === 'applied' && result.proposal)
+          return text(
+            `Scope \`${result.scope.slug}\` approved automatically in **${label}** (proposal ${result.proposal.id.slice(0, 8)}). ${AUTO_APPROVED} File guidelines under it with propose_learning (scope="${result.scope.slug}").`,
+          );
         return result.status === 'applied'
           ? text(
               `Created scope \`${result.scope.slug}\` in **${label}**. File guidelines under it with propose_learning (scope="${result.scope.slug}").`,

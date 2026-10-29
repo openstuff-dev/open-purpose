@@ -13,6 +13,7 @@ import {
   ensureLearningsDocument,
   getDocument,
   getSection,
+  insertScope,
   insertSection,
   loadSection,
   resolveLevel,
@@ -20,13 +21,14 @@ import {
   type SectionChange,
   type SectionInput,
 } from './content.js';
+import { agentRules, autoApproves, type AgentRules } from './permissions.js';
 import type { EditMode, Level, Proposal, ProposalStatus, Scope, Section } from './types.js';
 import type { ProposalCounts, ScopeSpec } from '@openpurpose/contracts';
 
 const PROPOSAL_COLS = `x.id, x.kind, x.status, x.organization_id, x.project_id, x.scope_id, x.document_id, x.section_id,
   x.base_version, x.heading, x.body, x.rationale, x.context, x.created_by, a.name AS created_by_name,
   x.created_at, x.reviewed_by, x.reviewed_at, x.review_note, x.result_section_id, x.scope_spec, x.result_scope_id,
-  x.revision, x.updated_at`;
+  x.revision, x.updated_at, x.auto_approved`;
 
 export const isOpen = (status: ProposalStatus) =>
   status === 'pending' || status === 'changes_requested';
@@ -263,15 +265,18 @@ export async function countReviewable(db: Queryable, a: Access): Promise<number>
 
 // ───────────────────────── mode-aware edits (humans and agents) ─────────────────────────
 
+/** proposal on an applied result: the change was proposed and approved automatically. */
 export type EditResult =
-  { status: 'applied'; section: Section } | { status: 'proposed'; proposal: Proposal };
+  | { status: 'applied'; section: Section; proposal?: Proposal } |
+  { status: 'proposed'; proposal: Proposal };
 
 /**
  * The single entry point for changing a section's content.
  *  - Editors of the section's level: applied directly, whatever the mode (they can also change
  *    the mode).
  *  - Agents (own organization or group-wide content): "open" → applied; "propose" → proposal;
- *    "locked" → refused.
+ *    "locked" → refused. An admin can make an agent propose in open sections too, or have its
+ *    proposals approved automatically (see permissions.ts).
  */
 export async function editSection(
   db: Db,
@@ -299,7 +304,8 @@ export async function editSection(
         `Section "${section.heading}" is locked. Agents can read it but not change or propose changes to it.`,
       );
     }
-    if (section.mode === 'open') {
+    const rules = await agentRules(c, a);
+    if (section.mode === 'open' && rules.review !== 'always_propose') {
       const updated = await applySectionChange(
         c,
         section,
@@ -322,7 +328,7 @@ export async function editSection(
       body: change.body ?? section.body,
       rationale: change.rationale ?? change.note ?? '',
     });
-    return { status: 'proposed', proposal };
+    return proposed(c, a, rules, proposal);
   });
 }
 
@@ -348,7 +354,8 @@ export async function addSection(
         `Document "${doc.title}" is locked; agents cannot add sections to it.`,
       );
     }
-    if (doc.mode === 'open') {
+    const rules = await agentRules(c, a);
+    if (doc.mode === 'open' && rules.review !== 'always_propose') {
       const section = await insertSection(
         c,
         doc.id,
@@ -368,8 +375,21 @@ export async function addSection(
       body: input.body ?? '',
       rationale: input.rationale ?? input.note ?? '',
     });
-    return { status: 'proposed', proposal };
+    return proposed(c, a, rules, proposal);
   });
+}
+
+/** A section proposal that was just made: approve it now if the agent may skip review. */
+async function proposed(
+  c: Db,
+  a: Access,
+  rules: AgentRules,
+  proposal: Proposal,
+): Promise<EditResult> {
+  if (!autoApproves(a, rules, proposal.organization_id)) return { status: 'proposed', proposal };
+  const r = await applyApproval(c, a, proposal, {}, rules);
+  if (!r.section) throw new AppError('conflict', 'Approving the proposal made no section');
+  return { status: 'applied', section: r.section, proposal: r.proposal };
 }
 
 // ───────────────────────────── learnings ─────────────────────────────
@@ -381,20 +401,28 @@ export interface LearningInput extends Partial<Level> {
   context?: Record<string, unknown>;
 }
 
-/** Always a proposal, even from editors: learnings are reviewed before they become rules. */
+/**
+ * Always a proposal, even from editors: learnings are reviewed before they become rules. Unless an
+ * admin lets the agent approve automatically: then it comes back approved.
+ */
 export async function proposeLearning(db: Db, a: Access, input: LearningInput): Promise<Proposal> {
   if (!input.heading.trim())
     throw badRequest('heading (a one-line summary of the learning) is required');
   if (!input.body.trim()) throw badRequest('body is required');
-  const level = await resolveLevel(db, input);
-  a.requireContribute(level.organization_id);
-  return insertProposal(db, a, {
-    kind: 'learning',
-    ...level,
-    heading: input.heading.trim(),
-    body: input.body.trim(),
-    rationale: input.rationale ?? '',
-    context: input.context ?? {},
+  return tx(db, async (c) => {
+    const level = await resolveLevel(c, input);
+    a.requireContribute(level.organization_id);
+    const proposal = await insertProposal(c, a, {
+      kind: 'learning',
+      ...level,
+      heading: input.heading.trim(),
+      body: input.body.trim(),
+      rationale: input.rationale ?? '',
+      context: input.context ?? {},
+    });
+    const rules = await agentRules(c, a);
+    if (!autoApproves(a, rules, proposal.organization_id)) return proposal;
+    return (await applyApproval(c, a, proposal, {}, rules)).proposal;
   });
 }
 
@@ -406,8 +434,9 @@ export interface ScopeProposalInput extends ScopeInput {
   context?: Record<string, unknown>;
 }
 
+/** proposal on an applied result: the scope was proposed and approved automatically. */
 export type ScopeResult =
-  | { status: 'applied'; scope: Scope } |
+  | { status: 'applied'; scope: Scope; proposal?: Proposal } |
   { status: 'proposed'; proposal: Proposal };
 
 /**
@@ -451,17 +480,23 @@ export async function proposeScope(
     stacks: normalizeTags(input.stacks ?? []),
     repository_ids: repositoryIds,
   };
-  const proposal = await insertProposal(db, a, {
-    kind: 'new_scope',
-    organization_id: lv.organization_id,
-    project_id: lv.project_id,
-    heading: input.name.trim(),
-    body: input.description?.trim() ?? '',
-    rationale: input.rationale ?? '',
-    context: input.context ?? {},
-    scope_spec: spec,
+  return tx(db, async (c) => {
+    const proposal = await insertProposal(c, a, {
+      kind: 'new_scope',
+      organization_id: lv.organization_id,
+      project_id: lv.project_id,
+      heading: input.name.trim(),
+      body: input.description?.trim() ?? '',
+      rationale: input.rationale ?? '',
+      context: input.context ?? {},
+      scope_spec: spec,
+    });
+    const rules = await agentRules(c, a);
+    if (!autoApproves(a, rules, proposal.organization_id)) return { status: 'proposed', proposal };
+    const r = await applyApproval(c, a, proposal, {}, rules);
+    if (!r.scope) throw new AppError('conflict', 'Approving the proposal made no scope');
+    return { status: 'applied', scope: r.scope, proposal: r.proposal };
   });
-  return { status: 'proposed', proposal };
 }
 
 // ───────────────────────────── review ─────────────────────────────
@@ -495,110 +530,127 @@ export async function approveProposal(
     if (!canReview(a, p)) a.requireEdit(p.organization_id);
     if (!isOpen(rows[0].status))
       throw new AppError('conflict', `Proposal is already ${rows[0].status}`);
-    const heading = input.heading?.trim() || p.heading;
-    const body = input.body ?? p.body;
-    let revision = p.revision;
-    if (heading !== p.heading || body !== p.body) {
-      // Edits made while approving become a revision too, so the history shows what was changed.
-      revision = await insertRevision(c, a, p, heading, body, 'Edited while approving');
-    }
-    const note = input.note || `Approved proposal from ${p.created_by_name ?? 'unknown'}`;
-    let section: Section | null = null;
-    let scope: Scope | null = null;
-    let level: Level = {
-      organization_id: p.organization_id,
-      project_id: p.project_id,
-      scope_id: p.scope_id,
-    };
-
-    if (p.kind === 'edit_section') {
-      if (!p.section_id)
-        throw new AppError('conflict', 'The section this proposal edits no longer exists');
-      const current = await loadSection(c, p.section_id, { forUpdate: true });
-      section = await applySectionChange(
-        c,
-        current,
-        { heading, body, mode: assertMode(input.mode) },
-        a.actor.id,
-        note,
-      );
-    } else if (p.kind === 'new_section') {
-      if (!p.document_id)
-        throw new AppError('conflict', 'The document for this proposal no longer exists');
-      section = await insertSection(
-        c,
-        p.document_id,
-        { heading, body, mode: assertMode(input.mode) },
-        a.actor.id,
-        note,
-      );
-    } else if (p.kind === 'new_scope') {
-      const spec = p.scope_spec;
-      // Repositories removed since the proposal was made are left out.
-      const repositoryIds = spec?.repository_ids.length
-        ? (
-            await c.query<{ id: string }>(
-              'SELECT id FROM repositories WHERE id = ANY($1::uuid[]) AND project_id = $2',
-              [spec.repository_ids, p.project_id],
-            )
-          ).rows.map((r) => r.id)
-        : undefined;
-      scope = await createScope(
-        c,
-        a,
-        { organization_id: p.organization_id, project_id: p.project_id },
-        {
-          name: heading,
-          description: body,
-          slug: spec?.slug,
-          path_globs: spec?.path_globs,
-          stacks: spec?.stacks,
-          repository_ids: repositoryIds,
-        },
-      );
-    } else {
-      if (input.target) level = await resolveLevel(c, input.target);
-      // Filing somewhere else (e.g. promoting to the group) needs edit rights there too.
-      if (!a.canEdit(level.organization_id)) {
-        throw forbidden(
-          level.organization_id === p.organization_id || level.organization_id
-            ? `Only editors of ${a.levelName(level.organization_id)} can file it there`
-            : `Only group editors can promote a learning to ${a.group.name}`,
-        );
-      }
-      const doc = await ensureLearningsDocument(c, level);
-      section = await insertSection(
-        c,
-        doc.id,
-        { heading, body, mode: assertMode(input.mode) ?? 'propose' },
-        a.actor.id,
-        note,
-      );
-    }
-
-    await c.query(
-      `UPDATE proposals SET status = 'approved', reviewed_by = $2, reviewed_at = now(), review_note = $3,
-              result_section_id = $4, heading = $5, body = $6, organization_id = $7, project_id = $8, scope_id = $9,
-              document_id = COALESCE(document_id, $10), result_scope_id = $11
-        WHERE id = $1`,
-      [
-        id,
-        a.actor.id,
-        input.note ?? '',
-        section?.id ?? null,
-        heading,
-        body,
-        level.organization_id,
-        level.project_id,
-        level.scope_id,
-        section?.document_id ?? null,
-        scope?.id ?? null,
-      ],
-    );
-    await c.query('UPDATE proposals SET updated_at = now() WHERE id = $1', [id]);
-    await addEvent(c, a, id, 'approved', revision, input.note ?? '');
-    return { proposal: await loadProposal(c, id), section, scope };
+    return applyApproval(c, a, p, input);
   });
+}
+
+/**
+ * Turn a proposal into the section or scope it proposes. Callers check who may approve; `auto`
+ * means nobody reviewed it: an admin lets the agent who made it skip review.
+ */
+async function applyApproval(
+  c: Db,
+  a: Access,
+  p: Proposal,
+  input: ApproveInput,
+  auto?: AgentRules,
+): Promise<{ proposal: Proposal; section: Section | null; scope: Scope | null }> {
+  const id = p.id;
+  const heading = input.heading?.trim() || p.heading;
+  const body = input.body ?? p.body;
+  let revision = p.revision;
+  if (heading !== p.heading || body !== p.body) {
+    // Edits made while approving become a revision too, so the history shows what was changed.
+    revision = await insertRevision(c, a, p, heading, body, 'Edited while approving');
+  }
+  const note = auto
+    ? `Approved automatically: ${auto.set_by_name ?? 'an admin'} lets ${a.actor.name} skip review`
+    : input.note || `Approved proposal from ${p.created_by_name ?? 'unknown'}`;
+  let section: Section | null = null;
+  let scope: Scope | null = null;
+  let level: Level = {
+    organization_id: p.organization_id,
+    project_id: p.project_id,
+    scope_id: p.scope_id,
+  };
+
+  if (p.kind === 'edit_section') {
+    if (!p.section_id)
+      throw new AppError('conflict', 'The section this proposal edits no longer exists');
+    const current = await loadSection(c, p.section_id, { forUpdate: true });
+    section = await applySectionChange(
+      c,
+      current,
+      { heading, body, mode: assertMode(input.mode) },
+      a.actor.id,
+      note,
+    );
+  } else if (p.kind === 'new_section') {
+    if (!p.document_id)
+      throw new AppError('conflict', 'The document for this proposal no longer exists');
+    section = await insertSection(
+      c,
+      p.document_id,
+      { heading, body, mode: assertMode(input.mode) },
+      a.actor.id,
+      note,
+    );
+  } else if (p.kind === 'new_scope') {
+    const spec = p.scope_spec;
+    // Repositories removed since the proposal was made are left out.
+    const repositoryIds = spec?.repository_ids.length
+      ? (
+          await c.query<{ id: string }>(
+            'SELECT id FROM repositories WHERE id = ANY($1::uuid[]) AND project_id = $2',
+            [spec.repository_ids, p.project_id],
+          )
+        ).rows.map((r) => r.id)
+      : undefined;
+    const scopeLevel = { organization_id: p.organization_id, project_id: p.project_id };
+    const scopeInput = {
+      name: heading,
+      description: body,
+      slug: spec?.slug,
+      path_globs: spec?.path_globs,
+      stacks: spec?.stacks,
+      repository_ids: repositoryIds,
+    };
+    scope = auto
+      ? await insertScope(c, { ...scopeLevel, scope_id: null }, scopeInput)
+      : await createScope(c, a, scopeLevel, scopeInput);
+  } else {
+    if (input.target) level = await resolveLevel(c, input.target);
+    // Filing somewhere else (e.g. promoting to the group) needs edit rights there too.
+    if (!auto && !a.canEdit(level.organization_id)) {
+      throw forbidden(
+        level.organization_id === p.organization_id || level.organization_id
+          ? `Only editors of ${a.levelName(level.organization_id)} can file it there`
+          : `Only group editors can promote a learning to ${a.group.name}`,
+      );
+    }
+    const doc = await ensureLearningsDocument(c, level);
+    section = await insertSection(
+      c,
+      doc.id,
+      { heading, body, mode: assertMode(input.mode) ?? 'propose' },
+      a.actor.id,
+      note,
+    );
+  }
+
+  await c.query(
+    `UPDATE proposals SET status = 'approved', reviewed_by = $2, reviewed_at = now(), review_note = $3,
+              result_section_id = $4, heading = $5, body = $6, organization_id = $7, project_id = $8, scope_id = $9,
+              document_id = COALESCE(document_id, $10), result_scope_id = $11, auto_approved = $12
+        WHERE id = $1`,
+    [
+      id,
+      a.actor.id,
+      auto ? note : (input.note ?? ''),
+      section?.id ?? null,
+      heading,
+      body,
+      level.organization_id,
+      level.project_id,
+      level.scope_id,
+      section?.document_id ?? null,
+      scope?.id ?? null,
+      !!auto,
+    ],
+  );
+  await c.query('UPDATE proposals SET updated_at = now() WHERE id = $1', [id]);
+  await addEvent(c, a, id, 'approved', revision, auto ? note : (input.note ?? ''));
+  return { proposal: await loadProposal(c, id), section, scope };
 }
 
 export async function rejectProposal(db: Db, a: Access, id: string, note = ''): Promise<Proposal> {

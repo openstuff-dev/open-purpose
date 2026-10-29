@@ -140,6 +140,8 @@ export interface Proposal {
   result_scope_id: string | null;
   revision: number;
   updated_at: string;
+  /** Approved without review: an admin lets the agent who made it skip review. */
+  auto_approved: boolean;
 }
 
 /**

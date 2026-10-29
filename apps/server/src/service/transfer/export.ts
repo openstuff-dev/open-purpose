@@ -180,12 +180,16 @@ export async function exportContent(
       )
     ).rows;
     for (const m of memberships) actors.add(m.actor_id);
-    const { rows } = await db.query<{ key: string; name: string; kind: ExportPerson['kind'] }>(
-      'SELECT id AS key, name, kind FROM actors WHERE id = ANY($1::uuid[]) ORDER BY kind DESC, name',
+    const { rows } = await db.query<
+      Omit<ExportPerson, 'memberships' | 'permissions'> & ExportPerson['permissions']
+    >(
+      `SELECT id AS key, name, kind, review, accept_findings FROM actors WHERE id = ANY($1::uuid[])
+        ORDER BY kind DESC, name`,
       [[...actors]],
     );
-    people = rows.map((p) => ({
+    people = rows.map(({ review, accept_findings, ...p }) => ({
       ...p,
+      ...(p.kind === 'agent' ? { permissions: { review, accept_findings } } : {}),
       memberships: memberships
         .filter((m) => m.actor_id === p.key)
         .map(({ organization, role }) => ({ organization, role })),
@@ -245,7 +249,8 @@ async function exportProposals(
       `SELECT id AS key, kind, status, organization_id AS organization, project_id AS project, scope_id AS scope,
             document_id AS document, section_id AS section, result_section_id AS result_section,
             result_scope_id AS result_scope, scope_spec, base_version, heading,
-            body, rationale, context, revision, created_by, created_at, updated_at, reviewed_by, reviewed_at, review_note
+            body, rationale, context, revision, created_by, created_at, updated_at, reviewed_by, reviewed_at, review_note,
+            auto_approved
        FROM proposals WHERE $1::uuid IS NULL OR organization_id = $1 ORDER BY created_at`,
       [org],
     )

@@ -38,6 +38,23 @@ export interface Actor {
   is_superadmin: boolean;
 }
 
+/**
+ * How much review an agent's writes get. edit_modes: follow each section's edit mode.
+ * always_propose: propose even in open sections. auto_approve: approve its proposals in its
+ * own organization as soon as they arrive.
+ */
+export type AgentReview = 'edit_modes' | 'always_propose' | 'auto_approve';
+
+/** What an admin lets one agent do without a person's review. */
+export interface AgentPermissions {
+  review: AgentReview;
+  /** File the agent's findings as to do instead of new. */
+  accept_findings: boolean;
+  /** Who last changed them, and when. null = never changed. */
+  set_by_name: string | null;
+  set_at: string | null;
+}
+
 export interface GroupRef {
   id: string;
   slug: string;
@@ -387,6 +404,8 @@ export interface ExportPerson {
   kind: ActorKind;
   /** organization null = a role in the group itself. */
   memberships: { organization: string | null; role: Role }[];
+  /** Agents only. Missing in files from before agent permissions. */
+  permissions?: { review: AgentReview; accept_findings: boolean };
 }
 
 export interface ExportOrganization {
@@ -529,6 +548,8 @@ export interface ExportProposal {
   reviewed_by: string | null;
   reviewed_at: string | null;
   review_note: string;
+  /** Approved without review. Missing in files from before agent permissions. */
+  auto_approved?: boolean;
   revisions: {
     revision: number;
     heading: string;
