@@ -4838,9 +4838,7 @@ ul.stat-rest {
   gap: 1px;
 }
 
-/* Finding 0ab6319e: this also styles the map legend's .dot. */
-/* stylelint-disable-next-line no-duplicate-selectors */
-.dot {
+.activity-cell {
   display: inline-block;
   width: var(--dot, 10px);
   height: var(--dot, 10px);
@@ -4850,23 +4848,23 @@ ul.stat-rest {
   outline-offset: -1px;
 }
 
-.dot.pad {
+.activity-cell.pad {
   visibility: hidden;
 }
 
-.dot[data-level='1'] {
+.activity-cell[data-level='1'] {
   background: var(--heat-1);
 }
 
-.dot[data-level='2'] {
+.activity-cell[data-level='2'] {
   background: var(--heat-2);
 }
 
-.dot[data-level='3'] {
+.activity-cell[data-level='3'] {
   background: var(--heat-3);
 }
 
-.dot[data-level='4'] {
+.activity-cell[data-level='4'] {
   background: var(--accent);
 }
 
@@ -4880,7 +4878,7 @@ ul.stat-rest {
   color: var(--faint);
 }
 
-.dots-legend .dot {
+.dots-legend .activity-cell {
   margin: 0 1px;
 }
 

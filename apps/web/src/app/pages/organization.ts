@@ -210,9 +210,11 @@ function readPeriod(): ActivityPeriod {
             </div>
             @if (style.choice() === 'dots') {
               <p class="dots-legend" aria-hidden="true">
-                Less <span class="dot" data-level="0"></span><span class="dot" data-level="1"></span
-                ><span class="dot" data-level="2"></span><span class="dot" data-level="3"></span
-                ><span class="dot" data-level="4"></span> More
+                Less <span class="activity-cell" data-level="0"></span
+                ><span class="activity-cell" data-level="1"></span
+                ><span class="activity-cell" data-level="2"></span
+                ><span class="activity-cell" data-level="3"></span
+                ><span class="activity-cell" data-level="4"></span> More
               </p>
             }
           }
