@@ -3,6 +3,12 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.3.1
+
+- Fixed the first start on Supabase projects with automatic RLS ("new row violates row-level
+  security policy for table groups"): tables that got row-level security without a policy now
+  get one that lets in only `openpurpose_app`, so Supabase's Data API roles still see nothing.
+
 ## 0.3.0
 
 - Added sign-in with GitHub or an email link (Supabase), browser sessions that expire, and
