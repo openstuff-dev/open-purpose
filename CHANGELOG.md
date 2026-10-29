@@ -3,6 +3,13 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.3.4
+
+- Pages no longer jump in section by section while they load. The Overview, Projects, Inbox,
+  Findings and the project, scope and document pages hold each section's place with placeholder
+  rows shaped like the real ones, and the content replaces them in place. On a fast load you
+  won't see the placeholders; the space is still kept.
+
 ## 0.3.3
 
 - The web app now loads who-am-I (`/api/me`, the heaviest request) only at startup and when you
