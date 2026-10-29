@@ -39,10 +39,10 @@ function weekdayMonFirst(ymd: string): number {
           [style.grid-template-rows]="size() === 'sm' ? '1fr' : 'repeat(7, var(--dot))'"
         >
           @for (p of pad(); track $index) {
-            <span class="dot pad"></span>
+            <span class="activity-cell pad"></span>
           }
           @for (c of cells(); track c.day) {
-            <span class="dot" [attr.data-level]="c.level" [title]="c.title"></span>
+            <span class="activity-cell" [attr.data-level]="c.level" [title]="c.title"></span>
           }
         </span>
         <span class="fig-small">{{ count() }}</span>
