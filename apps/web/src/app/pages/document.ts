@@ -38,6 +38,7 @@ import { ModeBadge, ModePicker } from '../shared/mode';
 import { Notices } from '../shared/notice';
 import { Icon } from '../shared/icon';
 import { ActivityFigure, StatStyleSwitch } from '../shared/activity-figure';
+import { PageSkeleton } from '../shared/list-skeleton';
 import { dateTime, lastDays, since } from '../core/time';
 
 interface Draft {
@@ -49,6 +50,7 @@ interface Draft {
 @Component({
   selector: 'app-document',
   imports: [
+    PageSkeleton,
     Breadcrumbs,
     EmptyState,
     Callout,
@@ -438,6 +440,8 @@ interface Draft {
           </button>
         }
       }
+    } @else if (!failed()) {
+      <app-page-skeleton />
     }
   `,
 })
@@ -449,6 +453,7 @@ export class DocumentPage {
   private router = inject(Router);
   private notices = inject(Notices);
   readonly doc = signal<DocDetail | null>(null);
+  readonly failed = signal(false);
   readonly editing = signal<string | null>(null);
   readonly historyFor = signal<string | null>(null);
   readonly refsFor = signal<string | null>(null);
@@ -511,6 +516,7 @@ export class DocumentPage {
     try {
       this.doc.set(await this.api.document(id));
     } catch (e) {
+      this.failed.set(true);
       this.notices.error(e);
     }
   }

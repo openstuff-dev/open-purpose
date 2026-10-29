@@ -17,6 +17,7 @@ const GLYPH: Record<DocKind, string> = {
   reference: 'grid',
   learnings: 'bot',
 };
+import { ListSkeleton } from './list-skeleton';
 import { Notices } from './notice';
 
 const KIND_HINT: Record<DocKind, string> = {
@@ -42,6 +43,7 @@ const KIND_HINT: Record<DocKind, string> = {
     Control,
     Badge,
     EmptyState,
+    ListSkeleton,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -75,6 +77,8 @@ const KIND_HINT: Record<DocKind, string> = {
       </ul>
     } @else if (loaded()) {
       <os-empty-state [title]="emptyTitle()" bordered>{{ emptyText() }}</os-empty-state>
+    } @else {
+      <app-list-skeleton kind="doc" [rows]="3" />
     }
     @if (canEdit()) {
       @if (adding()) {

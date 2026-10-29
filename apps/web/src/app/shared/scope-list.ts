@@ -13,6 +13,7 @@ import { Button, Chip, ConfirmDialog, Control, Field, EmptyState } from '@openst
 import { Api } from '../core/api';
 import type { Repository, Scope } from '../core/models';
 import { Session, claimingOldSlug } from '../core/session';
+import { ListSkeleton } from './list-skeleton';
 import { Notices } from './notice';
 import { Icon } from './icon';
 import { RepoPicker } from './repo-picker';
@@ -29,7 +30,18 @@ export const repoName = (key: string) => key.slice(key.lastIndexOf('/') + 1) || 
 /** Scopes at the org level (projectId null) or inside a project. */
 @Component({
   selector: 'app-scope-list',
-  imports: [EmptyState, RouterLink, FormsModule, Icon, RepoPicker, Button, Field, Control, Chip],
+  imports: [
+    EmptyState,
+    ListSkeleton,
+    RouterLink,
+    FormsModule,
+    Icon,
+    RepoPicker,
+    Button,
+    Field,
+    Control,
+    Chip,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (scopes().length) {
@@ -61,6 +73,8 @@ export const repoName = (key: string) => key.slice(key.lastIndexOf('/') + 1) || 
       </ul>
     } @else if (loaded()) {
       <os-empty-state [title]="emptyTitle()" bordered>{{ emptyText() }}</os-empty-state>
+    } @else {
+      <app-list-skeleton kind="scope" [rows]="2" />
     }
     @if (canEdit()) {
       @if (adding()) {

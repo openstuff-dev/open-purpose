@@ -28,6 +28,7 @@ import { Icon } from '../shared/icon';
 import { AgentView } from '../shared/agent-view';
 import { ApiSpecs } from '../shared/api-specs';
 import { ScopeList } from '../shared/scope-list';
+import { PageSkeleton } from '../shared/list-skeleton';
 import { SlugRenameField } from '../shared/slug-rename';
 
 interface Connection {
@@ -49,6 +50,7 @@ const TABS: Tab[] = [
 @Component({
   selector: 'app-project',
   imports: [
+    PageSkeleton,
     Breadcrumbs,
     EmptyState,
     Callout,
@@ -429,6 +431,8 @@ const TABS: Tab[] = [
         That project doesn't exist or you can't read it.
         <a os-button os-actions routerLink="/projects">See projects</a>
       </os-empty-state>
+    } @else {
+      <app-page-skeleton />
     }
   `,
 })

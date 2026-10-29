@@ -49,7 +49,7 @@
 }
 
 @media (width <= 820px) {
-  .doc-list li a {
+  .doc-list li > :is(a, .skeleton-row) {
     grid-template-columns: 2rem 1fr auto;
   }
 
@@ -65,7 +65,7 @@
     grid-column: 1;
   }
 
-  .project-list li a {
+  .project-list li > :is(a, .skeleton-row) {
     grid-template-columns: 1fr;
   }
 
@@ -122,7 +122,7 @@
 }
 
 @media (width <= 820px) {
-  .project-list li a {
+  .project-list li > :is(a, .skeleton-row) {
     grid-template-columns: 1fr;
   }
 }

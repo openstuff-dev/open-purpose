@@ -20,6 +20,7 @@ import {
   Drawer,
   IconButton,
   StatusDot,
+  Skeleton,
   type Tone, PageHeader } from '@openstuff-dev/ui-angular';
 import { Badges } from '../core/badges';
 import { Api } from '../core/api';
@@ -81,6 +82,7 @@ function lines(f: Finding): string {
   selector: 'app-findings',
   imports: [
     PageHeader,
+    Skeleton,
     FormsModule,
     RouterLink,
     DatePipe,
@@ -223,6 +225,29 @@ function lines(f: Finding): string {
                   }
                 </td>
               </tr>
+            } @else {
+              @for (w of placeholderRows; track $index) {
+                <tr role="row" class="skeleton-wait" aria-hidden="true">
+                  <td role="cell" class="col-change">
+                    <span class="cell-main"><os-skeleton [style.inline-size.rem]="w" /></span
+                    ><span class="os-cell-sub"
+                      ><os-skeleton [style.inline-size.rem]="w * 1.6"
+                    /></span>
+                  </td>
+                  <td role="cell" class="col-file"><os-skeleton [style.inline-size.rem]="7" /></td>
+                  <td role="cell" class="col-where">
+                    <span class="cell-main"><os-skeleton [style.inline-size.rem]="6" /></span
+                    ><span class="os-cell-sub"><os-skeleton [style.inline-size.rem]="8" /></span>
+                  </td>
+                  <td role="cell" class="col-when">
+                    <os-skeleton [style.inline-size.rem]="3.5" />
+                  </td>
+                  <td role="cell" class="col-from"><os-skeleton [style.inline-size.rem]="6" /></td>
+                  <td role="cell" class="col-status">
+                    <os-skeleton [style.inline-size.rem]="5" />
+                  </td>
+                </tr>
+              }
             }
           }
         </tbody>
@@ -458,6 +483,8 @@ export class FindingsPage {
   readonly all = signal<Finding[]>([]);
   readonly counts = signal<FindingCounts | null>(null);
   readonly loaded = signal(false);
+  /** Title widths of the rows that hold the table's place while it loads. */
+  readonly placeholderRows = [12, 9, 14, 10, 11];
   readonly shown = signal<FindingStatus[]>(DEFAULT_SHOWN);
   readonly q = signal('');
   readonly org = signal('');
