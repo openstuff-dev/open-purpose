@@ -12,6 +12,7 @@ import { findApi, loadApi, refreshStale, renderApiText } from './service/apis.js
 import { recordRequest, type Track } from './service/activity.js';
 import { buildContext, resolveTarget } from './service/context.js';
 import { relatedTo } from './service/graph.js';
+import { getSkill, listSkills } from './service/skills.js';
 import { tryParseRemote } from './domain/remote.js';
 import {
   addRepository,
@@ -88,7 +89,9 @@ Workflow:
    and don't let it get lost: call report_finding with the file, a one-line title, what's wrong and how you
    would fix it. Style preferences aren't findings. get_context lists known findings around your path: don't
    report those again, and ask the user before fixing one. When you fix one, call resolve_finding. If you got a
-   detail of your own finding wrong (commit, file, lines, wording), correct it with update_finding.`;
+   detail of your own finding wrong (commit, file, lines, wording), correct it with update_finding.
+8. When the user is new to OpenPurpose or asks you to set it up, call list_skills and then get_skill
+   with "init": a guided first run in their repository.`;
 
 const manifestSchema = z.object({
   path: z
@@ -164,6 +167,8 @@ export const READ_TOOLS = [
   'get_context',
   'resolve_project',
   'list_organizations',
+  'list_skills',
+  'get_skill',
   'list_projects',
   'list_scopes',
   'get_related',
@@ -339,6 +344,28 @@ export function createMcpServer(
             .map((o) => ({ slug: o.slug, name: o.name, readable: a.canRead(o.id) })),
         })),
       ),
+  );
+
+  server.registerTool(
+    'list_skills',
+    {
+      title: 'List skills',
+      description:
+        'Guides for setting up and using OpenPurpose, each with a name and a one-line description. Call get_skill to read one.',
+      inputSchema: {},
+    },
+    () => run('list_skills', async () => json(await listSkills())),
+  );
+
+  server.registerTool(
+    'get_skill',
+    {
+      title: 'Get a skill',
+      description:
+        'The full instructions of one skill from list_skills, e.g. "init" to set up OpenPurpose in a repository. Follow them.',
+      inputSchema: { name: z.string().describe('Skill name from list_skills') },
+    },
+    ({ name }) => run('get_skill', async () => text((await getSkill(name)).body)),
   );
 
   server.registerTool(

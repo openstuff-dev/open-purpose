@@ -27,7 +27,8 @@ FROM node:24-alpine
 ENV NODE_ENV=production \
     PORT=8080 \
     OPENPURPOSE_WEB_DIR=/app/web \
-    OPENPURPOSE_MIGRATIONS_DIR=/app/apps/server/migrations
+    OPENPURPOSE_MIGRATIONS_DIR=/app/apps/server/migrations \
+    OPENPURPOSE_SKILLS_DIR=/app/agent/skills
 WORKDIR /app/apps/server
 COPY --from=server-deps /app/node_modules /app/node_modules
 # Anything npm had to nest under the server instead of hoisting (usually empty).
@@ -36,6 +37,7 @@ COPY --from=server /app/apps/server/dist ./dist
 COPY --from=server /app/apps/server/migrations ./migrations
 COPY --from=server /app/apps/server/package.json ./
 COPY --from=web /app/apps/web/dist/web/browser /app/web
+COPY agent/skills /app/agent/skills
 USER node
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://127.0.0.1:8080/api/health || exit 1
