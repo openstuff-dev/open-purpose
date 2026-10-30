@@ -347,18 +347,12 @@ organization, the project and the part of the code you are in (a repository or a
                   <div>
                     <h3>Optional: take the guided first run</h3>
                     <p>
-                      The <code>openpurpose-start</code> skill walks you through it in your own
-                      repository: it connects the repository to a project, shows what an agent sees
-                      there and turns one rule you keep repeating into your first learning. For
-                      Claude Code, run this in the repository, then type
-                      <code>/openpurpose-start</code>.
+                      Ask your agent to <q>set up OpenPurpose in this repository</q>. It fetches the
+                      <code>init-openpurpose</code> skill from this server
+                      (<code>list_skills</code>, <code>get_skill</code>) and walks you through it:
+                      it connects the repository to a project, shows what an agent sees there and
+                      turns one rule you keep repeating into your first learning.
                     </p>
-                    <div class="copy-block">
-                      <pre><code>{{ startSkillCommand }}</code></pre>
-                      <button os-button size="sm" type="button" (click)="copy(startSkillCommand)">
-                        <app-icon name="copy" [size]="13" />Copy
-                      </button>
-                    </div>
                   </div>
                 </li>
                 <li>
@@ -763,10 +757,6 @@ export class SettingsPage {
   );
 
   readonly agentsSnippet = AGENTS_SNIPPET;
-  readonly startSkillCommand =
-    'mkdir -p .claude/skills/openpurpose-start && curl -fsSL \\\n' +
-    '  https://raw.githubusercontent.com/openstuff-dev/open-purpose/master/agent/skills/openpurpose-start/SKILL.md \\\n' +
-    '  -o .claude/skills/openpurpose-start/SKILL.md';
 
   readonly agentContext = JSON.stringify(
     { project: `${this.session.org()?.slug ?? 'org'}/project-slug` },
