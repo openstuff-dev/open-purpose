@@ -4,6 +4,7 @@ import { parseRemote, slugify } from '../src/domain/remote.js';
 import { detectStacks } from '../src/domain/stacks.js';
 import { matchScopes, mostSpecific, normalizePath } from '../src/domain/scopes.js';
 import { extractLinks, rewriteLinks } from '../src/domain/links.js';
+import { cacheControl } from '../src/domain/cache.js';
 
 describe('parseRemote', () => {
   const key = 'azure:acme/big project/portal-frontend';
@@ -309,4 +310,22 @@ describe('excerpt', () => {
   it('handles an empty body', () => {
     expect(excerpt({ id, body: '' })).toBe('_(0 more words: `read_section s:01234567`)_');
   });
+});
+
+describe('cacheControl', () => {
+  it.each([
+    'main-VEVG7XFE.js',
+    'chunk-Bffalnv-.js',
+    'styles-MFNSOQEC.css',
+    '/app/web/media/geist-latin-wght-normal-T72VVCUW.woff2',
+  ])('caches hashed %s for good', (file) => {
+    expect(cacheControl(file)).toBe('public, max-age=31536000, immutable');
+  });
+
+  it.each(['/app/web/index.html', 'favicon.svg', 'favicon-32.png'])(
+    'makes browsers check %s, which keeps its name between releases',
+    (file) => {
+      expect(cacheControl(file)).toBe('no-cache');
+    },
+  );
 });
