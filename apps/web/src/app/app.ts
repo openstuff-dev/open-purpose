@@ -332,31 +332,15 @@ import { SignInPage } from './pages/sign-in';
       </main>
     }
     <svg class="sprite" width="0" height="0" aria-hidden="true">
-      <symbol id="openpurpose-mark" viewBox="0 0 40 40">
-        <rect
-          x="5"
-          y="3"
-          width="26"
-          height="34"
-          rx="5"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.6"
+      <symbol id="openpurpose-mark" viewBox="0 0 32 32">
+        <path
+          fill="currentColor"
+          fill-rule="evenodd"
+          d="M16 1.5a14.5 14.5 0 1 0 0 29a14.5 14.5 0 1 0 0-29Zm0 4a10.5 10.5 0 1 1 0 21a10.5 10.5 0 1 1 0-21Z"
         />
         <path
-          d="M12 12h12M12 18.5h12M12 25h6"
-          stroke="currentColor"
-          stroke-width="2.6"
-          stroke-linecap="round"
-        />
-        <circle cx="31" cy="30" r="7" fill="var(--accent)" />
-        <path
-          d="M28 30l2 2 4-4"
-          fill="none"
-          stroke="#fff"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+          fill="var(--accent)"
+          d="M15.34 10.96Q16 9.97 16.66 10.96L21.47 19.38Q22.02 20.37 20.59 20.37L11.41 20.37Q9.98 20.37 10.53 19.38Z"
         />
       </symbol>
     </svg>

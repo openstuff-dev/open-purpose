@@ -3,6 +3,11 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.3.7
+
+- The web app has the new OpenStuff logo: a ring with a triangle. It replaces the old document
+  mark in the sidebar, the agent bar and the sign-in screens, and in the browser tab icon.
+
 ## 0.3.6
 
 - Agents can now fetch guides from the server: `list_skills` shows each skill's name and
