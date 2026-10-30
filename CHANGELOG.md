@@ -3,6 +3,16 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.3.8
+
+- The topbar's bottom line now runs on under the logo in the sidebar, so the logo sits in the
+  bar instead of floating above the menu.
+- On the overview, the agent activity period and chart switchers sit at the end of their row,
+  and an empty list of organization-wide scopes or documents keeps a gap above its add button.
+- The scope page looks like the rest of the app: **Edit** in the header, the matching rules in a
+  panel, the documents with a description, the slug under Details and **Delete scope** in its
+  own danger zone.
+
 ## 0.3.7
 
 - The web app has the new OpenStuff logo: a ring with a triangle. It replaces the old document
