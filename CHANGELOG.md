@@ -3,6 +3,11 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.3.10
+
+- The line under the Inbox and Findings drawers' header lines up with the topbar's line again.
+  The header is now exactly as tall as the topbar instead of taking its height from its buttons.
+
 ## 0.3.9
 
 - The browser tab shows the OpenPurpose icon again. The server sent the favicons as cacheable
