@@ -298,6 +298,15 @@ kbd {
   letter-spacing: -0.01em;
 }
 
+/* As tall as the topbar and bordered like it, so its line runs on under the logo. */
+.rail > .brand {
+  flex: none;
+  height: var(--bar);
+  margin: -0.75rem -0.65rem 0.75rem;
+  padding: 0 1.15rem;
+  border-bottom: 1px var(--os-border-style) var(--line);
+}
+
 .brand:hover {
   text-decoration: none;
 }
@@ -516,7 +525,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  height: 3.25rem;
+  height: var(--bar);
   padding: 0 clamp(1rem, 3vw, 2.25rem);
   background: var(--topbar-bg);
   backdrop-filter: saturate(1.4) blur(10px);
@@ -621,7 +630,8 @@ kbd {
   margin-bottom: 0.75rem;
 }
 
-.block-head > div {
+/* Only the title takes the free space; everything after it sits at the end. */
+.block-head > :first-child {
   margin-right: auto;
 }
 
@@ -829,6 +839,16 @@ kbd {
   margin: 0;
 }
 
+/* A scope's matching: the facts and one sentence on what they mean, in a panel. */
+.applies > .facts {
+  margin-top: 0;
+}
+
+.applies > p.quiet {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
 .facts dd > a + .quiet,
 .facts dd > .os-chip + .quiet {
   margin-left: 0.4rem;
@@ -872,6 +892,11 @@ pre {
   border: 1px var(--os-border-style) var(--line);
   border-radius: var(--r-lg);
   overflow: hidden;
+}
+
+/* Empty, the lists keep the same gap above their add button. */
+:is(app-doc-list, app-scope-list) > os-empty-state {
+  margin-bottom: 1rem;
 }
 
 :is(
@@ -2250,7 +2275,7 @@ mark {
 .map-page {
   display: grid;
   grid-template-rows: auto 1fr;
-  height: calc(100vh - 3.25rem);
+  height: calc(100vh - var(--bar));
   margin: -2rem clamp(-2.25rem, -3vw, -1rem) -5rem;
   max-width: none !important;
 }
@@ -3937,7 +3962,7 @@ mark {
 .page-tabs {
   margin: 1.75rem 0 0;
   position: sticky;
-  top: 3.25rem;
+  top: var(--bar);
   z-index: 5;
   background: var(--ground);
   scrollbar-width: none;
@@ -4127,7 +4152,7 @@ mark {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 1rem;
-  min-height: 3.25rem;
+  min-height: var(--bar);
   padding: 0.4rem clamp(1rem, 3vw, 2.25rem);
   background: var(--ground);
   border-bottom: 1px var(--os-border-style) var(--agent-line);

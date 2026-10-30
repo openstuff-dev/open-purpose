@@ -65,12 +65,24 @@ import { SlugRenameField } from '../shared/slug-rename';
             }}
           </p>
         </div>
+        @if (s.can_edit && !editing()) {
+          <div class="os-page-actions">
+            <button os-button type="button" (click)="startEdit()">
+              <app-icon name="pencil" />Edit
+            </button>
+          </div>
+        }
       </header>
 
       <section class="block">
-        <h2>When this applies</h2>
+        <div class="block-head">
+          <div>
+            <h2>When this applies</h2>
+            <p class="quiet">The code an agent has to be in to get this scope's documents.</p>
+          </div>
+        </div>
         @if (editing()) {
-          <form class="inline-form" (ngSubmit)="save()">
+          <form class="inline-form os-panel os-panel-body" (ngSubmit)="save()">
             <os-field label="Name" class="grow"
               ><input os-input name="name" [(ngModel)]="draft.name" required
             /></os-field>
@@ -107,59 +119,52 @@ import { SlugRenameField } from '../shared/slug-rename';
             </div>
           </form>
         } @else {
-          <dl class="facts">
-            @if (s.project) {
-              <dt>Repositories</dt>
+          <div class="applies os-panel os-panel-body">
+            <dl class="facts">
+              @if (s.project) {
+                <dt>Repositories</dt>
+                <dd>
+                  @for (r of boundRepos(s); track r.id) {
+                    <span os-chip tone="brand" class="mono" [title]="r.remote_key"
+                      ><app-icon name="branch" [size]="11" />{{ repoName(r.remote_key) }}</span
+                    >
+                  } @empty {
+                    <span class="quiet">Any of {{ s.project.name }}'s repositories</span>
+                  }
+                </dd>
+              }
+              <dt>Paths</dt>
               <dd>
-                @for (r of boundRepos(s); track r.id) {
-                  <span os-chip tone="brand" class="mono" [title]="r.remote_key"
-                    ><app-icon name="branch" [size]="11" />{{ repoName(r.remote_key) }}</span
-                  >
+                @for (g of s.path_globs; track g) {
+                  <code os-chip tone="brand">{{ g }}</code>
                 } @empty {
-                  <span class="quiet">Any of {{ s.project.name }}'s repositories</span>
+                  <span class="quiet">Any path</span>
                 }
               </dd>
-            }
-            <dt>Paths</dt>
-            <dd>
-              @for (g of s.path_globs; track g) {
-                <code os-chip tone="brand">{{ g }}</code>
-              } @empty {
-                <span class="quiet">Any path</span>
-              }
-            </dd>
-            <dt>Stacks</dt>
-            <dd>
-              @for (t of s.stacks; track t) {
-                <span os-chip>{{ t }}</span>
-              } @empty {
-                <span class="quiet">Any stack</span>
-              }
-            </dd>
-          </dl>
-          <p class="quiet">{{ explain(s) }}</p>
-          @if (s.can_edit) {
-            <div class="form-actions">
-              <button os-button type="button" (click)="startEdit()">Edit matching</button>
-              <button os-button variant="danger" type="button" (click)="remove()">
-                Delete scope
-              </button>
-            </div>
-          }
+              <dt>Stacks</dt>
+              <dd>
+                @for (t of s.stacks; track t) {
+                  <span os-chip>{{ t }}</span>
+                } @empty {
+                  <span class="quiet">Any stack</span>
+                }
+              </dd>
+            </dl>
+            <p class="quiet">{{ explain(s) }}</p>
+          </div>
         }
-        <app-slug-rename
-          kind="scope"
-          [id]="s.id"
-          [slug]="s.slug"
-          [name]="s.name"
-          [aliases]="s.aliases"
-          [canEdit]="s.can_edit"
-          (changed)="reload()"
-        />
       </section>
 
       <section class="block">
-        <h2>Documents</h2>
+        <div class="block-head">
+          <div>
+            <h2>Documents</h2>
+            <p class="quiet">
+              Rules that reach only this part of the code, after the
+              {{ s.project ? 'project' : s.organization ? 'organization' : 'workspace' }} rules.
+            </p>
+          </div>
+        </div>
         <app-doc-list
           [organizationId]="s.organization_id"
           [projectId]="s.project_id"
@@ -168,6 +173,35 @@ import { SlugRenameField } from '../shared/slug-rename';
           emptyText="Approved learnings for this scope will appear in a Learnings document here."
         />
       </section>
+
+      <section class="block">
+        <div class="block-head">
+          <div><h2>Details</h2></div>
+        </div>
+        <div class="os-panel os-panel-body">
+          <app-slug-rename
+            kind="scope"
+            [id]="s.id"
+            [slug]="s.slug"
+            [name]="s.name"
+            [aliases]="s.aliases"
+            [canEdit]="s.can_edit"
+            (changed)="reload()"
+          />
+        </div>
+      </section>
+
+      @if (s.can_edit) {
+        <section class="danger-zone">
+          <h2>Delete scope</h2>
+          <p class="quiet">Deletes its documents and learnings too.</p>
+          <div class="form-actions">
+            <button os-button variant="danger" type="button" (click)="remove()">
+              Delete scope
+            </button>
+          </div>
+        </section>
+      }
     } @else if (!failed()) {
       <app-page-skeleton />
     }
