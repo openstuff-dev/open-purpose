@@ -3,6 +3,15 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.3.9
+
+- The browser tab shows the OpenPurpose icon again. The server sent the favicons as cacheable
+  for a year, so browsers kept the old icon even after a hard reload. Files without a content
+  hash in their name (`index.html`, the favicons) are now checked on every load, and the icon
+  links changed so browsers fetch the new one.
+- The sidebar, logo row, topbar and narrow-window menu now come from the shared OpenStuff
+  toolkit (`.os-shell` in `@openstuff-dev/ui` 0.1.3). They look the same as in 0.3.8.
+
 ## 0.3.8
 
 - The topbar's bottom line now runs on under the logo in the sidebar, so the logo sits in the
