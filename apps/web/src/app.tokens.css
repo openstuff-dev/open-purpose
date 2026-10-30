@@ -48,6 +48,9 @@
   --r-lg: var(--os-radius-lg);
   --rail: 248px;
 
+  /* The topbar and the sidebar's brand row: one height, so their bottom borders form one line. */
+  --bar: 3.25rem;
+
   /* Mixed from the colours above, so agent mode re-tints them too. */
   --topbar-bg: color-mix(in srgb, var(--ground) 85%, transparent);
   --danger-line: color-mix(in srgb, var(--danger) 30%, var(--line));
