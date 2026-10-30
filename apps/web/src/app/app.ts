@@ -111,9 +111,9 @@ import { SignInPage } from './pages/sign-in';
           </main>
         </div>
       } @else {
-        <div class="shell" [class.rail-open]="railOpen()">
-          <nav class="rail" id="rail" aria-label="Main">
-            <a class="brand" routerLink="/organization">
+        <div class="os-shell" [attr.data-open]="railOpen() ? '' : null">
+          <nav class="os-shell-sidebar" id="rail" aria-label="Main">
+            <a class="os-shell-brand brand" routerLink="/organization">
               <svg viewBox="0 0 40 40" width="22" height="22" aria-hidden="true">
                 <use href="#openpurpose-mark" />
               </svg>
@@ -267,12 +267,12 @@ import { SignInPage } from './pages/sign-in';
             </div>
           </nav>
 
-          <div class="content">
-            <header class="topbar">
+          <div class="os-shell-content">
+            <header class="os-shell-topbar">
               <button
                 os-icon-button
                 variant="ghost"
-                class="menu-btn"
+                class="os-shell-menu"
                 type="button"
                 (click)="railOpen.set(!railOpen())"
                 [attr.aria-expanded]="railOpen()"
