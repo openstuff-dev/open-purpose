@@ -14,6 +14,10 @@ const replaced = [
     message: 'Use <label os-check> with os-checkbox or os-radio, and <os-field [error]> or .os-error, from @openstuff-dev/ui-angular instead of .check or .field-error.',
   },
   {
+    pattern: String.raw`class="([^"]*\s)?(shell|rail|content|topbar|menu-btn)[\s"]`,
+    message: 'Use .os-shell, .os-shell-sidebar, .os-shell-content, .os-shell-topbar and .os-shell-menu from @openstuff-dev/ui instead of .shell, .rail, .content, .topbar or .menu-btn.',
+  },
+  {
     pattern: String.raw`class="([^"]*\s)?(chip|chip-x|flag|status|mode-badge)[\s"]`,
     message: 'Use os-chip, os-badge or os-status-dot from @openstuff-dev/ui-angular instead of .chip, .flag, .status or .mode-badge.',
   },

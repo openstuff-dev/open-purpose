@@ -259,32 +259,14 @@ kbd {
   font-size: var(--fs-xs);
 }
 
-/* ─── Shell ─── */
-.shell {
-  display: grid;
-  grid-template-columns: var(--rail) minmax(0, 1fr);
-  min-height: 100%;
-  background:
-    linear-gradient(
-      to right,
-      var(--sidebar) calc(var(--rail) - 1px),
-      var(--line) calc(var(--rail) - 1px),
-      var(--line) var(--rail),
-      transparent var(--rail)
-    );
+/* ─── Shell: .os-shell from @openstuff-dev/ui, sized and spaced for this app ─── */
+.os-shell {
+  --os-shell-bar-height: var(--bar);
+  --os-shell-sidebar-width: var(--rail);
 }
 
-.rail {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
+.os-shell-sidebar {
   gap: 0.25rem;
-  padding: 0.75rem 0.65rem;
-  background: var(--sidebar);
-  border-right: 1px var(--os-border-style) var(--line);
 }
 
 .brand {
@@ -298,13 +280,9 @@ kbd {
   letter-spacing: -0.01em;
 }
 
-/* As tall as the topbar and bordered like it, so its line runs on under the logo. */
-.rail > .brand {
-  flex: none;
-  height: var(--bar);
-  margin: -0.75rem -0.65rem 0.75rem;
-  padding: 0 1.15rem;
-  border-bottom: 1px var(--os-border-style) var(--line);
+/* .brand also styles the agent bar's logo; in the sidebar the shell sets the row. */
+.os-shell-brand.brand {
+  padding: 0 var(--os-space-5);
 }
 
 .brand:hover {
@@ -415,7 +393,7 @@ kbd {
   padding: 0.85rem 0.55rem 0.3rem;
 }
 
-.rail ul {
+.os-shell-sidebar ul {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -423,7 +401,7 @@ kbd {
   gap: 1px;
 }
 
-.rail li a {
+.os-shell-sidebar li a {
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -434,23 +412,23 @@ kbd {
   font-size: var(--fs-sm);
 }
 
-.rail li a .icon {
+.os-shell-sidebar li a .icon {
   color: var(--muted);
 }
 
-.rail li a:hover {
+.os-shell-sidebar li a:hover {
   background: var(--hover);
   color: var(--ink);
   text-decoration: none;
 }
 
-.rail li a.active {
+.os-shell-sidebar li a.active {
   background: var(--surface);
   color: var(--ink);
   box-shadow: 0 0 0 1px var(--line);
 }
 
-.rail li a.active .icon {
+.os-shell-sidebar li a.active .icon {
   color: var(--accent);
 }
 
@@ -518,22 +496,12 @@ kbd {
   margin-left: auto;
 }
 
-.topbar {
-  position: sticky;
-  top: 0;
+.os-shell-topbar {
   z-index: 20;
-  display: flex;
-  align-items: center;
   gap: 0.75rem;
-  height: var(--bar);
-  padding: 0 clamp(1rem, 3vw, 2.25rem);
+  padding-inline: clamp(1rem, 3vw, 2.25rem);
   background: var(--topbar-bg);
   backdrop-filter: saturate(1.4) blur(10px);
-  border-bottom: 1px var(--os-border-style) var(--line);
-}
-
-.topbar .menu-btn {
-  display: none;
 }
 
 .topbar-title {
@@ -567,6 +535,28 @@ kbd {
   margin-left: auto;
 }
 
+/* Where the toolkit turns the sidebar into a drawer: above the topbar, with the title shown. */
+@container os-shell (inline-size < 52rem) {
+  .os-shell-sidebar {
+    z-index: 50;
+  }
+
+  .topbar-title {
+    display: block;
+  }
+
+  .search-trigger {
+    width: 2rem;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .search-trigger span,
+  .search-trigger kbd {
+    display: none;
+  }
+}
+
 .main {
   padding: 2rem clamp(1rem, 3vw, 2.25rem) 5rem;
   min-width: 0;
@@ -575,10 +565,6 @@ kbd {
 .main > * {
   display: block;
   max-width: 68rem;
-}
-
-.content {
-  min-width: 0;
 }
 
 /* ─── Page structure ─── */
