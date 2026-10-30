@@ -3,6 +3,20 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.3.6
+
+- Agents can now fetch guides from the server: `list_skills` shows each skill's name and
+  description, and `get_skill` returns one in full. The server's instructions point agents at
+  them, so "set up OpenPurpose in this repository" works without installing anything. Both are
+  read tools, so agent mode shows them too. The image ships the skills; `OPENPURPOSE_SKILLS_DIR`
+  overrides where the server reads them from.
+- Renamed the `openpurpose-start` skill to `init-openpurpose`. Settings › Connect an agent and the
+  README now say to ask your agent instead of copying a `curl` command, which would have shadowed
+  Claude Code's own `/init`.
+- Added the `describe-organization` skill: it interviews you about what your organization does
+  (and reads your website if you give it a link), then hands you an Organization purpose text to
+  paste into OpenPurpose.
+
 ## 0.3.5
 
 - Added the `openpurpose-start` skill for a guided first run in your own repository: it
