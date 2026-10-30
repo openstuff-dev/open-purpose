@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenPurpose: correct your agent once</title>
+  <meta name="description" content="OpenPurpose gives people and coding agents the same shared, scoped context over MCP. Correct an agent once, review the learning like a pull request, and every agent knows it from then on. Open source, MIT, self-hostable.">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#16181d" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#fafbfd" media="(prefers-color-scheme: light)">
+  <link rel="canonical" href="https://openstuff-dev.github.io/open-purpose/">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="OpenPurpose">
+  <meta property="og:title" content="OpenPurpose: correct your agent once">
+  <meta property="og:description" content="Shared, scoped context for people and coding agents. Open source, MIT, self-hostable.">
+  <meta property="og:url" content="https://openstuff-dev.github.io/open-purpose/">
+  <meta property="og:image" content="https://openstuff-dev.github.io/open-purpose/assets/img/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="OpenPurpose: Correct your agent once. Shared context for people and coding agents.">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preload" href="assets/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/css/site.css">
+  <script src="assets/js/site.js" defer></script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-x" viewBox="0 0 16 16"><path d="M4.5 4.5l7 7m0-7l-7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 16 16"><path d="M4 8h8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.4"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5v-.5a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 3v5A1.5 1.5 0 0 0 4 9.5h.5"/></g></symbol>
+  <symbol id="i-github" viewBox="0 0 16 16"><path fill="currentColor" d="M8 .2a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.72 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 .2z"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 16 16"><path d="M3 8h10m-4-4 4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 16 16"><path d="M2.5 4.5h11m-11 4h11m-11 4h11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M8 2 14.5 13.5h-13z"/><path d="M8 6.5v3" stroke-linecap="round"/></g><circle cx="8" cy="11.6" r=".8" fill="currentColor"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 2.5 17.5 6.5 10 10.5 2.5 6.5z"/><path d="m2.5 10 7.5 4 7.5-4M2.5 13.5l7.5 4 7.5-4"/></g></symbol>
+  <symbol id="i-building" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="3.5" y="2.5" width="9" height="15" rx="1"/><path d="M12.5 7.5h3a1 1 0 0 1 1 1v9h-4M6.5 6h3M6.5 9h3M6.5 12h3"/></g></symbol>
+  <symbol id="i-shield" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 2.5 16 5v5c0 3.6-2.5 6.3-6 7.5C6.5 16.3 4 13.6 4 10V5z"/><path d="m7.5 10 2 2 3.5-4" stroke-linecap="round"/></g></symbol>
+  <symbol id="i-users" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7.5" cy="7" r="3"/><path d="M2.5 16.5c.6-2.6 2.6-4 5-4s4.4 1.4 5 4"/><path d="M13 4.3a3 3 0 0 1 0 5.4M14.5 12.8c1.4.5 2.5 1.8 3 3.7"/></g></symbol>
+  <symbol id="i-key" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="13.5" r="3.5"/><path d="m9 11 7.5-7.5M14 6l2 2M12 8l1.5 1.5"/></g></symbol>
+  <symbol id="i-swap" viewBox="0 0 20 20"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h12m-3-3 3 3-3 3M16 13H4m3-3-3 3 3 3"/></g></symbol>
+  <symbol id="i-code" viewBox="0 0 20 20"><path d="m7 6-4 4 4 4m6-8 4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <div class="wrap">
+    <a class="brand" href="./" aria-label="OpenPurpose home">
+      <svg class="mark" aria-hidden="true"><use href="assets/logo/sprite.svg#mark-openpurpose"/></svg>
+      <svg class="word" viewBox="0 0 149.8 22.2" aria-hidden="true"><use href="assets/logo/sprite.svg#word-openpurpose"/></svg>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#self-host">Self-host</a>
+      <a href="https://github.com/openstuff-dev/open-purpose">GitHub</a>
+    </nav>
+    <div class="topbar-actions">
+      <a class="btn btn-ghost hide-sm" href="https://purpose.openstuff.app/sign-in">Sign in</a>
+      <a class="btn btn-primary" href="https://purpose.openstuff.app/sign-up">Try it free</a>
+      <button class="btn btn-ghost menu-btn" popovertarget="menu" aria-label="Open menu">
+        <svg aria-hidden="true"><use href="#i-menu"/></svg>
+      </button>
+    </div>
+  </div>
+  <div id="menu" popover>
+    <nav class="menu" aria-label="Mobile">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#self-host">Self-host</a>
+      <a href="https://github.com/openstuff-dev/open-purpose">GitHub</a>
+      <hr>
+      <a href="https://purpose.openstuff.app/sign-in">Sign in</a>
+      <a class="btn btn-primary" href="https://purpose.openstuff.app/sign-up">Try it free</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- 2. Hero -->
+<section class="hero" aria-labelledby="hero-title">
+  <div class="wrap">
+    <div class="hero-copy">
+      <a class="pill" href="https://github.com/openstuff-dev/open-purpose"><b>MIT</b> Open source and self-hostable</a>
+      <h1 id="hero-title">Correct your agent once.<span class="soft">Every agent remembers.</span></h1>
+      <p class="sub">OpenPurpose is shared, scoped context for people and coding agents: one place for your rules, and each agent gets exactly the ones for the code it is in.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary btn-lg" href="https://purpose.openstuff.app/sign-up">Try it free</a>
+        <a class="btn btn-lg" href="#self-host">Self-host it <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+      </div>
+      <p class="meta"><span>Open source</span> · <span>MIT</span> · <span>Works with Claude Code, Cursor, Codex, VS Code</span></p>
+    </div>
+
+    <figure class="hero-visual" aria-label="An agent calls get_context and receives rules in three layers">
+      <div class="term">
+        <div class="term-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="title">agent · acme/shop · frontend/src/cart/Total.tsx</span></div>
+<pre><code><span class="c-mut">›</span> <span class="c-brand">get_context</span>({
+    remote:   <span class="c-str">"github.com/acme/shop"</span>,
+    path:     <span class="c-str">"frontend/src/cart/Total.tsx"</span>,
+    manifest: <span class="c-str">"package.json"</span>
+  })
+<span class="c-mut">← 3 layers · 9 rules · 1,840 tokens</span>
+
+<span class="layer-tag lt-org">ORGANIZATION</span> <span class="c-mut">acme</span>
+  Amounts are integer øre, never floats.
+  Every string a customer reads goes through i18n.
+<span class="layer-tag lt-proj">PROJECT</span> <span class="c-mut">shop</span>
+  Say "basket" in code and "cart" in the UI. See [[Basket]].
+<span class="layer-tag lt-scope">SCOPE</span> <span class="c-brand">frontend/**</span> <span class="c-mut">· angular</span>
+  Format money with formatOre(). Never use toFixed().
+  Local state uses signals; no new NgModules.     <span class="win">← most specific wins</span></code></pre>
+      </div>
+    </figure>
+  </div>
+</section>
+
+<!-- 3. The problem -->
+<section class="divider" aria-labelledby="problem-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">The problem</span>
+      <h2 id="problem-title">One rule. Three repos. Three versions.</h2>
+      <p class="lede">You copy the same rules into a <code>CLAUDE.md</code>, an <code>AGENTS.md</code> and a <code>.cursorrules</code>. A month later they disagree, and nobody knows which one is right.</p>
+    </div>
+
+    <div class="files">
+      <figure class="file">
+        <figcaption class="file-head"><span><b>shop</b>/CLAUDE.md</span><span class="age">edited 2 days ago</span></figcaption>
+        <ol>
+          <li># Money</li>
+          <li>Amounts are integer øre, never floats.</li>
+          <li>Format with formatOre().</li>
+          <li>&nbsp;</li>
+          <li># Language</li>
+          <li>"basket" in code, "cart" in the UI.</li>
+        </ol>
+      </figure>
+      <figure class="file">
+        <figcaption class="file-head"><span><b>billing-api</b>/AGENTS.md</span><span class="age">edited 5 weeks ago</span></figcaption>
+        <ol>
+          <li># Money</li>
+          <li class="drift" data-note="drifted: contradicts shop">Use decimal for amounts.</li>
+          <li>Format with formatOre().</li>
+          <li>&nbsp;</li>
+          <li># Language</li>
+          <li class="drift" data-note="drifted: old term">"cart" everywhere.</li>
+        </ol>
+      </figure>
+      <figure class="file">
+        <figcaption class="file-head"><span><b>admin</b>/.cursorrules</span><span class="age">edited 4 months ago</span></figcaption>
+        <ol>
+          <li># Money</li>
+          <li class="gone">Amounts are integer øre, never floats.</li>
+          <li class="drift" data-note="missing: no money rule left">&nbsp;</li>
+          <li>&nbsp;</li>
+          <li># Language</li>
+          <li>"basket" in code, "cart" in the UI.</li>
+        </ol>
+      </figure>
+    </div>
+    <div class="session-end" role="note">
+      <span class="c-warn">session ended</span>
+      <s>"No, amounts are integer øre."</s>
+      <s>"Use the Basket type, not Cart."</s>
+      <span>2 corrections lost. You will give them again tomorrow.</span>
+    </div>
+    <div class="problem-notes">
+      <p><b>Copied into every repo</b>Each new repository starts with a stale copy.</p>
+      <p><b>They drift apart</b>A fix in one file never reaches the others.</p>
+      <p><b>Corrections end with the session</b>What you told the agent today is gone tomorrow.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4. Features (bento) -->
+<section id="features" class="divider" aria-labelledby="features-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Features</span>
+      <h2 id="features-title">One source of truth, served in layers.</h2>
+      <p class="lede">Rules live once. Each agent gets the ones that apply to the code in front of it, and every correction becomes a reviewed rule.</p>
+    </div>
+
+    <div class="bento">
+      <!-- Learnings: the big card -->
+      <article class="card big span-2 row-2" tabindex="0" aria-labelledby="c-learn">
+        <span class="tag">The core loop</span>
+        <div class="viz viz-learn" aria-hidden="true">
+          <div class="learn-flow">
+            <div class="bubble"><span class="who">you → agent</span>No. Amounts are integer øre, never floats.</div>
+            <div class="agent-line">agent calls <b>propose_learning</b></div>
+            <div class="panel proposal">
+              <div class="proposal-head"><b>Learning #142</b><span class="chip accent">frontend/**</span></div>
+              <div class="diff"><span class="add">Amounts are integer øre, never floats. Format with formatOre().</span></div>
+              <div class="review"><span class="avatar">MK</span><span>Mira reviewed</span><span class="chip ok"><svg><use href="#i-check"/></svg>Approved</span></div>
+            </div>
+          </div>
+          <div class="stack">
+            <div class="stack-head"><span>scope · frontend/**</span><span>live</span></div>
+            <div class="rule new">Amounts are integer øre, never floats.</div>
+            <div class="rule">Local state uses signals.</div>
+            <div class="rule">No new NgModules.</div>
+            <div class="rule">Every string goes through i18n.</div>
+            <div class="stack-foot">Every agent gets it from the next call.</div>
+          </div>
+        </div>
+        <h3 id="c-learn">Learnings, reviewed like pull requests</h3>
+        <p>When you correct an agent, it calls <code>propose_learning</code>. The learning is filed under the most specific scope, and a person reviews it with line comments, suggestions, request changes or approve before any other agent sees it. A correction made once never has to be made again.</p>
+      </article>
+
+      <!-- Layers -->
+      <article class="card" tabindex="0" aria-labelledby="c-layers">
+        <div class="viz viz-layers" aria-hidden="true">
+          <div class="plates">
+            <div class="plate" style="--i:0"><span>Workspace</span><span>general</span></div>
+            <div class="plate" style="--i:1"><span>Organization</span><span>acme</span></div>
+            <div class="plate" style="--i:2"><span>Project</span><span>shop</span></div>
+            <div class="plate scope" style="--i:3"><span>Scope</span><span>wins</span></div>
+          </div>
+        </div>
+        <h3 id="c-layers">Four layers, most specific wins</h3>
+        <p>Workspace, organization, project and scope. Agents get the general rules first and the specific ones last.</p>
+      </article>
+
+      <!-- Scoped -->
+      <article class="card" tabindex="0" aria-labelledby="c-scope">
+        <div class="viz" aria-hidden="true">
+          <ul class="tree">
+            <li><span class="i"></span>shop/</li>
+            <li class="fe root" style="--d:1"><span class="i">├ </span>frontend/<span class="chip accent">frontend/**</span></li>
+            <li class="fe" style="--d:2"><span class="i">│ ├ </span>src/cart/Total.tsx</li>
+            <li class="fe" style="--d:3"><span class="i">│ └ </span>package.json</li>
+            <li class="be" style="--d:1"><span class="i">├ </span>backend/</li>
+            <li class="be" style="--d:2"><span class="i">│ └ </span>Billing.csproj</li>
+            <li><span class="i">└ </span>AGENTS.md</li>
+          </ul>
+        </div>
+        <h3 id="c-scope">Scoped by path and stack</h3>
+        <p>Scope rules to <code>frontend/**</code>, one repository or a stack like <code>angular</code>. A frontend rule never reaches backend code.</p>
+      </article>
+
+      <!-- Agent mode -->
+      <article class="card" tabindex="0" aria-labelledby="c-agent">
+        <div class="viz viz-agent" aria-hidden="true">
+          <div class="agent-wrap">
+            <div class="switch-row"><span>Agent mode</span><span class="switch"></span></div>
+            <div class="flip">
+              <div class="face ui">
+                <h4>Money</h4>
+                <p>Amounts are integer øre, never floats. Format with <b>formatOre()</b>; never call toFixed().</p>
+                <div class="ui-meta"><span class="chip">organization</span><span class="chip">v7</span></div>
+              </div>
+              <div class="face console"><span class="c-mut">## acme › Money</span>
+Amounts are integer øre,
+never floats. Format with
+formatOre(); never call
+toFixed().
+<span class="c-mut">## shop › frontend/** …</span></div>
+            </div>
+          </div>
+        </div>
+        <h3 id="c-agent">Agent mode</h3>
+        <p>Flip one switch and see exactly what an agent gets back, word for word.</p>
+      </article>
+
+      <!-- MCP -->
+      <article class="card" tabindex="0" aria-labelledby="c-mcp">
+        <div class="viz" aria-hidden="true">
+          <svg class="mcp" viewBox="0 0 300 170">
+            <g class="agent"><rect x="1" y="8" width="104" height="28" rx="6"/><text x="12" y="26">Claude Code</text></g>
+            <g class="agent"><rect x="1" y="50" width="104" height="28" rx="6"/><text x="12" y="68">Cursor</text></g>
+            <g class="agent"><rect x="1" y="92" width="104" height="28" rx="6"/><text x="12" y="110">Codex</text></g>
+            <g class="agent"><rect x="1" y="134" width="104" height="28" rx="6"/><text x="12" y="152">VS Code</text></g>
+            <path class="wire" d="M105 22 C150 22 150 85 190 85"/>
+            <path class="wire" d="M105 64 C150 64 150 85 190 85"/>
+            <path class="wire" d="M105 106 C150 106 150 85 190 85"/>
+            <path class="wire" d="M105 148 C150 148 150 85 190 85"/>
+            <path class="pulse" style="--d:0" d="M105 22 C150 22 150 85 190 85"/>
+            <path class="pulse" style="--d:1" d="M105 64 C150 64 150 85 190 85"/>
+            <path class="pulse" style="--d:2" d="M105 106 C150 106 150 85 190 85"/>
+            <path class="pulse" style="--d:3" d="M105 148 C150 148 150 85 190 85"/>
+            <g class="node"><rect x="190" y="58" width="108" height="54" rx="8"/>
+              <svg class="mk" x="200" y="68" width="16" height="16"><use href="assets/logo/sprite.svg#mark-openpurpose"/></svg>
+              <text x="222" y="81">OpenPurpose</text><text class="fn" x="200" y="101">get_context</text></g>
+          </svg>
+        </div>
+        <h3 id="c-mcp">Works with your agents over MCP</h3>
+        <p>Before a task, the agent calls <code>get_context</code> with the git remote, the path and the manifest.</p>
+      </article>
+
+      <!-- Budget -->
+      <article class="card" tabindex="0" aria-labelledby="c-budget">
+        <div class="viz" aria-hidden="true">
+          <div class="budget">
+            <div class="sec" style="--d:0"><span>wksp</span><div class="lines"><i style="width:88%"></i><div class="more"><i style="width:96%"></i><i style="width:70%"></i></div></div></div>
+            <div class="sec" style="--d:1"><span>org</span><div class="lines"><i style="width:80%"></i><div class="more"><i style="width:92%"></i><i style="width:84%"></i><i style="width:60%"></i></div></div></div>
+            <div class="sec" style="--d:2"><span>proj</span><div class="lines"><i style="width:90%"></i><div class="more"><i style="width:76%"></i></div></div></div>
+            <div class="sec full"><span>scope</span><div class="lines"><i style="width:94%"></i><div class="more"><i style="width:100%"></i><i style="width:88%"></i><i style="width:66%"></i></div></div></div>
+            <div class="meter"><div class="meter-label"><span>context budget <span class="over c-warn">· over</span></span><b>4,000 tokens</b></div><div class="meter-track"><div class="meter-fill"></div></div></div>
+          </div>
+        </div>
+        <h3 id="c-budget">Context budget</h3>
+        <p>Big rule sets don't flood the agent. General sections shrink to their first sentence; the most specific always arrive in full.</p>
+      </article>
+
+      <!-- Findings -->
+      <article class="card" tabindex="0" aria-labelledby="c-find">
+        <div class="viz viz-find" aria-hidden="true">
+          <span class="chip warn find-chip"><svg><use href="#i-warn"/></svg>Retry loop has no limit · mailer/send.ts</span>
+          <div class="find-dest">
+            <div class="panel dest tracker"><div class="dest-head"><span>Issue tracker</span><span>untouched</span></div><ul><li>#311 Checkout copy</li><li>#309 Login flow</li></ul></div>
+            <div class="panel dest"><div class="dest-head"><span>Findings</span><span class="c-warn">+1</span></div><ul><li class="new">Retry loop has no limit</li><li>N+1 query in orders</li><li>Unused feature flag</li></ul></div>
+          </div>
+        </div>
+        <h3 id="c-find">Findings</h3>
+        <p>When an agent spots a real problem outside its task, it files it instead of fixing it or forgetting it. Findings stay out of your issue tracker.</p>
+      </article>
+
+      <!-- Self-host -->
+      <article class="card span-2" tabindex="0" aria-labelledby="c-host">
+        <div class="viz viz-host" aria-hidden="true">
+          <div class="term">
+            <div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span class="title">~/open-purpose</span></div>
+<pre><code><span class="c-mut">$</span> <span class="typed">docker compose up -d</span><span class="caret"></span>
+<span class="out c-mut" style="--d:0">[+] Running 2/2</span><span class="out" style="--d:1"><span class="c-ok">✔</span> Container open-purpose-db   <span class="c-ok">Started</span></span><span class="out" style="--d:2"><span class="c-ok">✔</span> Container open-purpose      <span class="c-ok">Started</span></span></code></pre>
+          </div>
+        </div>
+        <h3 id="c-host">Self-host in one command</h3>
+        <p>One Docker image, <code>ghcr.io/openstuff-dev/open-purpose</code>, configured with environment variables. Or use the hosted version.</p>
+      </article>
+    </div>
+
+    <div class="also">
+      <div><h3>Inbox</h3><p>Every pending proposal and learning in one table, showing whose move it is.</p></div>
+      <div><h3>API specs</h3><p>Attach OpenAPI or Swagger. Agents get exact endpoints and DTOs instead of guessing.</p></div>
+      <div><h3>Map</h3><p>Projects and glossary terms linked with <code>[[wikilinks]]</code>, across organizations.</p></div>
+      <div><h3>Full history</h3><p>Every section keeps its diffs. Restore any version in one click.</p></div>
+      <div><h3>Export and import</h3><p>Take everything with you as JSON or Markdown.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. How it works -->
+<section id="how" class="divider" aria-labelledby="how-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">How it works</span>
+      <h2 id="how-title">Three steps. The third one keeps paying off.</h2>
+    </div>
+    <ol class="steps" style="list-style:none;margin:0;padding:0">
+      <li class="step">
+        <span class="step-n">1</span>
+        <h3>Run it</h3>
+        <p>Sign up for the hosted version, or run it on your own server.</p>
+        <div class="term">
+          <div class="term-bar"><span class="title">terminal</span><button class="copy" type="button" data-copy="code-run"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
+<pre><code id="code-run"><span class="c-mut">$ </span>git clone https://github.com/openstuff-dev/open-purpose
+<span class="c-mut">$ </span>cd open-purpose
+<span class="c-mut">$ </span>docker compose up -d</code></pre>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-n">2</span>
+        <h3>Connect your agent</h3>
+        <p>Add the MCP server, then paste this into your repo's <code>AGENTS.md</code> or <code>CLAUDE.md</code>.</p>
+        <div class="term">
+          <div class="term-bar"><span class="title">AGENTS.md</span><button class="copy" type="button" data-copy="code-snippet"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
+<pre><code id="code-snippet"><span class="c-brand">## Context</span>
+Before each task, call get_context
+on the OpenPurpose MCP server with the
+git remote, the file path and the
+manifest. Follow the rules it returns.
+When I correct you, call
+propose_learning.</code></pre>
+        </div>
+      </li>
+      <li class="step">
+        <span class="step-n">3</span>
+        <h3>Correct your agent once</h3>
+        <p>The agent proposes a learning. You approve it in the Inbox. From then on, every agent working in that scope knows it.</p>
+        <div class="term">
+          <div class="term-bar"><span class="title">inbox</span></div>
+<pre><code><span class="c-mut">#142</span> Amounts are integer øre…
+     <span class="c-brand">frontend/**</span> · <span class="c-ok">approved</span>
+<span class="c-mut">#141</span> Use the Basket type…
+     <span class="c-brand">shop</span> · <span class="c-warn">your move</span></code></pre>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- 6. Why -->
+<section class="divider" aria-labelledby="why-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Why OpenPurpose</span>
+      <h2 id="why-title">Rules files were a good start. They don't scale past one repo.</h2>
+      <p class="lede">Keep a short <code>AGENTS.md</code> in each repo that points to OpenPurpose. Keep the rules themselves in one place.</p>
+    </div>
+    <div class="compare-box" role="region" aria-label="Comparison table" tabindex="0">
+      <table class="compare">
+        <thead><tr><th scope="col">&nbsp;</th><th scope="col">Rules files copied per repo</th><th scope="col" class="us">OpenPurpose</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">One source of truth across repos</th>
+            <td><span class="yn no"><svg aria-hidden="true"><use href="#i-x"/></svg>No</span>A copy per repo. Fixes stay where you made them.</td>
+            <td class="us"><span class="yn yes"><svg aria-hidden="true"><use href="#i-check"/></svg>Yes</span>Each rule lives once and reaches every repo that needs it.</td></tr>
+          <tr><th scope="row">Rules scoped to the code an agent is in</th>
+            <td><span class="yn part"><svg aria-hidden="true"><use href="#i-dash"/></svg>Partly</span>Per folder at best. The agent reads the whole file.</td>
+            <td class="us"><span class="yn yes"><svg aria-hidden="true"><use href="#i-check"/></svg>Yes</span>By path, repository and stack. <code>frontend/**</code> rules stay out of backend code.</td></tr>
+          <tr><th scope="row">Corrections become reviewed rules</th>
+            <td><span class="yn no"><svg aria-hidden="true"><use href="#i-x"/></svg>No</span>Forgotten when the session ends, unless someone edits the file by hand.</td>
+            <td class="us"><span class="yn yes"><svg aria-hidden="true"><use href="#i-check"/></svg>Yes</span>The agent proposes a learning. A person reviews and approves it.</td></tr>
+          <tr><th scope="row">History and restore</th>
+            <td><span class="yn part"><svg aria-hidden="true"><use href="#i-dash"/></svg>Partly</span>Git history, spread over many repos.</td>
+            <td class="us"><span class="yn yes"><svg aria-hidden="true"><use href="#i-check"/></svg>Yes</span>Diffs per section, one-click restore.</td></tr>
+          <tr><th scope="row">Works with every MCP agent</th>
+            <td><span class="yn part"><svg aria-hidden="true"><use href="#i-dash"/></svg>Partly</span>Each agent expects its own file name and format.</td>
+            <td class="us"><span class="yn yes"><svg aria-hidden="true"><use href="#i-check"/></svg>Yes</span>One <code>get_context</code> call for Claude Code, Cursor, Codex, VS Code and the rest.</td></tr>
+          <tr><th scope="row">You own the data</th>
+            <td><span class="yn yes"><svg aria-hidden="true"><use href="#i-check"/></svg>Yes</span>The files are in your repos.</td>
+            <td class="us"><span class="yn yes"><svg aria-hidden="true"><use href="#i-check"/></svg>Yes</span>Self-host it, and export everything as JSON or Markdown at any time.</td></tr>
+          <tr><th scope="row">Open source</th>
+            <td><span class="yn yes"><svg aria-hidden="true"><use href="#i-check"/></svg>Yes</span>Plain text files.</td>
+            <td class="us"><span class="yn yes"><svg aria-hidden="true"><use href="#i-check"/></svg>Yes</span>MIT licence. Read the code, run it, change it.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 7. Open source -->
+<section id="self-host" class="divider" aria-labelledby="oss-title">
+  <div class="wrap oss">
+    <div>
+      <span class="eyebrow">Open source</span>
+      <h2 id="oss-title">Read the code, run it, change it.</h2>
+      <p class="lede">OpenPurpose is MIT-licensed. Run the same image we run, on your own servers, with your own data.</p>
+      <ul>
+        <li><svg aria-hidden="true"><use href="#i-check"/></svg><span><b>One Docker image.</b> Configure it with environment variables.</span></li>
+        <li><svg aria-hidden="true"><use href="#i-check"/></svg><span><b>Your data stays with you.</b> Rules, learnings and tokens live in your own database.</span></li>
+        <li><svg aria-hidden="true"><use href="#i-check"/></svg><span><b>No lock-in.</b> Export everything as JSON or Markdown.</span></li>
+      </ul>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/openstuff-dev/open-purpose"><svg aria-hidden="true"><use href="#i-github"/></svg>View on GitHub</a>
+        <a class="btn" href="https://github.com/openstuff-dev/open-purpose#readme">Self-hosting guide</a>
+      </div>
+    </div>
+    <div>
+      <div class="term">
+        <div class="term-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="title">terminal</span><button class="copy" type="button" data-copy="code-pull"><svg aria-hidden="true"><use href="#i-copy"/></svg><span>Copy</span></button></div>
+<pre><code id="code-pull"><span class="c-mut">$ </span>docker pull ghcr.io/openstuff-dev/open-purpose</code></pre>
+      </div>
+      <div class="family">
+        <p class="family-head">Part of the OpenStuff family: tools built on one shared toolkit.</p>
+        <div class="family-row">
+          <span class="fam"><svg class="mark" aria-hidden="true"><use href="assets/logo/sprite.svg#mark-openstuff"/></svg><svg class="word" viewBox="0 0 114.24 22.2" role="img" aria-label="OpenStuff"><use href="assets/logo/sprite.svg#word-openstuff"/></svg></span>
+          <span class="fam"><svg class="mark" aria-hidden="true"><use href="assets/logo/sprite.svg#mark-openpurpose"/></svg><svg class="word" viewBox="0 0 149.8 22.2" role="img" aria-label="OpenPurpose"><use href="assets/logo/sprite.svg#word-openpurpose"/></svg></span>
+          <a href="https://design.openstuff.dev" style="--mark-core:#9442d9"><svg class="mark" aria-hidden="true"><use href="assets/logo/sprite.svg#mark-openstuff-design"/></svg><span>OpenStuff Design</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 8. Teams -->
+<section class="divider" aria-labelledby="teams-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">For teams and enterprises</span>
+      <h2 id="teams-title">Shared where you want it. Private everywhere else.</h2>
+      <p class="lede">Give many repositories the same rules without giving everyone access to everything.</p>
+    </div>
+    <div class="feature-grid">
+      <div><svg aria-hidden="true"><use href="#i-layers"/></svg><h3>Workspaces</h3><p>Each team or company gets its own workspace, with its own rules and members.</p></div>
+      <div><svg aria-hidden="true"><use href="#i-building"/></svg><h3>Private organizations</h3><p>Organizations are private by default. Share one with another workspace only when you choose to.</p></div>
+      <div><svg aria-hidden="true"><use href="#i-shield"/></svg><h3>Row-level security</h3><p>Postgres row-level security separates every workspace in the database itself.</p></div>
+      <div><svg aria-hidden="true"><use href="#i-users"/></svg><h3>Roles</h3><p>Decide who can propose, who can review and who can change the rules.</p></div>
+      <div><svg aria-hidden="true"><use href="#i-key"/></svg><h3>Hashed tokens</h3><p>Agent tokens are stored hashed. Revoke one without touching the others.</p></div>
+      <div><svg aria-hidden="true"><use href="#i-swap"/></svg><h3>Export and import</h3><p>Move a workspace between hosted and self-hosted as JSON or Markdown.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 9. FAQ -->
+<section class="divider" aria-labelledby="faq-title">
+  <div class="wrap">
+    <div class="section-head center">
+      <span class="eyebrow">FAQ</span>
+      <h2 id="faq-title">Questions developers ask first</h2>
+    </div>
+    <div class="faq">
+      <details name="faq">
+        <summary>Is it free?</summary>
+        <div class="a"><p>Yes. OpenPurpose is open source under the MIT licence, so self-hosting costs nothing but your server. You can also start on the hosted version for free.</p></div>
+      </details>
+      <details name="faq">
+        <summary>Can I self-host it?</summary>
+        <div class="a"><p>Yes. It ships as one Docker image, <code>ghcr.io/openstuff-dev/open-purpose</code>, configured with environment variables. Clone the repository and run <code>docker compose up -d</code>.</p></div>
+      </details>
+      <details name="faq">
+        <summary>Which agents work with it?</summary>
+        <div class="a"><p>Any agent that speaks MCP: Claude Code, Cursor, Codex, VS Code and others. The agent calls <code>get_context</code> before a task and <code>propose_learning</code> when you correct it.</p></div>
+      </details>
+      <details name="faq">
+        <summary>Where is my data?</summary>
+        <div class="a"><p>On the hosted version, in our database, with every workspace separated by Postgres row-level security. When you self-host, on your own servers. Either way you can export everything as JSON or Markdown.</p></div>
+      </details>
+      <details name="faq">
+        <summary>How is this different from a CLAUDE.md file?</summary>
+        <div class="a"><p>A <code>CLAUDE.md</code> is one file in one repo, read in full by one kind of agent. OpenPurpose keeps each rule once, serves only the rules for the code an agent is in, works with every MCP agent, and turns your corrections into reviewed rules with history.</p><p>You still keep a short <code>AGENTS.md</code> or <code>CLAUDE.md</code>: it tells the agent to call OpenPurpose.</p></div>
+      </details>
+      <details name="faq">
+        <summary>Does it send my code anywhere?</summary>
+        <div class="a"><p>No. To get context, the agent sends three things: the git remote, the file path and the manifest (<code>package.json</code>, <code>*.csproj</code>). Your source code stays where it is.</p></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- 10. Final CTA -->
+<section class="final divider" aria-labelledby="final-title">
+  <div class="wrap">
+    <h2 id="final-title">Make the next correction the last one.</h2>
+    <p class="lede">Start on the hosted version in a minute, or run it yourself.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary btn-lg" href="https://purpose.openstuff.app/sign-up">Try it free</a>
+      <a class="btn btn-lg" href="https://github.com/openstuff-dev/open-purpose">Self-host it <svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <div>
+      <a class="brand" href="https://github.com/openstuff-dev" aria-label="OpenStuff on GitHub">
+        <svg class="mark" aria-hidden="true"><use href="assets/logo/sprite.svg#mark-openstuff"/></svg>
+        <svg class="word" viewBox="0 0 114.24 22.2" aria-hidden="true"><use href="assets/logo/sprite.svg#word-openstuff"/></svg>
+      </a>
+      <small>Made by OpenStuff. OpenPurpose is released under the MIT licence.</small>
+    </div>
+    <nav aria-label="Footer">
+      <a href="https://github.com/openstuff-dev/open-purpose">GitHub</a>
+      <a href="https://design.openstuff.dev">Design</a>
+      <a href="https://github.com/openstuff-dev/open-purpose/blob/master/LICENSE">Licence</a>
+      <a href="https://purpose.openstuff.app/sign-in">Sign in</a>
+    </nav>
+  </div>
+</footer>
+<p id="copy-status" class="visually-hidden" aria-live="polite"></p>
+</body>
+</html>
