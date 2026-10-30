@@ -20,6 +20,7 @@ import { createProvider, SignInError } from './auth/providers/index.js';
 import { RateLimiter } from './auth/rate-limit.js';
 import type { Config } from './config.js';
 import { endScope, type Pool } from './db.js';
+import { cacheControl } from './domain/cache.js';
 import { AppError, badRequest, notFound } from './errors.js';
 import { callReadTool, createMcpServer } from './mcp.js';
 import * as activity from './service/activity.js';
@@ -1454,12 +1455,9 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
   if (fs.existsSync(config.webDir)) {
     await app.register(fastifyStatic, {
       root: config.webDir,
-      // Hashed bundles never change; index.html must always be fresh so new deploys load.
+      // Hashed bundles never change; index.html and the favicons are checked on every load.
       setHeaders: (reply, filePath) => {
-        reply.header(
-          'Cache-Control',
-          filePath.endsWith('index.html') ? 'no-cache' : 'public, max-age=31536000, immutable',
-        );
+        reply.header('Cache-Control', cacheControl(filePath));
       },
     });
     app.setNotFoundHandler((req, reply) => {
