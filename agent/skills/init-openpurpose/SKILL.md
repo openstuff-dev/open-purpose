@@ -1,5 +1,5 @@
 ---
-name: init
+name: init-openpurpose
 description: Guided first run of OpenPurpose in the current repository. Use when someone is new to OpenPurpose, or asks to get started, set it up or try it here.
 ---
 

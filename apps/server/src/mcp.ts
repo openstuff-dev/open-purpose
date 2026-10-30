@@ -90,8 +90,9 @@ Workflow:
    would fix it. Style preferences aren't findings. get_context lists known findings around your path: don't
    report those again, and ask the user before fixing one. When you fix one, call resolve_finding. If you got a
    detail of your own finding wrong (commit, file, lines, wording), correct it with update_finding.
-8. When the user is new to OpenPurpose or asks you to set it up, call list_skills and then get_skill
-   with "init": a guided first run in their repository.`;
+8. Skills are guides the server offers. When the user is new to OpenPurpose or asks you to set it up, call
+   get_skill with "init-openpurpose": a guided first run in their repository. When they want to describe
+   their organization, use "describe-organization". list_skills shows all of them.`;
 
 const manifestSchema = z.object({
   path: z
@@ -362,7 +363,7 @@ export function createMcpServer(
     {
       title: 'Get a skill',
       description:
-        'The full instructions of one skill from list_skills, e.g. "init" to set up OpenPurpose in a repository. Follow them.',
+        'The full instructions of one skill from list_skills, e.g. "init-openpurpose" to set up OpenPurpose in a repository. Follow them.',
       inputSchema: { name: z.string().describe('Skill name from list_skills') },
     },
     ({ name }) => run('get_skill', async () => text((await getSkill(name)).body)),

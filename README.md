@@ -320,11 +320,16 @@ into your repo's `AGENTS.md` or `CLAUDE.md`.
 ### First run
 
 New to OpenPurpose? Ask your agent to "set up OpenPurpose in this repository". The server tells
-agents about `list_skills` and `get_skill`, so it fetches the [`init`](agent/skills/init/SKILL.md)
+agents about `list_skills` and `get_skill`, so it fetches the [`init-openpurpose`](agent/skills/init-openpurpose/SKILL.md)
 skill itself: a guided first run that checks the connection, connects the repository to a
 project, adds the snippet above, shows what an agent sees there, fills one gap (usually the
 project purpose) and turns one rule you keep repeating into your first learning. Nothing to
 install, and it is always the version that matches your server.
+
+An empty **Organization purpose**? Ask your agent to "describe my organization". The
+[`describe-organization`](agent/skills/describe-organization/SKILL.md) skill interviews you
+(and reads your website if you give it a link), pushes back on vague answers and ends with a text
+you paste into the organization's purpose.
 
 ### MCP tools
 
@@ -338,7 +343,7 @@ install, and it is always the version that matches your server.
 | `search`, `read_section` | Full-text search, read one section with its version |
 | `update_section`, `add_section` | Change content, subject to the section's or document's mode |
 | `list_projects`, `list_scopes`, `list_organizations` | Discovery |
-| `list_skills`, `get_skill` | Guides the server offers agents, e.g. `init` for a guided first run: names and descriptions first, one skill's full text on request |
+| `list_skills`, `get_skill` | Guides the server offers agents, e.g. `init-openpurpose` for a guided first run: names and descriptions first, one skill's full text on request |
 | `get_api` | Endpoints and DTOs from a project's OpenAPI/Swagger spec: all endpoints, one endpoint in detail, or one DTO |
 | `list_my_proposals`, `get_review` | The agent's own proposals and the review feedback on one, with numbered lines |
 | `reply_to_review`, `apply_suggestion`, `revise_proposal` | Answer a thread (and resolve it), accept a reviewer's suggestion, push a new revision |

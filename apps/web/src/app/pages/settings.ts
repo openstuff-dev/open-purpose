@@ -348,10 +348,10 @@ organization, the project and the part of the code you are in (a repository or a
                     <h3>Optional: take the guided first run</h3>
                     <p>
                       Ask your agent to <q>set up OpenPurpose in this repository</q>. It fetches the
-                      <code>init</code> skill from this server (<code>list_skills</code>,
-                      <code>get_skill</code>) and walks you through it: it connects the repository
-                      to a project, shows what an agent sees there and turns one rule you keep
-                      repeating into your first learning.
+                      <code>init-openpurpose</code> skill from this server
+                      (<code>list_skills</code>, <code>get_skill</code>) and walks you through it:
+                      it connects the repository to a project, shows what an agent sees there and
+                      turns one rule you keep repeating into your first learning.
                     </p>
                   </div>
                 </li>
