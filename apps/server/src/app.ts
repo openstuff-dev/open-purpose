@@ -47,6 +47,7 @@ import { DEFAULT_INCLUDES, exportContent } from './service/transfer/export.js';
 import { importAsGroup, importContent } from './service/transfer/import.js';
 import { exportZip, readExportZip } from './service/transfer/markdown.js';
 import { DOC_KINDS, EDIT_MODES } from './service/types.js';
+import { websites } from './domain/websites.js';
 import type {
   AuthConfig as AuthConfigDto,
   AuthStartResult,
@@ -93,6 +94,7 @@ const id = z.uuid();
 const optId = id.nullable().optional();
 const role = z.enum(['admin', 'editor', 'viewer', 'agent']);
 const manifest = z.object({ path: z.string(), content: z.string() });
+const websitesBody = z.object({ websites });
 
 function parse<T extends z.ZodType>(schema: T, value: unknown): z.infer<T> {
   return schema.parse(value ?? {});
@@ -545,6 +547,14 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
         }
         return admin.updateOrganization(req.db, req.access, orgId, body);
       });
+      api.put('/organizations/:id/websites', async (req) =>
+        admin.setOrganizationWebsites(
+          req.db,
+          req.access,
+          (req.params as { id: string }).id,
+          parse(websitesBody, req.body).websites,
+        ),
+      );
       api.get('/organizations/:id/activity', async (req) => {
         const { period } = parse(
           z.object({ period: z.enum(['7d', '30d', 'all']).default('30d') }),
@@ -650,6 +660,14 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
         }
         return projects.updateProject(req.db, req.access, projectId, body);
       });
+      api.put('/projects/:id/websites', async (req) =>
+        projects.setWebsites(
+          req.db,
+          req.access,
+          (req.params as { id: string }).id,
+          parse(websitesBody, req.body).websites,
+        ),
+      );
       api.post('/projects/:id/rename', async (req) =>
         renameSlug(
           req.db,

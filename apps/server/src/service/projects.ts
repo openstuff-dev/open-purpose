@@ -5,10 +5,10 @@ import { AppError, badRequest, mapPgError, notFound } from '../errors.js';
 import { parseRemote, slugify, type RemoteInfo } from '../domain/remote.js';
 import { claimSlug } from './aliases.js';
 import { insertDocument, insertSection } from './content.js';
-import type { Project, Repository } from './types.js';
+import type { Project, Repository, Website } from './types.js';
 
 const PROJECT_COLS =
-  'p.id, p.organization_id, p.slug, p.name, p.summary, p.reviewed, p.created_at, p.updated_at, p.archived_at';
+  'p.id, p.organization_id, p.slug, p.name, p.summary, p.reviewed, p.websites, p.created_at, p.updated_at, p.archived_at';
 
 export interface ProjectListItem extends Project {
   organization_slug: string;
@@ -136,7 +136,7 @@ export async function createProject(db: Db, a: Access, input: ProjectInput): Pro
       const { rows } = await c.query<Project>(
         `INSERT INTO projects (organization_id, slug, name, summary, reviewed, created_by)
          VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, organization_id, slug, name, summary, reviewed, created_at, updated_at, archived_at`,
+         RETURNING id, organization_id, slug, name, summary, reviewed, websites, created_at, updated_at, archived_at`,
         [orgId, slug, input.name.trim(), input.summary ?? '', a.canEdit(orgId), a.actor.id],
       );
       const project = rows[0];
@@ -198,7 +198,7 @@ export async function updateProject(
                                    WHEN $6 THEN COALESCE(archived_at, now()) ELSE NULL END,
                 organization_id = $7, updated_at = now()
           WHERE id = $1
-          RETURNING id, organization_id, slug, name, summary, reviewed, created_at, updated_at, archived_at`,
+          RETURNING id, organization_id, slug, name, summary, reviewed, websites, created_at, updated_at, archived_at`,
         [
           cur.id,
           input.slug?.toLowerCase() ?? cur.slug,
@@ -223,6 +223,22 @@ export async function updateProject(
   } catch (err) {
     throw mapPgError(err);
   }
+}
+
+/** Replace a project's websites. Anyone who can edit the project may. */
+export async function setWebsites(
+  db: Queryable,
+  a: Access,
+  ref: string,
+  websites: Website[],
+): Promise<Website[]> {
+  const p = await getProject(db, a, ref);
+  a.requireEdit(p.organization_id);
+  const { rows } = await db.query<{ websites: Website[] }>(
+    'UPDATE projects SET websites = $2::jsonb, updated_at = now() WHERE id = $1 RETURNING websites',
+    [p.id, JSON.stringify(websites)],
+  );
+  return rows[0].websites;
 }
 
 export async function deleteProject(db: Db, a: Access, ref: string): Promise<void> {

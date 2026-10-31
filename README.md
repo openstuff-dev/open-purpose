@@ -104,6 +104,9 @@ second organization under Settings › Organizations.
   `get_api` returns the endpoints one line each, or one endpoint with its parameters,
   responses and every DTO it uses as TypeScript-like interfaces. The project's API
   tab shows exactly that text, endpoint by endpoint.
+- **Websites** on every project and organization: links such as Staging or Production,
+  with a label of your own, shown under the page header. Editors add them in place.
+  `get_context` lists them too, so agents know where the code runs.
 - **Project pages** split into tabs: Documents, Scopes, API, What agents see,
   Connections, Repositories and Settings, under a strip that shows where the
   project sits (workspace › organization › project › scopes).

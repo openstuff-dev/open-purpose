@@ -21,6 +21,7 @@ import type {
   Me,
   Member,
   Organization,
+  Website,
   Project,
   ProjectDetail,
   Proposal,
@@ -181,6 +182,9 @@ export class Api {
     },
   ) => this.send<Organization>('PATCH', `/organizations/${id}`, body);
 
+  setOrgWebsites = (id: string, websites: Website[]) =>
+    this.send<Website[]>('PUT', `/organizations/${id}/websites`, { websites });
+
   setReader = (targetId: string, readerId: string, allowed: boolean) =>
     this.send('PUT', `/organizations/${targetId}/readers/${readerId}`, { allowed });
 
@@ -210,6 +214,9 @@ export class Api {
       archived?: boolean;
     },
   ) => this.send<Project>('PATCH', `/projects/${id}`, body);
+
+  setProjectWebsites = (id: string, websites: Website[]) =>
+    this.send<Website[]>('PUT', `/projects/${id}/websites`, { websites });
 
   deleteProject = (id: string) => this.send<undefined>('DELETE', `/projects/${id}`);
   addRepository = (projectId: string, remote_url: string) =>

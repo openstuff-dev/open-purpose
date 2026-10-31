@@ -15,7 +15,7 @@ import { AppError, badRequest, forbidden, mapPgError, notFound } from '../errors
 import { slugify } from '../domain/remote.js';
 import { claimSlug } from './aliases.js';
 import { insertDocument, insertSection } from './content.js';
-import type { Group, Organization } from './types.js';
+import type { Group, Organization, Website } from './types.js';
 import type { AgentPermissions, AgentReview, SlugAlias } from '@openpurpose/contracts';
 
 export const AGENT_REVIEWS: AgentReview[] = ['edit_modes', 'always_propose', 'auto_approve'];
@@ -293,7 +293,7 @@ export interface OrgListItem extends Organization {
 
 export async function listOrganizations(db: Queryable, a: Access): Promise<OrgListItem[]> {
   const { rows } = await db.query<Organization & { projects: number; aliases: SlugAlias[] }>(
-    `SELECT o.id, o.slug, o.name, o.summary, o.context_max_tokens, o.created_at, o.archived_at,
+    `SELECT o.id, o.slug, o.name, o.summary, o.context_max_tokens, o.websites, o.created_at, o.archived_at,
             (SELECT count(*)::int FROM projects p WHERE p.organization_id = o.id AND p.archived_at IS NULL) AS projects,
             COALESCE((SELECT json_agg(json_build_object('id', x.id, 'old_slug', x.old_slug, 'created_at', x.created_at) ORDER BY x.created_at DESC)
                         FROM slug_aliases x WHERE x.organization_id = o.id), '[]') AS aliases
@@ -308,6 +308,7 @@ export async function listOrganizations(db: Queryable, a: Access): Promise<OrgLi
     return {
       ...o,
       summary: readable ? o.summary : '',
+      websites: readable ? o.websites : [],
       readable,
       role: a.orgRole(o.id),
       projects: readable ? o.projects : null,
@@ -323,7 +324,7 @@ async function insertOrganization(
 ): Promise<Organization> {
   const { rows } = await c.query<Organization>(
     `INSERT INTO organizations (slug, name, summary) VALUES ($1, $2, $3)
-     RETURNING id, slug, name, summary, context_max_tokens, created_at, archived_at`,
+     RETURNING id, slug, name, summary, context_max_tokens, websites, created_at, archived_at`,
     [input.slug || slugify(input.name), input.name.trim(), input.summary ?? ''],
   );
   await seedOrgDocs(c, rows[0].id, actorId);
@@ -369,7 +370,7 @@ export async function updateOrganization(
       `UPDATE organizations SET name = COALESCE($2, name), slug = COALESCE($3, slug), summary = COALESCE($4, summary),
               archived_at = CASE WHEN $5::boolean IS NULL THEN archived_at WHEN $5 THEN COALESCE(archived_at, now()) ELSE NULL END,
               context_max_tokens = CASE WHEN $6::boolean THEN $7::integer ELSE context_max_tokens END
-        WHERE id = $1 RETURNING id, slug, name, summary, context_max_tokens, created_at, archived_at`,
+        WHERE id = $1 RETURNING id, slug, name, summary, context_max_tokens, websites, created_at, archived_at`,
       [
         id,
         input.name?.trim() || null,
@@ -385,6 +386,22 @@ export async function updateOrganization(
   } catch (err) {
     throw mapPgError(err);
   }
+}
+
+/** Replace an organization's websites. Anyone who can edit its documents may. */
+export async function setOrganizationWebsites(
+  db: Queryable,
+  a: Access,
+  id: string,
+  websites: Website[],
+): Promise<Website[]> {
+  a.requireEdit(id);
+  const { rows } = await db.query<{ websites: Website[] }>(
+    'UPDATE organizations SET websites = $2::jsonb WHERE id = $1 RETURNING websites',
+    [id, JSON.stringify(websites)],
+  );
+  if (!rows[0]) throw notFound('Organization');
+  return rows[0].websites;
 }
 
 /** Let members of `reader` read `target`. Group admins only. */

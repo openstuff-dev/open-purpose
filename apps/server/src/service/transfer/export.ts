@@ -45,7 +45,7 @@ export async function exportContent(
 
   const organizations = (
     await db.query<ExportOrganization>(
-      `SELECT o.id AS key, o.slug, o.name, o.summary, o.created_at, o.archived_at, o.context_max_tokens,
+      `SELECT o.id AS key, o.slug, o.name, o.summary, o.created_at, o.archived_at, o.context_max_tokens, o.websites,
             ARRAY(SELECT x.old_slug FROM slug_aliases x WHERE x.organization_id = o.id ORDER BY x.created_at) AS aliases
        FROM organizations o WHERE $1::uuid IS NULL OR o.id = $1 ORDER BY o.created_at, o.slug`,
       [org],
@@ -71,7 +71,7 @@ export async function exportContent(
   const projects = (
     await db.query<ExportProject>(
       `SELECT p.id AS key, p.organization_id AS organization, p.slug, p.name, p.summary, p.reviewed, p.created_by,
-            p.created_at, p.updated_at, p.archived_at,
+            p.created_at, p.updated_at, p.archived_at, p.websites,
             ARRAY(SELECT x.old_slug FROM slug_aliases x WHERE x.project_id = p.id ORDER BY x.created_at) AS aliases
        FROM projects p WHERE $1::uuid IS NULL OR p.organization_id = $1 ORDER BY p.created_at, p.slug`,
       [org],

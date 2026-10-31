@@ -1880,6 +1880,66 @@ definitions:`,
     await jonas.client.close();
   });
 
+  it('keeps labelled websites on organizations and projects, and gives them to agents', async () => {
+    const staging = { label: 'Staging', url: 'https://staging.portal.example.com' };
+    const prod = { label: 'Production', url: 'https://portal.example.com' };
+    const wiki = { label: '', url: 'http://wiki.logistics.internal/home' };
+
+    // Without websites, get_context has no Websites block.
+    const before = await mcp(ADMIN);
+    expect((await before.call('get_context', { remote_url: SSH_REMOTE })).text).not.toContain(
+      '## Websites',
+    );
+    await before.client.close();
+
+    const put = await api('PUT', `/projects/${projectId}/websites`, {
+      websites: [staging, { ...prod, label: '  Production ' }],
+    });
+    expect(put.status).toBe(200);
+    expect(put.data).toEqual([staging, prod]);
+    expect((await api('GET', `/projects/${projectId}`)).data.websites).toEqual([staging, prod]);
+    expect(
+      (await api('PUT', `/organizations/${o.logistics}/websites`, { websites: [wiki] })).data,
+    ).toEqual([wiki]);
+    const me = (await api('GET', '/me')).data;
+    expect(me.organizations.find((x: any) => x.id === o.logistics).websites).toEqual([wiki]);
+
+    // Only http(s), at most 20, and only editors.
+    for (const url of ['javascript:alert(1)', 'data:text/html,hi', 'ftp://x.example.com', 'nope'])
+      expect(
+        (await api('PUT', `/projects/${projectId}/websites`, { websites: [{ label: 'x', url }] }))
+          .status,
+      ).toBe(400);
+    const many = Array.from({ length: 21 }, (_, i) => ({ label: '', url: `https://e${i}.com` }));
+    expect((await api('PUT', `/projects/${projectId}/websites`, { websites: many })).status).toBe(
+      400,
+    );
+    for (const path of [`/projects/${projectId}/websites`, `/organizations/${o.logistics}/websites`])
+      expect((await api('PUT', path, { websites: [] }, { token: t.anders })).status).toBe(403);
+    // Payments' admin can't touch Logistics, and doesn't see its websites without read access.
+    expect(
+      (await api('PUT', `/organizations/${o.logistics}/websites`, { websites: [] }, { token: t.ida }))
+        .status,
+    ).toBe(403);
+    const seen = (await api('GET', '/me', undefined, { token: t.ida })).data.organizations.find(
+      (x: any) => x.id === o.logistics,
+    );
+    if (seen && !seen.readable) expect(seen.websites).toEqual([]);
+    // Another workspace can't see them.
+    const olga = (await api('GET', '/organizations', undefined, { token: ADMIN, group: 'other-corp' }))
+      .data;
+    expect(JSON.stringify(olga)).not.toContain('staging.portal');
+
+    // Agents get them, organization first.
+    const { client, call } = await mcp(ADMIN);
+    const ctx = (await call('get_context', { remote_url: SSH_REMOTE })).text;
+    expect(ctx).toContain('## Websites');
+    expect(ctx).toContain('- Acme Logistics: http://wiki.logistics.internal/home');
+    expect(ctx).toContain('- **Staging** (Customer Portal): https://staging.portal.example.com');
+    expect(ctx.indexOf('Acme Logistics: http')).toBeLessThan(ctx.indexOf('**Staging**'));
+    await client.close();
+  });
+
   it('keeps viewers read-only and revokes tokens', async () => {
     expect((await api('GET', '/projects', undefined, { token: t.anders })).status).toBe(200);
     expect(
@@ -1921,6 +1981,8 @@ definitions:`,
     const file = exported.data;
     expect(JSON.stringify(file)).not.toMatch(/chr_|token_hash/);
     expect(file.organizations.map((x: any) => x.slug)).toEqual(['logistics']);
+    expect(file.organizations[0].websites).toHaveLength(1);
+    expect(file.projects.find((x: any) => x.slug === 'customer-portal').websites).toHaveLength(2);
     expect(file.documents.every((d: any) => d.organization === o.logistics)).toBe(true);
     expect(file.proposals.length).toBeGreaterThan(0);
     expect(file.api_specs.length).toBeGreaterThan(0);
@@ -1998,6 +2060,8 @@ definitions:`,
     const file = (await api('GET', `/export?organization_id=${o.logistics}`)).data;
     const acme = (await api('GET', '/organizations')).data.length;
     const other: Who = { token: ADMIN, group: 'other-corp' };
+    // Files from before websites import with none.
+    for (const x of [...file.organizations, ...file.projects]) delete x.websites;
     const res = await api('POST', '/import', { file }, other);
     expect(res.status).toBe(201);
     expect(res.data.organizations[0].slug).toBe('logistics');
@@ -2007,6 +2071,12 @@ definitions:`,
     expect(
       (await api('GET', '/organizations', undefined, other)).data.map((x: any) => x.slug).sort(),
     ).toEqual(['logistics', 'other']);
+    const imported = (await api('GET', '/organizations', undefined, other)).data.find(
+      (x: any) => x.slug === 'logistics',
+    );
+    expect(imported.websites).toEqual([]);
+    const projects = (await api('GET', '/projects', undefined, other)).data;
+    expect(projects.every((x: any) => x.websites.length === 0)).toBe(true);
   });
 
   it('merges a file into an organization, section by section', async () => {

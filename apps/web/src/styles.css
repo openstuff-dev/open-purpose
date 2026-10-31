@@ -605,6 +605,74 @@ kbd {
   border-radius: 4px;
 }
 
+/* ─── Websites under a page header: link icon, link, label badge ─── */
+.websites {
+  margin: 0.5rem 0 0;
+}
+
+.website-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.website {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-block-size: 1.75rem;
+  font-size: var(--fs-sm);
+}
+
+.website-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  overflow-wrap: anywhere;
+}
+
+.website-link .icon {
+  flex: none;
+  color: var(--muted);
+}
+
+.website .row-actions {
+  display: inline-flex;
+  gap: 0.25rem;
+  transition: opacity var(--os-duration-fast) ease;
+}
+
+/* Edit and Remove show on hover or focus; screens without hover always show them. */
+@media (hover: hover) {
+  .website:not(:hover, :focus-within) .row-actions {
+    opacity: 0;
+  }
+}
+
+.website-add {
+  margin-top: 0.35rem;
+}
+
+.website-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  align-items: end;
+  margin: 0.5rem 0;
+}
+
+.website-form > os-field {
+  flex: 1 1 10rem;
+}
+
+.website-form > os-field.grow {
+  flex: 3 1 16rem;
+}
+
 .block {
   margin: 0 0 2.5rem;
 }
