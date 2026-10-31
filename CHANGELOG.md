@@ -3,6 +3,15 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.3.11
+
+- Added websites to every project and organization: links such as Staging, Production or an
+  internal dashboard, each with a label of your own. They show under the page header with a link
+  icon and the label as a badge. Editors add them in place; **Edit** and **Remove** show when you
+  hover over or tab to a row. Only `http://` and `https://` addresses are accepted, up to 20 each.
+- `get_context` lists the organization's and the project's websites under **Websites**, so agents
+  know where the code runs. Exports include them; older export files import with none.
+
 ## 0.3.10
 
 - The line under the Inbox and Findings drawers' header lines up with the topbar's line again.
