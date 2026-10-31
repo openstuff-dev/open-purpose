@@ -125,6 +125,14 @@ export interface GroupRef {
   name: string;
 }
 
+/** A labelled URL on a project or organization, e.g. { label: 'Staging', url: 'https://…' }. */
+export interface Website {
+  /** Free text such as Staging, Production or Public. Empty = no badge. */
+  label: string;
+  /** Always http: or https:. */
+  url: string;
+}
+
 export interface Repository {
   id: string;
   project_id: string;
@@ -482,6 +490,8 @@ export interface ExportOrganization {
   aliases: string[];
   /** Missing in files from before context budgets; null = no limit. */
   context_max_tokens?: number | null;
+  /** Missing in files from before websites. */
+  websites?: Website[];
 }
 
 export interface ExportProject {
@@ -496,6 +506,8 @@ export interface ExportProject {
   updated_at: string;
   archived_at: string | null;
   aliases: string[];
+  /** Missing in files from before websites. */
+  websites?: Website[];
   repositories: {
     key: string;
     remote_key: string;

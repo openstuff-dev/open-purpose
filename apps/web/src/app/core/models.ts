@@ -18,9 +18,11 @@ import type {
   Role,
   Scope,
   SlugAlias,
+  Website,
 } from '@openpurpose/contracts';
 
 export type {
+  Website,
   Actor,
   ActorKind,
   AgentPermissions,
@@ -119,6 +121,8 @@ export interface Organization {
   summary: string;
   /** Applies while the group has a single organization. null = no limit. */
   context_max_tokens: number | null;
+  /** Empty when the organization isn't readable. */
+  websites: Website[];
   created_at: string;
   archived_at: string | null;
   readable: boolean;
@@ -174,6 +178,7 @@ export interface Project {
   name: string;
   summary: string;
   reviewed: boolean;
+  websites: Website[];
   created_at: string;
   updated_at: string;
   archived_at: string | null;

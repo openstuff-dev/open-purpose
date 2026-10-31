@@ -4,6 +4,7 @@ import type {
   ProposalKind,
   ProposalStatus,
   ScopeSpec,
+  Website,
 } from '@openpurpose/contracts';
 
 export type {
@@ -13,6 +14,7 @@ export type {
   ProposalStatus,
   Repository,
   Scope,
+  Website,
 } from '@openpurpose/contracts';
 
 /** Still being worked on: waiting for a review, or for the author after changes were requested. */
@@ -55,6 +57,7 @@ export interface Organization {
    * limit.
    */
   context_max_tokens: number | null;
+  websites: Website[];
   created_at: string;
   archived_at: string | null;
 }
@@ -66,6 +69,7 @@ export interface Project {
   name: string;
   summary: string;
   reviewed: boolean;
+  websites: Website[];
   created_at: string;
   updated_at: string;
   archived_at: string | null;

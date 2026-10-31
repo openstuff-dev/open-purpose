@@ -19,7 +19,7 @@ import {
   Callout,
   EmptyState, Breadcrumbs } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
-import type { Graph, GraphNode, LinkRef, ProjectDetail } from '../core/models';
+import type { Graph, GraphNode, LinkRef, ProjectDetail, Website } from '../core/models';
 import { Session, provideHere } from '../core/session';
 import { ContextSwitch } from '../core/switch';
 import { DocList } from '../shared/doc-list';
@@ -30,6 +30,7 @@ import { ApiSpecs } from '../shared/api-specs';
 import { ScopeList } from '../shared/scope-list';
 import { PageSkeleton } from '../shared/list-skeleton';
 import { SlugRenameField } from '../shared/slug-rename';
+import { Websites } from '../shared/websites';
 
 interface Connection {
   node: GraphNode;
@@ -62,6 +63,7 @@ const TABS: Tab[] = [
     AgentView,
     ApiSpecs,
     SlugRenameField,
+    Websites,
     Button,
     Field,
     Control,
@@ -95,6 +97,7 @@ const TABS: Tab[] = [
             }
           </div>
           <p class="os-page-description">{{ p.summary || 'No summary yet.' }}</p>
+          <app-websites [websites]="p.websites" [canEdit]="p.can_edit" [save]="saveWebsites" />
           <p class="meta">
             <code>{{ p.organization.slug }}/{{ p.slug }}</code>
           </p>
@@ -578,6 +581,20 @@ export class ProjectPage {
       this.notices.error(e);
     }
   }
+
+  readonly saveWebsites = async (websites: Website[]): Promise<boolean> => {
+    const p = this.project();
+    if (!p) return false;
+    try {
+      const saved = await this.api.setProjectWebsites(p.id, websites);
+      this.project.set({ ...p, websites: saved });
+      this.notices.ok('Saved websites');
+      return true;
+    } catch (e) {
+      this.notices.error(e);
+      return false;
+    }
+  };
 
   async markReviewed(): Promise<void> {
     const p = this.project();

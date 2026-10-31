@@ -16,6 +16,7 @@ import {
   type Project,
   type Scope,
   type Section,
+  type Website,
 } from './types.js';
 
 export interface ContextRequest {
@@ -58,7 +59,7 @@ export interface ContextBudget {
 export interface ContextResult {
   /** shown: false while the group has a single organization, so it is just that organization. */
   group: { name: string; shown: boolean };
-  organization: { id: string; slug: string; name: string } | null;
+  organization: { id: string; slug: string; name: string; websites: Website[] } | null;
   project: Project | null;
   resolution: Pick<Resolution, 'via' | 'remote' | 'renamed' | 'suggestions'>;
   path: string;
@@ -111,6 +112,14 @@ async function scopesAt(
     [organizationId, projectId],
   );
   return rows;
+}
+
+async function orgWebsites(db: Queryable, orgId: string): Promise<Website[]> {
+  const { rows } = await db.query<{ websites: Website[] }>(
+    'SELECT websites FROM organizations WHERE id = $1',
+    [orgId],
+  );
+  return rows[0]?.websites ?? [];
 }
 
 /** The project's repository the agent is working in, when its remote is one of them. */
@@ -315,7 +324,9 @@ export async function buildContext(
 
   const result: Omit<ContextResult, 'markdown'> = {
     group: { name: g, shown: a.orgs.length > 1 },
-    organization: org ? { id: org.id, slug: org.slug, name: org.name } : null,
+    organization: org
+      ? { id: org.id, slug: org.slug, name: org.name, websites: await orgWebsites(db, org.id) }
+      : null,
     project,
     resolution: {
       via: resolution.via,
@@ -588,6 +599,16 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
     const usedBy = ctx.related.filter((r) => r.direction === 'used_by');
     if (uses.length) out.push('', 'This project uses / refers to:', ...uses.map(line));
     if (usedBy.length) out.push('', 'Referenced by:', ...usedBy.map(line));
+  }
+  const websites = [
+    ...(ctx.organization?.websites ?? []).map((w) => ({ ...w, owner: ctx.organization?.name })),
+    ...(ctx.project?.websites ?? []).map((w) => ({ ...w, owner: ctx.project?.name })),
+  ];
+  if (websites.length) {
+    out.push('', '---', '', '## Websites');
+    out.push('Where the organization and project run, as people labelled them.', '');
+    for (const w of websites)
+      out.push(`- ${w.label ? `**${w.label}** (${w.owner})` : w.owner}: ${w.url}`);
   }
   if (ctx.apis.length) {
     out.push('', '---', '', '## APIs');

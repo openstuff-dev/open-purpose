@@ -25,6 +25,7 @@ import type {
   ImportChangePolicy,
   ImportOptions,
   ImportReport,
+  Website,
 } from '@openpurpose/contracts';
 
 class DryRun extends Error {}
@@ -408,9 +409,17 @@ async function apply(run: Run): Promise<void> {
     } else {
       slug = entry.suggested_slug ?? entry.new_slug ?? o.slug;
       const { rows } = await c.query<{ id: string }>(
-        `INSERT INTO organizations (slug, name, summary, created_at, archived_at, context_max_tokens)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-        [slug, o.name, o.summary, o.created_at, o.archived_at, o.context_max_tokens ?? null],
+        `INSERT INTO organizations (slug, name, summary, created_at, archived_at, context_max_tokens, websites)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb) RETURNING id`,
+        [
+          slug,
+          o.name,
+          o.summary,
+          o.created_at,
+          o.archived_at,
+          o.context_max_tokens ?? null,
+          JSON.stringify(o.websites ?? []),
+        ],
       );
       orgId = rows[0].id;
       names.org.set(o.key, o.name);
@@ -480,8 +489,9 @@ async function apply(run: Run): Promise<void> {
       name: string;
       summary: string;
       reviewed: boolean;
+      websites: Website[];
     }>(
-      `SELECT id, name, summary, reviewed FROM projects
+      `SELECT id, name, summary, reviewed, websites FROM projects
         WHERE organization_id = $1 AND (slug = $2 OR slug = ANY($3::text[]) OR id IN (SELECT project_id FROM slug_aliases WHERE old_slug = $2))
         ORDER BY slug = $2 DESC LIMIT 1`,
       [orgId, p.slug, p.aliases],
@@ -490,22 +500,26 @@ async function apply(run: Run): Promise<void> {
     if (found[0]) {
       projectId = found[0].id;
       merged.projects++;
+      // Files from before websites keep the project's own.
+      const websites = p.websites ?? found[0].websites;
       if (
         found[0].name !== p.name ||
         found[0].summary !== p.summary ||
-        found[0].reviewed !== p.reviewed
+        found[0].reviewed !== p.reviewed ||
+        JSON.stringify(found[0].websites) !== JSON.stringify(websites)
       ) {
         if (updateMeta) {
           await c.query(
-            'UPDATE projects SET name = $2, summary = $3, reviewed = $4, updated_at = now() WHERE id = $1',
-            [projectId, p.name, p.summary, p.reviewed],
+            `UPDATE projects SET name = $2, summary = $3, reviewed = $4, websites = $5::jsonb, updated_at = now()
+              WHERE id = $1`,
+            [projectId, p.name, p.summary, p.reviewed, JSON.stringify(websites)],
           );
         } else metaKept++;
       }
     } else {
       const { rows } = await c.query<{ id: string }>(
-        `INSERT INTO projects (organization_id, slug, name, summary, reviewed, created_by, created_at, updated_at, archived_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+        `INSERT INTO projects (organization_id, slug, name, summary, reviewed, created_by, created_at, updated_at, archived_at, websites)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb) RETURNING id`,
         [
           orgId,
           p.slug,
@@ -516,6 +530,7 @@ async function apply(run: Run): Promise<void> {
           p.created_at,
           p.updated_at,
           p.archived_at,
+          JSON.stringify(p.websites ?? []),
         ],
       );
       projectId = rows[0].id;

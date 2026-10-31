@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { AppError } from '../../errors.js';
 import { DOC_KINDS, EDIT_MODES } from '../types.js';
+import { websites } from '../../domain/websites.js';
 import type { ExportDocument, ExportFile } from '@openpurpose/contracts';
 
 export const FORMAT = 'openpurpose-export';
@@ -63,6 +64,7 @@ const fileSchema = z.object({
       archived_at: time.nullable(),
       aliases: z.array(slug),
       context_max_tokens: z.number().int().min(1000).nullable().optional(),
+      websites: websites.optional(),
     }),
   ),
   read_grants: z.array(z.object({ reader: key, target: key })),
@@ -79,6 +81,7 @@ const fileSchema = z.object({
       updated_at: time,
       archived_at: time.nullable(),
       aliases: z.array(slug),
+      websites: websites.optional(),
       repositories: z.array(
         z.object({
           key,

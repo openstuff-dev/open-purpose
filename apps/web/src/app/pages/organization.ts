@@ -21,6 +21,7 @@ import type {
   ActivityPeriod,
   OrgActivity,
   Project,
+  Website,
 } from '../core/models';
 import { Session } from '../core/session';
 import { StatStyle } from '../core/stat-style';
@@ -30,6 +31,8 @@ import { DocList } from '../shared/doc-list';
 import { Icon } from '../shared/icon';
 import { ListSkeleton } from '../shared/list-skeleton';
 import { ScopeList } from '../shared/scope-list';
+import { Websites } from '../shared/websites';
+import { Notices } from '../shared/notice';
 
 const PERIOD_KEY = 'openpurpose.activityPeriod';
 
@@ -49,6 +52,7 @@ function readPeriod(): ActivityPeriod {
     EmptyState,
     DocList,
     ScopeList,
+    Websites,
     RouterLink,
     Icon,
     ActivityFigure,
@@ -62,7 +66,7 @@ function readPeriod(): ActivityPeriod {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (session.org(); as org) {
-      <header class="os-page-header">
+      <header class="os-page-header" data-align="start">
         <div>
           @if (session.groupShown()) {
             <nav os-breadcrumbs>
@@ -88,6 +92,11 @@ function readPeriod(): ActivityPeriod {
                   ' before project rules.'
             }}
           </p>
+          <app-websites
+            [websites]="org.websites"
+            [canEdit]="session.canEdit(org.id)"
+            [save]="saveWebsites"
+          />
         </div>
         <div class="os-page-actions">
           @if (session.canAdmin(org.id)) {
@@ -320,6 +329,7 @@ function readPeriod(): ActivityPeriod {
 export class OrganizationPage {
   readonly session = inject(Session);
   private api = inject(Api);
+  private notices = inject(Notices);
   readonly initials = initials;
   readonly recent = signal<Project[]>([]);
   readonly style = inject(StatStyle);
@@ -378,6 +388,21 @@ export class OrganizationPage {
       },
     ];
   }
+
+  readonly saveWebsites = async (websites: Website[]): Promise<boolean> => {
+    const id = this.session.orgId();
+    if (!id) return false;
+    try {
+      await this.api.setOrgWebsites(id, websites);
+      // The organization comes from /me, so reload it to show the new list.
+      this.session.me.set(await this.api.me());
+      this.notices.ok('Saved websites');
+      return true;
+    } catch (e) {
+      this.notices.error(e);
+      return false;
+    }
+  };
 
   constructor() {
     effect(() => {
