@@ -154,19 +154,32 @@ export interface SectionActivityRow extends SectionActivity {
 
 /**
  * Read counts of the sections `from` yields as `s(id)`, e.g. `unnest($1::uuid[]) AS s(id)` or
- * `sections s WHERE s.document_id = ...`.
+ * `sections s WHERE s.document_id = ...`. One pass over the reads: they are counted per section
+ * and day, and the totals, the weeks and the 28 daily counts come from those counts. Days are
+ * the database's own dates, as `created_at >= current_date - n` counts them.
  */
-export const sectionActivitySql = (from: string) => `SELECT s.id AS section_id,
-            (SELECT count(*)::int FROM section_reads r WHERE r.section_id = s.id) AS reads,
-            (SELECT max(created_at) FROM section_reads r WHERE r.section_id = s.id) AS last_read_at,
-            ARRAY(SELECT count(r.request_id)::int
-                    FROM generate_series(current_date - 27, current_date, interval '1 day') g
-                    LEFT JOIN section_reads r ON r.section_id = s.id AND r.created_at >= g AND r.created_at < g + interval '1 day'
-                   GROUP BY g ORDER BY g) AS daily,
-            (SELECT count(*)::int FROM section_reads r WHERE r.section_id = s.id AND r.created_at >= current_date - 6) AS week,
-            (SELECT count(*)::int FROM section_reads r WHERE r.section_id = s.id
-                AND r.created_at >= current_date - 13 AND r.created_at < current_date - 6) AS previous_week
-       FROM ${from}`;
+export const sectionActivitySql = (from: string) => `WITH ids AS (SELECT DISTINCT s.id FROM ${from}),
+       per_day AS (
+         SELECT r.section_id, r.created_at::date AS day, count(*)::int AS n, max(r.created_at) AS last
+           FROM section_reads r JOIN ids ON ids.id = r.section_id
+          GROUP BY 1, 2),
+       totals AS (
+         SELECT section_id,
+                sum(n)::int AS reads,
+                max(last) AS last_read_at,
+                COALESCE(sum(n) FILTER (WHERE day >= current_date - 6), 0)::int AS week,
+                COALESCE(sum(n) FILTER (WHERE day >= current_date - 13 AND day < current_date - 6), 0)::int AS previous_week,
+                array_agg(n ORDER BY day) FILTER (WHERE day BETWEEN current_date - 27 AND current_date) AS counts,
+                array_agg(day - (current_date - 27) ORDER BY day) FILTER (WHERE day BETWEEN current_date - 27 AND current_date) AS at
+           FROM per_day GROUP BY section_id)
+SELECT ids.id AS section_id,
+       COALESCE(t.reads, 0) AS reads,
+       t.last_read_at,
+       ARRAY(SELECT COALESCE(t.counts[array_position(t.at, i)], 0)
+               FROM generate_series(0, 27) i ORDER BY i) AS daily,
+       COALESCE(t.week, 0) AS week,
+       COALESCE(t.previous_week, 0) AS previous_week
+  FROM ids LEFT JOIN totals t ON t.section_id = ids.id`;
 
 /** Read counts of sections, by id. No permission check; callers check. */
 export async function sectionActivity(
