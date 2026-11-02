@@ -3,6 +3,59 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.4.0
+
+Adds migrations `017_document_proposals.sql` and `018_section_archive_move.sql`. Agents need to
+reconnect to see the new tools.
+
+**Upgrading:** the server no longer fetches API specs from private network addresses
+(localhost, `10.x`, `192.168.x`, cloud metadata, Docker service names), checked again on every
+redirect. If your specs live on your own network, list those hosts in
+`OPENPURPOSE_API_FETCH_ALLOW` (`specs.internal,192.168.1.20,10.0.0.0/8`).
+
+### Agents
+
+- Added `archive_section` and `move_section`. They follow the edit modes like `update_section`:
+  an open section changes right away, a propose section becomes an **Archive** or **Move**
+  proposal in the Inbox, and a locked one is refused. Sections move only within one
+  organization and keep their id, history, review threads and open proposals. Archived
+  sections stay in their document but are left out of `get_context`, search and links.
+- Added `propose_document`, so an agent can suggest a missing document with its first sections
+  for a person to approve. `get_context` shows each document's `[d:…]` id and lists empty
+  documents, so agents can add sections to them.
+- Added `dismiss_finding`: an agent dismisses a finding that isn't a real problem once you
+  agree, with a reason that people see and can reopen it from.
+- `get_context` lists the known findings on files without an extension, like a `Dockerfile`.
+- Agents can no longer manage their own account: they can't issue themselves tokens, rename
+  themselves or change their own review and findings permissions. Only admins of the agent's
+  organization can.
+
+### Web app
+
+- On the document page, **Archive** replaces Delete, and **Move to…** moves a section to
+  another document. Archived sections are listed at the bottom with **Restore** and **Delete
+  for good**; only archived sections can be deleted.
+- The finding drawer has a **Fixed in** field for the commit or pull request that solved it.
+- Pages you visited before show at once and reload behind the scenes. A project page opens
+  with one request instead of three, and the Inbox shows its table without first fetching
+  scopes for every learning.
+- The map lays itself out once when resizing stops, and the site's header no longer jumps
+  while the stylesheet loads.
+
+### Server
+
+- Every API request costs one database round trip instead of four, and the project, document,
+  review and activity pages each load in one or two. `get_context` and `get_related` no longer
+  build the whole workspace graph.
+- Answers over 1 KB are compressed with brotli or gzip and carry weak ETags, so a repeated GET
+  gets 304. MCP is never compressed.
+- The sign-in rate limiter counts IPv6 addresses per /64 and keeps at most 50,000 keys.
+- The server warns at startup when `OPENPURPOSE_TRUST_PROXY` is `true`; list the proxy's own
+  addresses instead.
+- Two people signing up with the same name at the same moment both get a workspace.
+- Importing the same export twice no longer adds every finding again, and findings filed under
+  an organization scope import.
+
 ## 0.3.11
 
 - Added websites to every project and organization: links such as Staging, Production or an
