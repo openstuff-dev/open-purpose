@@ -90,6 +90,17 @@ describe('supabase provider', () => {
     expect(started.notice?.level).toBe('info');
   });
 
+  it('creates the Supabase user for someone an admin added, even with sign-ups off', async () => {
+    answer(200, {});
+    await createSupabaseProvider({ ...config, signup: 'off' }).start({
+      method: magicLink,
+      email: 'invited@example.com',
+      callbackUrl,
+      allowNewUser: true,
+    });
+    expect(request().body.create_user).toBe(true);
+  });
+
   it('warns in the log when Supabase refuses sign-ups that OpenPurpose allows', async () => {
     answer(422, { code: 'signup_disabled', msg: 'Signups not allowed for this instance' });
     const started = await createSupabaseProvider(config).start({
@@ -121,6 +132,7 @@ describe('supabase provider', () => {
       user: {
         id: 'u-1',
         email: 'Ada@Example.com',
+        email_confirmed_at: '2026-11-01T10:00:00Z',
         app_metadata: { provider: 'github' },
         user_metadata: { full_name: 'Ada Lovelace' },
       },
@@ -137,6 +149,7 @@ describe('supabase provider', () => {
       provider: 'supabase',
       subject: 'u-1',
       email: 'ada@example.com',
+      emailVerified: true,
       name: 'Ada Lovelace',
       method: 'github',
     });
@@ -174,8 +187,20 @@ describe('identityOf', () => {
       provider: 'supabase',
       subject: 'a',
       email: null,
+      emailVerified: false,
       name: null,
       method: null,
     });
+  });
+
+  it('trusts the email only once Supabase confirmed it', () => {
+    expect(identityOf({ id: 'a', email: 'Ada@Example.com' })).toMatchObject({
+      email: 'ada@example.com',
+      emailVerified: false,
+    });
+    expect(
+      identityOf({ id: 'a', email: 'ada@example.com', email_confirmed_at: '2026-11-01T10:00:00Z' })
+        .emailVerified,
+    ).toBe(true);
   });
 });

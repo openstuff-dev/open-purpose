@@ -3186,15 +3186,20 @@ describe('browser sessions', () => {
 describe('sign-up and sign-in through a provider', () => {
   // A fake provider: the callback's ?code= names the identity, and it checks the PKCE verifier.
   const people = new Map<string, ExternalIdentity>();
+  /** What start() was last asked for: invites read their link from it. */
+  const starts: { email?: string; callbackUrl: string; allowNewUser?: boolean }[] = [];
   registerProvider('fake', () => ({
     id: 'fake',
     methods: () => [{ kind: 'magic_link' }, { kind: 'oauth', provider: 'github', label: 'GitHub' }],
-    start: async ({ method, callbackUrl }) => ({
-      ...(method.kind === 'oauth'
-        ? { redirect: `https://fake.example/authorize?redirect_to=${callbackUrl}` }
-        : { emailSent: true }),
-      verifier: 'pkce-verifier',
-    }),
+    start: async ({ method, email, callbackUrl, allowNewUser }) => {
+      starts.push({ email, callbackUrl, allowNewUser });
+      return {
+        ...(method.kind === 'oauth'
+          ? { redirect: `https://fake.example/authorize?redirect_to=${callbackUrl}` }
+          : { emailSent: true }),
+        verifier: 'pkce-verifier',
+      };
+    },
     finish: async ({ query, verifier }) => {
       if (verifier !== 'pkce-verifier') throw new SignInError('other-browser', 'No verifier');
       const who = people.get(query.code);
@@ -3236,17 +3241,15 @@ describe('sign-up and sign-in through a provider', () => {
     return { status: res.status, headers: res.headers, data: text ? JSON.parse(text) : undefined };
   };
 
-  /** Start with GitHub, come back on the callback, and swap the code. A token or the error. */
+  /**
+   * Come back on the callback with the verifier cookie /auth/start sets (the fake's is always
+   * the same; starting each time would run into the rate limit), and swap the code. A token or
+   * the error.
+   */
   async function signIn(identity: ExternalIdentity): Promise<{ token?: string; error?: string }> {
-    const start = await call('POST', '/auth/start', {
-      method: { kind: 'oauth', provider: 'github' },
-    });
-    expect(start.status).toBe(200);
-    const cookie = start.headers.get('set-cookie') ?? '';
-    expect(cookie).toMatch(/op_auth_verifier=pkce-verifier;.*HttpOnly/);
     people.set(identity.subject, identity);
     const back = await fetch(`${signupBase}/api/auth/callback?code=${identity.subject}`, {
-      headers: { cookie: cookie.split(';')[0] },
+      headers: { cookie: 'op_auth_verifier=pkce-verifier' },
       redirect: 'manual',
     });
     expect(back.status).toBe(302);
@@ -3258,13 +3261,29 @@ describe('sign-up and sign-in through a provider', () => {
     return { token: swapped.data.token };
   }
 
-  const person = (subject: string, name: string): ExternalIdentity => ({
+  const person = (subject: string, name: string, email = `${subject}@example.com`): ExternalIdentity => ({
     provider: 'fake',
     subject,
     name,
-    email: `${subject}@example.com`,
+    email,
+    emailVerified: true,
     method: 'email',
   });
+
+  /** Open the link an invite sent, in a browser with no verifier cookie. */
+  async function openInvite(identity: ExternalIdentity, link = starts.at(-1)!.callbackUrl) {
+    people.set(identity.subject, identity);
+    const url = new URL(link);
+    url.searchParams.set('code', identity.subject);
+    const back = await fetch(`${signupBase}${url.pathname}${url.search}`, { redirect: 'manual' });
+    const to = new URL(back.headers.get('location') ?? '', signupBase);
+    if (to.pathname === '/sign-in') return { error: to.searchParams.get('error') ?? '' };
+    const swapped = await call('POST', '/auth/exchange', { code: to.searchParams.get('code') });
+    return { token: swapped.data.token as string };
+  }
+
+  const firstOrg = async () =>
+    (await call('GET', '/me', undefined, ADMIN)).data.organizations[0] as { id: string; name: string };
 
   it('offers the provider\'s methods and starts a sign-in', async () => {
     expect((await call('GET', '/auth/config')).data).toEqual({
@@ -3275,6 +3294,7 @@ describe('sign-up and sign-in through a provider', () => {
     const github = await call('POST', '/auth/start', {
       method: { kind: 'oauth', provider: 'github' },
     });
+    expect(github.headers.get('set-cookie')).toMatch(/op_auth_verifier=pkce-verifier;.*HttpOnly/);
     expect(github.data).toEqual({
       redirect: 'https://fake.example/authorize?redirect_to=https://purpose.example.com/api/auth/callback',
       email_sent: false,
@@ -3394,6 +3414,153 @@ describe('sign-up and sign-in through a provider', () => {
     );
     expect(groups.every((g) => g?.role === 'admin')).toBe(true);
     expect(groups.map((g) => g.slug).sort()).toEqual(['kari', 'kari-2', 'kari-3', 'kari-4']);
+  });
+
+  it('adds a person by email and emails them a link that works in their own browser', async () => {
+    config.auth.signup = 'off';
+    const org = await firstOrg();
+    const added = await call(
+      'POST',
+      '/members/invite',
+      { email: 'Sofie@Example.com', organization_id: org.id, role: 'viewer' },
+      ADMIN,
+    );
+    expect(added.status).toBe(201);
+    expect(added.data).toMatchObject({
+      actor: { name: 'sofie', kind: 'human', email: 'sofie@example.com' },
+      existing: false,
+      email_sent: true,
+      sign_in_url: 'https://purpose.example.com/sign-in',
+    });
+    const sent = starts.at(-1)!;
+    expect(sent).toMatchObject({ email: 'sofie@example.com', allowNewUser: true });
+    expect(sent.callbackUrl).toMatch(
+      /^https:\/\/purpose\.example\.com\/api\/auth\/callback\?invite=[\w-]+$/,
+    );
+
+    // No cookie, sign-up off, and still in: the link's invite id has the verifier.
+    const { token } = await openInvite(person('sofie-sb', 'Sofie Lund', 'sofie@example.com'));
+    const me = await call('GET', '/me', undefined, token);
+    expect(me.status).toBe(200);
+    expect(me.data.actor.id).toBe(added.data.actor.id);
+    // The link works once.
+    expect(await openInvite(person('sofie-sb', 'Sofie Lund', 'sofie@example.com'), sent.callbackUrl))
+      .toEqual({ error: 'other-browser' });
+  });
+
+  it('links a new identity to the person with the same verified email (finding 36c69085)', async () => {
+    config.auth.signup = 'off';
+    const org = await firstOrg();
+    const added = await call(
+      'POST',
+      '/members/invite',
+      { email: 'nils@example.com', name: 'Nils Holm', organization_id: org.id },
+      ADMIN,
+    );
+    // An unverified email links to nobody, so with sign-up off it gets no account.
+    expect(
+      await signIn({ ...person('nils-unverified', 'Mallory', 'nils@example.com'), emailVerified: false }),
+    ).toEqual({ error: 'no-account' });
+    // GitHub with the verified address joins the account the admin made.
+    const { token } = await signIn(person('nils-github', 'Nils', 'NILS@example.com'));
+    const me = await call('GET', '/me', undefined, token);
+    expect(me.data.actor).toMatchObject({ id: added.data.actor.id, name: 'Nils Holm' });
+    // And a magic link later is the same person, not a second one.
+    await signIn(person('nils-email', 'Nils', 'nils@example.com'));
+    const { rows } = await pool.query(
+      `SELECT count(DISTINCT actor_id)::int AS actors, count(*)::int AS identities
+         FROM identities WHERE email = ANY($1)`,
+      [['nils@example.com', 'NILS@example.com']],
+    );
+    expect(rows[0]).toEqual({ actors: 1, identities: 2 });
+  });
+
+  it('keeps one person per verified email when people sign up with two methods', async () => {
+    config.auth.signup = 'approval';
+    await signIn(person('vera-github', 'Vera', 'vera@example.com'));
+    await signIn(person('vera-email', 'Vera', 'vera@example.com'));
+    const { rows } = await pool.query(
+      `SELECT count(*)::int AS n FROM actors WHERE email = 'vera@example.com'`,
+    );
+    expect(rows[0].n).toBe(1);
+    // An unverified email isn't kept, so it can't pull another identity in later.
+    await signIn({ ...person('ghost', 'Ghost', 'ghost@example.com'), emailVerified: false });
+    const ghost = await pool.query(
+      `SELECT a.email FROM actors a JOIN identities i ON i.actor_id = a.id WHERE i.subject = 'ghost'`,
+    );
+    expect(ghost.rows[0].email).toBeNull();
+  });
+
+  it('refuses a turned-down person, whichever way they sign in', async () => {
+    config.auth.signup = 'approval';
+    await signIn(person('troll-github', 'Troll', 'troll@example.com'));
+    const { rows } = await pool.query(`SELECT id FROM actors WHERE email = 'troll@example.com'`);
+    await call('POST', `/signups/${rows[0].id}/reject`, undefined, ADMIN);
+    expect(await signIn(person('troll-email', 'Troll', 'troll@example.com'))).toEqual({
+      error: 'rejected',
+    });
+    const org = await firstOrg();
+    const again = await call(
+      'POST',
+      '/members/invite',
+      { email: 'troll@example.com', organization_id: org.id },
+      ADMIN,
+    );
+    expect(again.status).toBe(400);
+  });
+
+  it('gives someone who already has an account the role, and only admins add people', async () => {
+    config.auth.signup = 'off';
+    const org = await firstOrg();
+    // Maja signed up and got Berg Studio earlier; now she joins this workspace too.
+    const added = await call(
+      'POST',
+      '/members/invite',
+      { email: 'maja@example.com', organization_id: org.id, role: 'editor' },
+      ADMIN,
+    );
+    expect(added.status).toBe(201);
+    expect(added.data).toMatchObject({ existing: true, actor: { name: 'Maja Berg' } });
+    const twice = await call(
+      'POST',
+      '/members/invite',
+      { email: 'maja@example.com', organization_id: org.id },
+      ADMIN,
+    );
+    expect(twice.status).toBe(409);
+    expect(twice.data.message).toMatch(/already has a role there/);
+
+    const members = (await call('GET', '/members', undefined, ADMIN)).data;
+    expect(members.find((m: any) => m.id === added.data.actor.id).email).toBe('maja@example.com');
+
+    // Sofie is a viewer there.
+    const { token: viewer } = await signIn(person('sofie-sb', 'Sofie Lund', 'sofie@example.com'));
+    expect(
+      (await call('POST', '/members/invite', { email: 'x@example.com', organization_id: org.id }, viewer))
+        .status,
+    ).toBe(403);
+    expect(
+      (await call('POST', '/members/invite', { email: 'not an email', organization_id: org.id }, ADMIN))
+        .status,
+    ).toBe(400);
+  });
+
+  it('sends a magic link to someone an admin added, even with sign-up off', async () => {
+    config.auth.signup = 'off';
+    await call('POST', '/auth/start', { method: { kind: 'magic_link' }, email: 'nils@example.com' });
+    expect(starts.at(-1)).toMatchObject({ email: 'nils@example.com', allowNewUser: true });
+    await call('POST', '/auth/start', { method: { kind: 'magic_link' }, email: 'who@example.com' });
+    expect(starts.at(-1)).toMatchObject({ email: 'who@example.com', allowNewUser: false });
+  });
+
+  it('pending sign-ups an admin adds stop waiting', async () => {
+    config.auth.signup = 'approval';
+    const { token } = await signIn(person('pia', 'Pia', 'pia@example.com'));
+    expect((await call('GET', '/auth/status', undefined, token)).data.signup).toBe('pending');
+    const org = await firstOrg();
+    await call('POST', '/members/invite', { email: 'pia@example.com', organization_id: org.id }, ADMIN);
+    expect((await call('GET', '/auth/status', undefined, token)).data.signup).toBe('approved');
+    expect((await call('GET', '/me', undefined, token)).status).toBe(200);
   });
 
   it('leaves agent and API tokens alone', async () => {

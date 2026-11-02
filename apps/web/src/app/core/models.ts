@@ -75,6 +75,8 @@ export type {
   SignupMode,
   SignupStatus,
   PendingSignup,
+  InviteMemberRequest,
+  InviteMemberResult,
 } from '@openpurpose/contracts';
 
 export const EDIT_MODES: EditMode[] = ['locked', 'propose', 'open'];
@@ -415,6 +417,8 @@ export interface TokenRow {
 }
 
 export interface Member extends Actor {
+  /** People added by email or who signed in through a provider. */
+  email: string | null;
   created_at: string;
   disabled_at: string | null;
   memberships: { id: string; organization_id: string | null; role: Role }[];
