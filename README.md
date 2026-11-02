@@ -242,7 +242,7 @@ connection is IPv6 only unless you buy the IPv4 add-on.
 | `OPENPURPOSE_API_REFRESH_MINUTES` | `60` | re-fetch linked API specs older than this when agents read them; `0` = only on demand |
 | `OPENPURPOSE_API_MAX_MB` | `20` | largest API spec accepted |
 | `OPENPURPOSE_IMPORT_MAX_MB` | `100` | largest export file accepted by an import |
-| `OPENPURPOSE_TRUST_PROXY` | off | behind a reverse proxy: `true`, or the proxy's addresses (`10.0.0.0/8,127.0.0.1`) |
+| `OPENPURPOSE_TRUST_PROXY` | off | behind a reverse proxy: the proxy's addresses (`10.0.0.0/8,127.0.0.1`). `true` trusts anyone; see below |
 | `OPENPURPOSE_AUTH_PROVIDER` | empty | `supabase` for sign-in by email link and GitHub; empty = access tokens only. See [Sign-up and sign-in](#sign-up-and-sign-in) |
 | `OPENPURPOSE_SIGNUP` | `off` | `off`, `approval` or `open` |
 | `OPENPURPOSE_SUPABASE_URL`, `OPENPURPOSE_SUPABASE_KEY` | empty | the Supabase project URL and its publishable key |
@@ -255,8 +255,10 @@ Behind a reverse proxy (nginx, Caddy, Traefik, a load balancer), set
 `OPENPURPOSE_TRUST_PROXY` so the server sees each visitor's own address in
 `X-Forwarded-For`. Sign-in links are limited to 20 per address every 15 minutes;
 without this setting every visitor shares the proxy's address and that one limit.
-Leave it off when people reach the server directly: then anyone could fake the
-header.
+Set it to the addresses your proxy connects from, such as `172.16.0.0/12` for a
+Docker network. `true` trusts the header from anyone, so use it only when nothing
+but the proxy can reach the server; the server warns about it at startup. Leave
+it off when people reach the server directly: then anyone could fake the header.
 
 Linked API specs are fetched by the server, so it must be able to reach those URLs.
 Only editors can add a link, and only http(s) URLs without credentials are accepted.
