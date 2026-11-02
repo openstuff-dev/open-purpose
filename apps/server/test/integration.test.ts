@@ -140,6 +140,31 @@ describe('OpenPurpose with groups and organizations', () => {
     ).toEqual(['purpose', 'business_logic', 'guidelines']);
   });
 
+  it('answers a request in one database round trip plus its own queries', async () => {
+    // Every trip to the database costs 25-40 ms in production, so count them.
+    const sent: string[] = [];
+    const proto = pg.Client.prototype as unknown as { query: (...args: unknown[]) => unknown };
+    const query = proto.query;
+    proto.query = function (this: pg.Client, ...args: unknown[]) {
+      const q = args[0];
+      sent.push(typeof q === 'string' ? q : String((q as { text?: string }).text));
+      return query.apply(this, args);
+    };
+    try {
+      await api('GET', '/me/counts'); // warm up: last_used_at is written once a minute at most
+      sent.length = 0;
+      expect((await api('GET', '/me/counts')).status).toBe(200);
+      await new Promise((r) => setTimeout(r, 50)); // reads commit after the response
+    } finally {
+      proto.query = query;
+    }
+    // Token, groups and access in one trip; the two counts; the commit. Reads are READ ONLY, so
+    // committing after the response can't lose a write.
+    expect(sent).toHaveLength(4);
+    expect(sent[0]).toMatch(/^BEGIN READ ONLY;/);
+    expect(sent.at(-1)).toBe('COMMIT');
+  });
+
   it('creates a second organization, people and agents per organization', async () => {
     const pay = await api('POST', '/organizations', { name: 'Acme Payments', slug: 'payments' });
     expect(pay.status).toBe(201);

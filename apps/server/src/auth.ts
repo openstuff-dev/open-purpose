@@ -167,39 +167,50 @@ export function bearer(header: string | undefined): string | undefined {
   return m?.[1]?.trim();
 }
 
+/** SQL that finds a token's actor; `touch` says whether last_used_at is worth writing. */
+function tokenSql(c: pg.ClientBase, token: string): string {
+  return `SELECT a.id, a.name, a.kind, a.is_superadmin, t.id AS token_id,
+         (t.last_used_at IS NULL OR t.last_used_at < now() - interval '1 minute') AS touch
+    FROM api_tokens t JOIN actors a ON a.id = t.actor_id
+   WHERE t.token_hash = ${c.escapeLiteral(hashToken(token))} AND t.revoked_at IS NULL
+     AND a.disabled_at IS NULL AND (t.expires_at IS NULL OR t.expires_at > now())`;
+}
+
+type TokenRow = Actor & { token_id: string; touch: boolean };
+
+const touching = new Set<string>();
+/**
+ * The actor behind a token row, or unauthorized. Writes last_used_at at most once a minute per
+ * token, outside the request, so it never holds up or fails one.
+ */
+function actorOf(pool: Pool, row: TokenRow | undefined): Actor {
+  if (!row) throw new AppError('unauthorized', 'Invalid or revoked token');
+  if (row.touch && !touching.has(row.token_id)) {
+    touching.add(row.token_id);
+    pool
+      .query('UPDATE api_tokens SET last_used_at = now() WHERE id = $1', [row.token_id])
+      .catch(() => undefined)
+      .finally(() => touching.delete(row.token_id));
+  }
+  return { id: row.id, name: row.name, kind: row.kind, is_superadmin: row.is_superadmin };
+}
+
 export async function actorFromToken(pool: Pool, token: string | undefined): Promise<Actor> {
   if (!token) throw new AppError('unauthorized', 'Missing bearer token');
-  const { rows } = await pool.query<Actor & { token_id: string }>(
-    `SELECT a.id, a.name, a.kind, a.is_superadmin, t.id AS token_id
-       FROM api_tokens t JOIN actors a ON a.id = t.actor_id
-      WHERE t.token_hash = $1 AND t.revoked_at IS NULL AND a.disabled_at IS NULL
-        AND (t.expires_at IS NULL OR t.expires_at > now())`,
-    [hashToken(token)],
-  );
-  const row = rows.at(0);
-  if (!row) throw new AppError('unauthorized', 'Invalid or revoked token');
-  pool
-    .query('UPDATE api_tokens SET last_used_at = now() WHERE id = $1', [row.token_id])
-    // Only a convenience for the token list; never fail a request over it.
-    .catch(() => undefined);
-  return { id: row.id, name: row.name, kind: row.kind, is_superadmin: row.is_superadmin };
+  const c = await pool.connect();
+  try {
+    return actorOf(pool, (await c.query<TokenRow>(tokenSql(c, token))).rows.at(0));
+  } finally {
+    c.release();
+  }
 }
 
 /** SQL for the groups an actor belongs to (server admins: all), to share a round trip. */
 function groupsSql(c: pg.ClientBase, actor: Actor): string {
   return actor.is_superadmin && actor.kind === 'human'
-    ? 'SELECT id, slug, name FROM groups ORDER BY name'
+    ? 'SELECT id, slug, name FROM groups ORDER BY name, id'
     : `SELECT DISTINCT g.id, g.slug, g.name FROM memberships m JOIN groups g ON g.id = m.group_id
-        WHERE m.actor_id = ${c.escapeLiteral(actor.id)} ORDER BY g.name`;
-}
-
-/** The groups an actor belongs to (server admins: all groups). */
-export async function groupsOf(pool: Pool, actor: Actor): Promise<GroupRef[]> {
-  return withScope(
-    pool,
-    { groupId: null, bypass: true },
-    async (c) => (await c.query<GroupRef>(groupsSql(c, actor))).rows,
-  );
+        WHERE m.actor_id = ${c.escapeLiteral(actor.id)} ORDER BY g.name, g.id`;
 }
 
 /**
@@ -221,22 +232,60 @@ export async function resolveAccess(
 }
 
 /**
- * Open the transaction a request runs in and build its Access, in two round trips: the
- * transaction with the actor's groups, then the switch to the chosen group with everything
- * Access needs. The transaction stays open, scoped to that group; on an error it is closed.
+ * Open the transaction a request runs in and build its Access, in one round trip: the token's
+ * actor, their groups, the switch to the chosen group and everything Access needs. The
+ * transaction stays open, scoped to that group; on an error it is closed.
  */
 export async function beginRequest(
   pool: Pool,
-  actor: Actor,
+  token: string | undefined,
   wantGroup?: string | null,
   wantOrg?: string | null,
-): Promise<{ db: pg.PoolClient; access: Access }> {
+  /** Reads (GET, HEAD): Postgres refuses writes, so committing after the response loses none. */
+  readOnly = false,
+): Promise<{ db: pg.PoolClient; actor: Actor; groups: GroupRef[]; access: Access }> {
+  if (!token) throw new AppError('unauthorized', 'Missing bearer token');
   const db = await pool.connect();
   try {
-    const [, , groups] = (await db.query(
-      `BEGIN; ${scopeSql(db, { groupId: null, bypass: true })}; ${groupsSql(db, actor)}`,
-    )) as unknown as [pg.QueryResult, pg.QueryResult, pg.QueryResult<GroupRef>];
-    return { db, access: await accessIn(db, actor, groups.rows, wantGroup, wantOrg) };
+    // actors, api_tokens and groups have no row-level security, so the token's actor can be
+    // looked up again inside each statement, also once the transaction is scoped to the group.
+    const actorId = `(SELECT x.id FROM (${tokenSql(db, token)}) x)`;
+    const groups = `FROM groups g
+      WHERE (g.id IN (SELECT m.group_id FROM memberships m WHERE m.actor_id = ${actorId})
+         OR EXISTS (SELECT 1 FROM actors a WHERE a.id = ${actorId} AND a.is_superadmin AND a.kind = 'human'))`;
+    const want = wantGroup
+      ? `AND (g.id::text = ${db.escapeLiteral(wantGroup)} OR g.slug = lower(${db.escapeLiteral(wantGroup)}))`
+      : '';
+    const [, , tokenRes, groupsRes, chosen, , orgs, memberships, grants] =
+      (await db.query(`BEGIN${readOnly ? ' READ ONLY' : ''};
+      ${scopeSql(db, { groupId: null, bypass: true })};
+      ${tokenSql(db, token)};
+      SELECT g.id, g.slug, g.name ${groups} ORDER BY g.name, g.id;
+      SELECT set_config('openpurpose.group_id',
+        COALESCE((SELECT g.id::text ${groups} ${want} ORDER BY g.name, g.id LIMIT 1), ''), true) AS id;
+      SELECT set_config('openpurpose.bypass', '', true);
+      ${ACCESS_SQL(actorId)}`)) as unknown as [
+        pg.QueryResult,
+        pg.QueryResult,
+        pg.QueryResult<TokenRow>,
+        pg.QueryResult<GroupRef>,
+        pg.QueryResult<{ id: string }>,
+        pg.QueryResult,
+        pg.QueryResult<OrgRef>,
+        pg.QueryResult<Membership>,
+        pg.QueryResult<Grant>,
+      ];
+    const actor = actorOf(pool, tokenRes.rows.at(0));
+    const group = pickGroup(actor, groupsRes.rows, wantGroup);
+    // The SQL above chose the same group; if it ever doesn't, refuse rather than read another one.
+    if (chosen.rows[0]?.id !== group.id)
+      throw new AppError('forbidden', 'You are not a member of that workspace');
+    return {
+      db,
+      actor,
+      groups: groupsRes.rows,
+      access: buildAccess(actor, group, orgs.rows, memberships.rows, grants.rows, wantOrg),
+    };
   } catch (err) {
     await db.query('ROLLBACK').catch(() => undefined);
     db.release();
@@ -244,14 +293,21 @@ export async function beginRequest(
   }
 }
 
-/** Access from `groups`, on a transaction open with `bypass`; scopes it to the chosen group. */
-async function accessIn(
-  c: pg.PoolClient,
-  actor: Actor,
-  groups: GroupRef[],
-  wantGroup?: string | null,
-  wantOrg?: string | null,
-): Promise<Access> {
+interface Grant {
+  reader_org_id: string;
+  target_org_id: string;
+}
+
+/** What Access reads once the transaction is scoped to the group: orgs, memberships, grants. */
+const ACCESS_SQL = (actorId: string) => `
+    SELECT o.id, o.slug, o.name, o.archived_at,
+           ARRAY(SELECT x.old_slug FROM slug_aliases x WHERE x.organization_id = o.id) AS aliases
+      FROM organizations o ORDER BY o.name;
+    SELECT group_id, organization_id, role FROM memberships WHERE actor_id = ${actorId};
+    SELECT reader_org_id, target_org_id FROM org_read_grants`;
+
+/** The group the client asked for (id or slug), or the actor's first one. */
+function pickGroup(actor: Actor, groups: GroupRef[], wantGroup?: string | null): GroupRef {
   if (groups.length === 0) {
     throw new AppError(
       'forbidden',
@@ -264,43 +320,58 @@ async function accessIn(
     ? groups.find((g) => g.id === wantGroup || g.slug === wantGroup.toLowerCase())
     : groups[0];
   if (!group) throw new AppError('forbidden', 'You are not a member of that workspace');
+  return group;
+}
 
+/** Access from `groups`, on a transaction open with `bypass`; scopes it to the chosen group. */
+async function accessIn(
+  c: pg.PoolClient,
+  actor: Actor,
+  groups: GroupRef[],
+  wantGroup?: string | null,
+  wantOrg?: string | null,
+): Promise<Access> {
+  const group = pickGroup(actor, groups, wantGroup);
   // Several statements in one query come back as one result each.
   const [, orgs, memberships, grants] = (await c.query(`${scopeSql(c, { groupId: group.id })};
-    SELECT o.id, o.slug, o.name, o.archived_at,
-           ARRAY(SELECT x.old_slug FROM slug_aliases x WHERE x.organization_id = o.id) AS aliases
-      FROM organizations o ORDER BY o.name;
-    SELECT group_id, organization_id, role FROM memberships WHERE actor_id = ${c.escapeLiteral(actor.id)};
-    SELECT reader_org_id, target_org_id FROM org_read_grants`)) as unknown as [
+    ${ACCESS_SQL(c.escapeLiteral(actor.id))}`)) as unknown as [
     pg.QueryResult,
     pg.QueryResult<OrgRef>,
     pg.QueryResult<Membership>,
-    pg.QueryResult<{ reader_org_id: string; target_org_id: string }>,
+    pg.QueryResult<Grant>,
   ];
-  {
-    const grantMap = new Map<string, Set<string>>();
-    for (const g of grants.rows) {
-      const targets = grantMap.get(g.reader_org_id) ?? new Set<string>();
-      targets.add(g.target_org_id);
-      grantMap.set(g.reader_org_id, targets);
-    }
-    let orgId: string | null = null;
-    if (actor.kind === 'agent') {
-      orgId = memberships.rows.find((m) => m.organization_id)?.organization_id ?? null;
-    } else if (wantOrg) {
-      // A remembered organization from another group is ignored rather than an error.
-      orgId =
-        orgs.rows.find((x) => x.id === wantOrg || x.slug === wantOrg.toLowerCase())?.id ?? null;
-    }
-    if (!orgId && actor.kind !== 'agent') {
-      const own = memberships.rows.filter((m) => m.organization_id);
-      if (own.length === 1) orgId = own[0].organization_id;
-      else if (own.length === 0 && orgs.rows.length === 1) orgId = orgs.rows[0].id;
-    }
-    const probe = new Access(actor, group, orgs.rows, memberships.rows, grantMap, orgId);
-    if (orgId && !probe.canRead(orgId)) orgId = null;
-    return new Access(actor, group, orgs.rows, memberships.rows, grantMap, orgId);
+  return buildAccess(actor, group, orgs.rows, memberships.rows, grants.rows, wantOrg);
+}
+
+function buildAccess(
+  actor: Actor,
+  group: GroupRef,
+  orgs: OrgRef[],
+  memberships: Membership[],
+  grants: Grant[],
+  wantOrg?: string | null,
+): Access {
+  const grantMap = new Map<string, Set<string>>();
+  for (const g of grants) {
+    const targets = grantMap.get(g.reader_org_id) ?? new Set<string>();
+    targets.add(g.target_org_id);
+    grantMap.set(g.reader_org_id, targets);
   }
+  let orgId: string | null = null;
+  if (actor.kind === 'agent') {
+    orgId = memberships.find((m) => m.organization_id)?.organization_id ?? null;
+  } else if (wantOrg) {
+    // A remembered organization from another group is ignored rather than an error.
+    orgId = orgs.find((x) => x.id === wantOrg || x.slug === wantOrg.toLowerCase())?.id ?? null;
+  }
+  if (!orgId && actor.kind !== 'agent') {
+    const own = memberships.filter((m) => m.organization_id);
+    if (own.length === 1) orgId = own[0].organization_id;
+    else if (own.length === 0 && orgs.length === 1) orgId = orgs[0].id;
+  }
+  const probe = new Access(actor, group, orgs, memberships, grantMap, orgId);
+  if (orgId && !probe.canRead(orgId)) orgId = null;
+  return new Access(actor, group, orgs, memberships, grantMap, orgId);
 }
 
 /**

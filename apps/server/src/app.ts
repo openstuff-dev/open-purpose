@@ -12,7 +12,7 @@ import {
   agentViewOf,
   bearer,
   canViewAsAgent,
-  groupsOf,
+  type GroupRef,
   resolveAccess,
   type Actor,
 } from './auth.js';
@@ -68,6 +68,8 @@ export const VERSION = (
 declare module 'fastify' {
   interface FastifyRequest {
     actor: Actor;
+    /** The workspaces the actor belongs to (server admins: all), read with the access. */
+    groups: GroupRef[];
     access: Access;
     db: pg.PoolClient;
     scopeOpen: boolean;
@@ -143,6 +145,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
 
   app.decorateRequest('actor', null as unknown as Actor);
   app.decorateRequest('access', null as unknown as Access);
+  app.decorateRequest('groups', null as unknown as GroupRef[]);
   app.decorateRequest('db', null as unknown as pg.PoolClient);
   app.decorateRequest('scopeOpen', false);
   app.decorateRequest('person', null);
@@ -206,17 +209,29 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
     async (api) => {
       // Every group-level request runs in one transaction that row-level security scopes to the
       // caller's group.
+      // Reads run in a READ ONLY transaction: a GET that writes fails loudly instead of losing
+      // its write when the commit after the response fails.
+      const reads = (req: FastifyRequest) => req.method === 'GET' || req.method === 'HEAD';
       api.addHook('preHandler', async (req) => {
         if (req.routeOptions.config.public) return;
-        req.actor = await actorFromToken(pool, bearer(req.headers.authorization));
-        if (req.routeOptions.config.serverLevel) return;
-        // One transaction for the whole request: access is read in it, then it stays scoped to
-        // the caller's group. The close hooks below end it, also when this hook throws later.
-        ({ db: req.db, access: req.access } = await beginRequest(
+        if (req.routeOptions.config.serverLevel) {
+          req.actor = await actorFromToken(pool, bearer(req.headers.authorization));
+          return;
+        }
+        // One transaction for the whole request, opened in the same round trip that checks the
+        // token and reads access; then it stays scoped to the caller's group. The close hooks
+        // below end it, also when this hook throws later.
+        ({
+          db: req.db,
+          actor: req.actor,
+          groups: req.groups,
+          access: req.access,
+        } = await beginRequest(
           pool,
-          req.actor,
+          bearer(req.headers.authorization),
           header(req, 'x-openpurpose-group'),
           header(req, 'x-openpurpose-org'),
+          reads(req),
         ));
         req.scopeOpen = true;
         // Agent mode: answer as an agent in the chosen organization would see it. Read-only.
@@ -236,11 +251,17 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
         req.scopeOpen = false;
         await endScope(req.db, ok);
       };
+      // A change commits before its response leaves, so the next request sees it. A read
+      // commits after its response has gone: nothing waits on that round trip.
       api.addHook('onSend', async (req, reply, payload) => {
-        await close(req, reply.statusCode < 400);
+        if (!reads(req)) await close(req, reply.statusCode < 400);
         return payload;
       });
-      api.addHook('onResponse', async (req) => close(req, false));
+      api.addHook('onResponse', async (req, reply) =>
+        close(req, reads(req) && reply.statusCode < 400).catch((err: unknown) => {
+          req.log.error(err);
+        }),
+      );
       api.addHook('onRequestAbort', async (req) => close(req, false));
 
       const server = { config: { serverLevel: true } };
@@ -375,7 +396,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
         const a = req.access;
         return {
           actor: req.actor,
-          groups: await groupsOf(pool, req.actor),
+          groups: req.groups,
           group: {
             ...a.group,
             role: a.groupRole,
