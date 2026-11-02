@@ -2143,6 +2143,16 @@ definitions:`,
       dismissed: 0,
       solved: 1,
     });
+    // A file at the root without an extension, like a Dockerfile, shows its own findings too.
+    const docker = await report({ file: 'Dockerfile', title: 'Image runs as root' });
+    const dockerId = /Finding `([0-9a-f]{8})`/.exec(docker.text)![1];
+    const dockerRow = (await api('GET', `/findings?project_id=${projectId}`)).data.find((f: any) =>
+      f.id.startsWith(dockerId),
+    );
+    await api('PUT', `/findings/${dockerRow.id}/status`, { status: 'todo' });
+    expect(
+      (await jonas.call('get_context', { remote_url: SSH_REMOTE, path: 'Dockerfile' })).text,
+    ).toContain('Image runs as root');
     // Row-level security: another group's transaction sees none of them, even without a WHERE
     // clause.
     const count = (scope: { groupId: string | null; bypass?: boolean }) =>
@@ -2153,7 +2163,7 @@ definitions:`,
           (await c.query<{ n: number }>('SELECT count(*)::int AS n FROM findings')).rows[0].n,
       );
     expect(await count({ groupId: '00000000-0000-0000-0000-000000000001' })).toBe(0);
-    expect(await count({ groupId: null, bypass: true })).toBe(3);
+    expect(await count({ groupId: null, bypass: true })).toBe(4);
     await jonas.client.close();
   });
 
@@ -2263,7 +2273,7 @@ definitions:`,
     expect(file.documents.every((d: any) => d.organization === o.logistics)).toBe(true);
     expect(file.proposals.length).toBeGreaterThan(0);
     expect(file.api_specs.length).toBeGreaterThan(0);
-    expect(file.findings.map((f: any) => f.status).sort()).toEqual(['ask_later', 'new', 'solved']);
+    expect(file.findings.map((f: any) => f.status).sort()).toEqual(['ask_later', 'new', 'solved', 'todo']);
     expect(file.people.map((p: any) => p.name)).toContain('Anders H.');
     const sections = file.documents.flatMap((d: any) => d.sections).length;
 
@@ -2298,7 +2308,7 @@ definitions:`,
     const imported = await api('POST', '/import', { file, organizations: asNew('logistics-copy') });
     expect(imported.status).toBe(201);
     expect(imported.data).toMatchObject({ ok: true, applied: true });
-    expect(imported.data.counts.findings).toBe(3);
+    expect(imported.data.counts.findings).toBe(4);
     const copy = imported.data.organizations[0].id;
     copyOrg = copy;
     expect(await orgCount()).toBe(before + 1);
