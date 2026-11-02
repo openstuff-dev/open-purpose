@@ -1620,6 +1620,59 @@ definitions:`,
     });
   });
 
+  it('compresses large answers, answers 304 to a repeated GET, and leaves MCP alone', async () => {
+    const get = (encoding: string, extra: Record<string, string> = {}) =>
+      fetch(`${base}/api/graph`, {
+        headers: { authorization: `Bearer ${ADMIN}`, 'accept-encoding': encoding, ...extra },
+      });
+    const plain = await get('identity');
+    expect(plain.headers.get('content-encoding')).toBeNull();
+    const body = await plain.text();
+    expect(body.length).toBeGreaterThan(1024);
+    for (const encoding of ['br', 'gzip']) {
+      const res = await get(encoding);
+      expect(res.headers.get('content-encoding')).toBe(encoding);
+      expect(await res.text()).toBe(body); // fetch decompresses it again
+    }
+
+    const etag = plain.headers.get('etag');
+    expect(etag).toMatch(/^W\//);
+    const again = await get('br', { 'if-none-match': etag! });
+    expect(again.status).toBe(304);
+    expect(await again.text()).toBe('');
+
+    // Small answers go as they are.
+    const small = await fetch(`${base}/api/health`, { headers: { 'accept-encoding': 'br' } });
+    expect(small.headers.get('content-encoding')).toBeNull();
+
+    // MCP streams its own answer, uncompressed, and the SDK client still works.
+    const res = await fetch(`${base}/mcp`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${t.jonas}`,
+        'accept-encoding': 'br, gzip',
+        accept: 'application/json, text/event-stream',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: '2025-03-26',
+          capabilities: {},
+          clientInfo: { name: 'raw', version: '1' },
+        },
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-encoding')).toBeNull();
+    expect(await res.text()).toContain('serverInfo');
+    const { client, call } = await mcp(t.jonas);
+    expect((await call('list_projects', {})).isError).toBe(false);
+    await client.close();
+  });
+
   it('warns about documents agents stopped requesting, and hides disabled ones from agents', async () => {
     const doc = (
       await api('POST', '/documents', {
