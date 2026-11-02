@@ -6,7 +6,7 @@ import type { AuthConfig } from '../../config.js';
 import type { AuthProvider } from './provider.js';
 import { createSupabaseProvider } from './supabase.js';
 
-export type { AuthProvider, ExternalIdentity } from './provider.js';
+export type { AuthProvider, ExternalIdentity, Invitation } from './provider.js';
 export { SignInError } from './provider.js';
 
 export type ProviderFactory = (config: AuthConfig) => AuthProvider;
