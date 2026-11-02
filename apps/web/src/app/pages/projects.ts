@@ -190,6 +190,8 @@ import { ListSkeleton } from '../shared/list-skeleton';
   `,
 })
 export class ProjectsPage {
+  /** Counts loads, so an answer for an earlier one is ignored. */
+  private asked = 0;
   readonly session = inject(Session);
   private readonly confirmDialog = inject(ConfirmDialog);
   private api = inject(Api);
@@ -225,9 +227,13 @@ export class ProjectsPage {
   }
 
   private async load(): Promise<void> {
+    const ask = ++this.asked;
+    const show = (projects: Project[]) => {
+      if (ask === this.asked) this.projects.set(projects);
+    };
     try {
       const orgId = this.all() ? null : this.session.orgId();
-      this.projects.set(await this.api.projects({ q: this.q(), organizationId: orgId }));
+      show(await this.api.projects({ q: this.q(), organizationId: orgId }, show));
     } catch (e) {
       this.notices.error(e);
     }

@@ -110,6 +110,8 @@ const KIND_HINT: Record<DocKind, string> = {
   `,
 })
 export class DocList {
+  /** Counts loads, so an answer for an earlier one is ignored. */
+  private asked = 0;
   /** null = group-wide. */
   readonly organizationId = input<string | null>(null);
   readonly projectId = input<string | null>(null);
@@ -155,8 +157,13 @@ export class DocList {
     project_id: string | null;
     scope_id: string | null;
   }): Promise<void> {
+    const ask = ++this.asked;
     try {
-      this.docs.set(await this.api.documents(level));
+      // A stored list shows at once; a newer one replaces it if it is still the list on screen.
+      const docs = await this.api.documents(level, (fresh) => {
+        if (ask === this.asked) this.docs.set(fresh);
+      });
+      if (ask === this.asked) this.docs.set(docs);
     } catch (e) {
       this.notices.error(e);
     }

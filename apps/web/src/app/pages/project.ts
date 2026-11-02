@@ -446,6 +446,8 @@ const TABS: Tab[] = [
   `,
 })
 export class ProjectPage {
+  /** Counts loads, so an answer for an earlier one is ignored. */
+  private asked = 0;
   readonly id = input.required<string>();
   /** From the ?tab= query parameter. */
   readonly tab = input<string | undefined>();
@@ -557,14 +559,26 @@ export class ProjectPage {
   }
 
   private async load(id: string): Promise<void> {
-    try {
-      const p = await this.api.project(id);
+    const ask = ++this.asked;
+    // A stored project shows at once; when the server's differs, it replaces it.
+    const show = (p: ProjectDetail) => {
+      if (ask !== this.asked) return;
       // Fetched again when Connections is (or next gets) open: a change may have moved links.
       this.graphFor = null;
       this.graphOf.set(null);
+      // Keep what someone is typing in Settings when a newer answer arrives.
+      const old = this.project();
+      const edited =
+        old?.id === p.id &&
+        (this.draft.name !== old.name ||
+          this.draft.summary !== old.summary ||
+          this.draft.organization_id !== old.organization_id);
       this.project.set(p);
-      this.resetDraft();
+      if (!edited) this.resetDraft();
       this.missing.set(false);
+    };
+    try {
+      show(await this.api.project(id, show));
     } catch {
       this.project.set(null);
       this.missing.set(true);
@@ -574,10 +588,12 @@ export class ProjectPage {
   private async loadGraph(id: string): Promise<void> {
     this.graphFor = id;
     try {
-      const graph = await this.api.graph({ focus: id, depth: 1 });
-      if (this.graphFor !== id) return;
-      this.graph.set(graph);
-      this.graphOf.set(id);
+      const show = (graph: Graph) => {
+        if (this.graphFor !== id) return;
+        this.graph.set(graph);
+        this.graphOf.set(id);
+      };
+      show(await this.api.graph({ focus: id, depth: 1 }, show));
     } catch (e) {
       if (this.graphFor === id) this.graphFor = null;
       this.notices.error(e);
