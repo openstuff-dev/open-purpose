@@ -1009,6 +1009,8 @@ export class InboxPage {
   /** A proposal opened by link that isn't in the current list. */
   private readonly extra = signal<Proposal | null>(null);
   private scopeCache = new Map<string, Scope[]>();
+  /** Targets being worked out, or worked out, for these proposals since the list loaded. */
+  private targetsLoading = new Map<string, Promise<void>>();
 
   private readonly params = toSignal(this.route.queryParamMap);
   readonly openId = computed(() => this.params()?.get('p') ?? null);
@@ -1081,8 +1083,7 @@ export class InboxPage {
           return;
         void this.api
           .proposal(id)
-          .then(async (p) => {
-            await this.prepare(p);
+          .then((p) => {
             this.extra.set(p);
           })
           .catch((e: unknown) => {
@@ -1099,6 +1100,7 @@ export class InboxPage {
         this.view.set('review');
         this.compare.set(p.kind === 'edit_section' && isOpen(p.status) ? 'section' : 'none');
         void this.loadReview(p.id);
+        void this.loadTargets(p);
         queueMicrotask(() => {
           this.drawer()?.nativeElement.focus({ preventScroll: true });
         });
@@ -1394,13 +1396,29 @@ export class InboxPage {
     return scopes;
   }
 
-  private async prepare(p: Proposal): Promise<void> {
-    const r = this.blank(p);
-    if (p.kind === 'learning' && isOpen(p.status) && p.can_review)
-      r.targets = await this.targetsFor(p);
-    if (r.targets.length && !r.targets.some((t) => t.key === r.target))
-      r.target = r.targets[r.targets.length - 1].key;
-    this.drafts.update((all) => ({ ...all, [p.id]: r }));
+  /**
+   * Work out where the reviewer may file a learning, once, when it is opened: the table doesn't
+   * need it, and it takes a scopes request per level.
+   */
+  private loadTargets(p: Proposal): Promise<void> {
+    if (p.kind !== 'learning' || !isOpen(p.status) || !p.can_review) return Promise.resolve();
+    let loading = this.targetsLoading.get(p.id);
+    if (!loading) {
+      loading = this.targetsFor(p)
+        .then((targets) => {
+          const r = this.draft(p);
+          r.targets = targets;
+          if (targets.length && !targets.some((t) => t.key === r.target))
+            r.target = targets[targets.length - 1].key;
+          this.touch();
+        })
+        .catch((e: unknown) => {
+          this.targetsLoading.delete(p.id);
+          this.notices.error(e);
+        });
+      this.targetsLoading.set(p.id, loading);
+    }
+    return loading;
   }
 
   private async load(): Promise<void> {
@@ -1411,9 +1429,12 @@ export class InboxPage {
         this.api.proposalCounts(level),
       ]);
       this.drafts.set({});
-      for (const p of list) await this.prepare(p);
+      this.targetsLoading.clear();
       this.all.set(list);
       this.counts.set(counts);
+      // The drafts were reset; the drawer may still be open on the same proposal.
+      const open = this.current();
+      if (open) void this.loadTargets(open);
     } catch (e) {
       this.notices.error(e);
     }
@@ -1497,6 +1518,7 @@ export class InboxPage {
   }
 
   async approve(p: Proposal): Promise<void> {
+    await this.loadTargets(p);
     const r = this.draft(p);
     const t = r.targets.find((x) => x.key === r.target);
     try {
