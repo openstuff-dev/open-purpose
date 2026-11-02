@@ -69,34 +69,61 @@ export function stalenessOf(
   return null;
 }
 
-async function trackingSince(db: Queryable): Promise<string | null> {
-  const { rows } = await db.query<{ at: string | null }>(
-    'SELECT min(created_at) AS at FROM agent_requests',
-  );
-  return rows[0].at;
+/**
+ * When agents first requested anything in this workspace (row-level security narrows it), as a
+ * subquery: the start of what staleness can know about.
+ */
+export const TRACKING_SINCE_SQL = '(SELECT min(created_at) FROM agent_requests)';
+
+/** The last time agents read a section of the document with id `docId` (a SQL expression). */
+export const lastReadSql = (docId: string) =>
+  `(SELECT max(r.created_at) FROM section_reads r WHERE r.document_id = ${docId})`;
+
+/** A document row with `last_read_at` and `tracking_since` selected alongside it. */
+export interface DocumentReadRow {
+  created_at: string;
+  disabled_at: string | null;
+  last_read_at: string | null;
+  tracking_since: string | null;
 }
 
-/** Staleness and last read of documents, by id. No permission check; callers check. */
+/** Turn `last_read_at` and `tracking_since` into the activity people see. */
+export function withActivity<T extends DocumentReadRow>(
+  row: T,
+): Omit<T, 'tracking_since'> & DocumentActivity {
+  const { tracking_since, ...doc } = row;
+  return {
+    ...doc,
+    disabled_at: row.disabled_at,
+    last_read_at: row.last_read_at,
+    staleness: row.disabled_at
+      ? null
+      : stalenessOf(row.created_at, tracking_since, row.last_read_at),
+  };
+}
+
+/** Staleness and last read of documents, by id, in one round trip. No permission check. */
 export async function documentActivity(
   db: Queryable,
   docs: { id: string; created_at: string; disabled_at: string | null }[],
 ): Promise<Map<string, DocumentActivity>> {
   const out = new Map<string, DocumentActivity>();
   if (!docs.length) return out;
-  const since = await trackingSince(db);
-  const { rows } = await db.query<{ document_id: string; last_read_at: string }>(
-    `SELECT document_id, max(created_at) AS last_read_at FROM section_reads
-      WHERE document_id = ANY($1::uuid[]) GROUP BY document_id`,
+  const { rows } = await db.query<{ id: string; last_read_at: string | null; at: string | null }>(
+    `SELECT d.id, ${lastReadSql('d.id')} AS last_read_at, ${TRACKING_SINCE_SQL} AS at
+       FROM unnest($1::uuid[]) AS d(id)`,
     [docs.map((d) => d.id)],
   );
-  const last = new Map(rows.map((r) => [r.document_id, r.last_read_at]));
+  const read = new Map(rows.map((r) => [r.id, r]));
   for (const d of docs) {
-    const lastRead = last.get(d.id) ?? null;
-    out.set(d.id, {
+    const r = read.get(d.id);
+    const { disabled_at, last_read_at, staleness } = withActivity({
+      created_at: d.created_at,
       disabled_at: d.disabled_at,
-      last_read_at: lastRead,
-      staleness: d.disabled_at ? null : stalenessOf(d.created_at, since, lastRead),
+      last_read_at: r?.last_read_at ?? null,
+      tracking_since: r?.at ?? null,
     });
+    out.set(d.id, { disabled_at, last_read_at, staleness });
   }
   return out;
 }
@@ -119,22 +146,16 @@ export const noDocumentActivity = (d: { disabled_at: string | null }): DocumentA
   staleness: null,
 });
 
-/** Read counts of sections, by id. No permission check; callers check. */
-export async function sectionActivity(
-  db: Queryable,
-  sectionIds: string[],
-): Promise<Map<string, SectionActivity>> {
-  const out = new Map<string, SectionActivity>();
-  if (!sectionIds.length) return out;
-  const { rows } = await db.query<{
-    section_id: string;
-    reads: number;
-    last_read_at: string;
-    daily: number[];
-    week: number;
-    previous_week: number;
-  }>(
-    `SELECT s.id AS section_id,
+/** The row type of `sectionActivitySql`. */
+export interface SectionActivityRow extends SectionActivity {
+  section_id: string;
+}
+
+/**
+ * Read counts of the sections `from` yields as `s(id)`, e.g. `unnest($1::uuid[]) AS s(id)` or
+ * `sections s WHERE s.document_id = ...`.
+ */
+export const sectionActivitySql = (from: string) => `SELECT s.id AS section_id,
             (SELECT count(*)::int FROM section_reads r WHERE r.section_id = s.id) AS reads,
             (SELECT max(created_at) FROM section_reads r WHERE r.section_id = s.id) AS last_read_at,
             ARRAY(SELECT count(r.request_id)::int
@@ -144,18 +165,25 @@ export async function sectionActivity(
             (SELECT count(*)::int FROM section_reads r WHERE r.section_id = s.id AND r.created_at >= current_date - 6) AS week,
             (SELECT count(*)::int FROM section_reads r WHERE r.section_id = s.id
                 AND r.created_at >= current_date - 13 AND r.created_at < current_date - 6) AS previous_week
-       FROM unnest($1::uuid[]) AS s(id)`,
+       FROM ${from}`;
+
+/** Read counts of sections, by id. No permission check; callers check. */
+export async function sectionActivity(
+  db: Queryable,
+  sectionIds: string[],
+): Promise<Map<string, SectionActivity>> {
+  if (!sectionIds.length) return new Map();
+  const { rows } = await db.query<SectionActivityRow>(
+    sectionActivitySql('unnest($1::uuid[]) AS s(id)'),
     [sectionIds],
   );
-  for (const r of rows) {
-    out.set(r.section_id, {
-      reads: r.reads,
-      last_read_at: r.last_read_at,
-      daily: r.daily,
-      week: r.week,
-      previous_week: r.previous_week,
-    });
-  }
+  return activityById(rows);
+}
+
+/** Section activity rows by section id. */
+export function activityById(rows: SectionActivityRow[]): Map<string, SectionActivity> {
+  const out = new Map<string, SectionActivity>();
+  for (const { section_id, ...activity } of rows) out.set(section_id, activity);
   return out;
 }
 
@@ -314,7 +342,9 @@ export async function organizationActivity(
     ...fig(r),
   });
 
-  const since = await trackingSince(db);
+  const since = (
+    await db.query<{ at: string | null }>(`SELECT ${TRACKING_SINCE_SQL} AS at`)
+  ).rows[0].at;
   const { rows: docs } = await db.query<{
     id: string;
     title: string;
