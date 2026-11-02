@@ -5,6 +5,7 @@ import { detectStacks } from '../src/domain/stacks.js';
 import { matchScopes, mostSpecific, normalizePath } from '../src/domain/scopes.js';
 import { extractLinks, rewriteLinks } from '../src/domain/links.js';
 import { cacheControl } from '../src/domain/cache.js';
+import { parseDocumentBody, renderDocumentBody } from '../src/domain/document-body.js';
 
 describe('parseRemote', () => {
   const key = 'azure:acme/big project/portal-frontend';
@@ -328,4 +329,29 @@ describe('cacheControl', () => {
       expect(cacheControl(file)).toBe('no-cache');
     },
   );
+});
+
+describe('document proposal text', () => {
+  it('splits on "## " lines and round-trips', () => {
+    const sections = [
+      { heading: 'Order', body: 'What a customer buys.\n\n### Not a quote\n\nSeparate.' },
+      { heading: 'Empty', body: '' },
+    ];
+    const text = renderDocumentBody(sections);
+    expect(text).toBe('## Order\n\nWhat a customer buys.\n\n### Not a quote\n\nSeparate.\n\n## Empty');
+    expect(parseDocumentBody(text)).toEqual({ sections });
+    expect(parseDocumentBody('')).toEqual({ sections: [] });
+  });
+
+  it('keeps "## " lines inside code blocks in the body', () => {
+    const r = parseDocumentBody('## Example\n\n```md\n## Not a section\n```');
+    expect(r).toEqual({
+      sections: [{ heading: 'Example', body: '```md\n## Not a section\n```' }],
+    });
+  });
+
+  it('refuses text before the first heading and empty headings', () => {
+    expect(parseDocumentBody('Intro\n\n## A')).toHaveProperty('error');
+    expect(parseDocumentBody('## A\n\n##\n')).toHaveProperty('error');
+  });
 });

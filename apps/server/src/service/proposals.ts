@@ -4,31 +4,44 @@ import { tx } from '../db.js';
 import { AppError, badRequest, forbidden, notFound } from '../errors.js';
 import { slugify } from '../domain/remote.js';
 import { normalizeTags } from '../domain/stacks.js';
+import { parseDocumentBody, renderDocumentBody, type SectionDraft } from '../domain/document-body.js';
 import {
   applySectionChange,
   assertMode,
   checkVersion,
   cleanGlobs,
   createScope,
+  documentsAt,
   ensureLearningsDocument,
   getDocument,
   getSection,
+  insertDocument,
   insertScope,
   insertSection,
   loadSection,
+  resolveDocumentRef,
   resolveLevel,
   type ScopeInput,
   type SectionChange,
   type SectionInput,
 } from './content.js';
 import { agentRules, autoApproves, type AgentRules } from './permissions.js';
-import type { EditMode, Level, Proposal, ProposalStatus, Scope, Section } from './types.js';
-import type { ProposalCounts, ScopeSpec } from '@openpurpose/contracts';
+import {
+  PROPOSABLE_DOC_KINDS,
+  type Document,
+  type EditMode,
+  type Level,
+  type Proposal,
+  type ProposalStatus,
+  type Scope,
+  type Section,
+} from './types.js';
+import type { DocumentSpec, ProposalCounts, ScopeSpec } from '@openpurpose/contracts';
 
 const PROPOSAL_COLS = `x.id, x.kind, x.status, x.organization_id, x.project_id, x.scope_id, x.document_id, x.section_id,
   x.base_version, x.heading, x.body, x.rationale, x.context, x.created_by, a.name AS created_by_name,
   x.created_at, x.reviewed_by, x.reviewed_at, x.review_note, x.result_section_id, x.scope_spec, x.result_scope_id,
-  x.revision, x.updated_at, x.auto_approved`;
+  x.document_spec, x.revision, x.updated_at, x.auto_approved`;
 
 export const isOpen = (status: ProposalStatus) =>
   status === 'pending' || status === 'changes_requested';
@@ -54,8 +67,8 @@ async function insertProposal(
 ): Promise<Proposal> {
   const { rows } = await c.query<{ id: string }>(
     `INSERT INTO proposals (kind, organization_id, project_id, scope_id, document_id, section_id, base_version,
-                            heading, body, rationale, context, created_by, scope_spec)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+                            heading, body, rationale, context, created_by, scope_spec, document_spec)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
     [
       p.kind,
       p.organization_id ?? null,
@@ -70,6 +83,7 @@ async function insertProposal(
       JSON.stringify(p.context ?? {}),
       a.actor.id,
       p.scope_spec ? JSON.stringify(p.scope_spec) : null,
+      p.document_spec ? JSON.stringify(p.document_spec) : null,
     ],
   );
   const id = rows[0].id;
@@ -184,7 +198,7 @@ export async function listProposals(
             p.slug AS project_slug, p.name AS project_name, sc.slug AS scope_slug,
             sc.name AS scope_name, d.title AS document_title, d.mode AS document_mode, s.heading AS current_heading,
             s.body AS current_body, s.version AS current_version, s.mode AS section_mode,
-            rv.name AS reviewed_by_name, rs.document_id AS result_document_id,
+            rv.name AS reviewed_by_name, COALESCE(rs.document_id, CASE WHEN x.kind = 'new_document' THEN x.document_id END) AS result_document_id,
             CASE WHEN x.scope_spec IS NULL THEN NULL
                  ELSE ARRAY(SELECT r.remote_key FROM repositories r
                              WHERE r.id::text IN (SELECT jsonb_array_elements_text(x.scope_spec->'repository_ids'))
@@ -360,7 +374,7 @@ export async function addSection(
   input: SectionInput & { note?: string; rationale?: string },
 ): Promise<EditResult> {
   return tx(db, async (c) => {
-    const doc = await getDocument(c, a, documentId);
+    const doc = await getDocument(c, a, await resolveDocumentRef(c, documentId));
     a.requireContribute(doc.organization_id);
     if (a.canEdit(doc.organization_id)) {
       return {
@@ -519,6 +533,140 @@ export async function proposeScope(
   });
 }
 
+// ───────────────────────────── documents ─────────────────────────────
+
+export interface DocumentProposalInput {
+  title: string;
+  kind: string;
+  slug?: string;
+  /** Its first sections. More can be added with add_section once it exists. */
+  sections?: SectionDraft[];
+  /** Why the level needs this document. */
+  rationale?: string;
+  context?: Record<string, unknown>;
+}
+
+/** proposal on an applied result: the document was proposed and approved automatically. */
+export type DocumentResult =
+  | { status: 'applied'; document: Document; sections: Section[]; proposal?: Proposal } |
+  { status: 'proposed'; proposal: Proposal };
+
+/** The sections of a new_document proposal's text, or a 400 that says how to fix it. */
+export function documentSections(body: string): SectionDraft[] {
+  const r = parseDocumentBody(body);
+  if ('error' in r) throw badRequest(r.error);
+  return r.sections;
+}
+
+/**
+ * A new document at a level, with its first sections. Editors create it right away; agents
+ * propose it, and it's created when a person approves the proposal. The sections are reviewed
+ * as one text, a "## Heading" line per section.
+ */
+export async function proposeDocument(
+  db: Db,
+  a: Access,
+  level: Partial<Level>,
+  input: DocumentProposalInput,
+): Promise<DocumentResult> {
+  const title = input.title.trim();
+  if (!title) throw badRequest('title is required');
+  if (!(PROPOSABLE_DOC_KINDS as string[]).includes(input.kind))
+    throw badRequest(
+      input.kind === 'learnings'
+        ? 'Learnings documents are made when a learning is approved; call propose_learning instead.'
+        : `kind must be one of ${PROPOSABLE_DOC_KINDS.join(', ')}`,
+    );
+  const sections = (input.sections ?? []).map((s) => ({
+    heading: s.heading.trim(),
+    body: s.body.trim(),
+  }));
+  if (sections.some((s) => !s.heading)) throw badRequest('Every section needs a heading');
+  const body = renderDocumentBody(sections);
+  // The text must read back as the same sections, e.g. no "## " line inside a body.
+  if (documentSections(body).length !== sections.length)
+    throw badRequest('A section body has a "## " line. Use "###" for headings inside a section.');
+  const spec: DocumentSpec = {
+    kind: input.kind as DocumentSpec['kind'],
+    slug: input.slug?.trim() || slugify(title),
+  };
+  return tx(db, async (c) => {
+    const lv = await resolveLevel(c, level);
+    a.requireContribute(lv.organization_id);
+    const taken = (await documentsAt(c, lv)).find((d) => d.slug === spec.slug);
+    if (taken)
+      throw new AppError(
+        'conflict',
+        `There already is a document "${taken.title}" (${spec.slug}) here${taken.disabled_at ? ', disabled for agents' : ''}. Add sections to it with add_section(document_id="${taken.id.slice(0, 8)}") instead.`,
+      );
+    const { rows: pending } = await c.query<{ id: string }>(
+      `SELECT id FROM proposals
+        WHERE kind = 'new_document' AND status IN ('pending', 'changes_requested')
+          AND organization_id IS NOT DISTINCT FROM $1 AND project_id IS NOT DISTINCT FROM $2
+          AND scope_id IS NOT DISTINCT FROM $3 AND document_spec->>'slug' = $4`,
+      [lv.organization_id, lv.project_id, lv.scope_id, spec.slug],
+    );
+    if (pending[0])
+      throw new AppError(
+        'conflict',
+        `A document "${spec.slug}" is already proposed here (proposal ${pending[0].id.slice(0, 8)}). Change it with revise_proposal instead.`,
+      );
+    if (a.canEdit(lv.organization_id)) {
+      const document = await createProposedDocument(c, lv, title, spec, sections, 'propose', {
+        actorId: a.actor.id,
+        note: 'Created',
+      });
+      return { status: 'applied', ...document };
+    }
+    const proposal = await insertProposal(c, a, {
+      kind: 'new_document',
+      ...lv,
+      heading: title,
+      body,
+      rationale: input.rationale ?? '',
+      context: input.context ?? {},
+      document_spec: spec,
+    });
+    const rules = await agentRules(c, a);
+    if (!autoApproves(a, rules, proposal.organization_id)) return { status: 'proposed', proposal };
+    const r = await applyApproval(c, a, proposal, {}, rules);
+    if (!r.document) throw new AppError('conflict', 'Approving the proposal made no document');
+    return { status: 'applied', document: r.document, sections: r.sections, proposal: r.proposal };
+  });
+}
+
+/** Insert a document and its sections, in order. No permission check. */
+async function createProposedDocument(
+  c: Queryable,
+  level: Level,
+  title: string,
+  spec: DocumentSpec,
+  sections: SectionDraft[],
+  mode: EditMode,
+  by: { actorId: string; note: string },
+): Promise<{ document: Document; sections: Section[] }> {
+  const position = (await documentsAt(c, level)).filter((d) => d.kind !== 'learnings').length;
+  const document = await insertDocument(c, level, {
+    kind: spec.kind,
+    title,
+    slug: spec.slug,
+    mode,
+    position,
+  });
+  const made: Section[] = [];
+  for (const [i, s] of sections.entries())
+    made.push(
+      await insertSection(
+        c,
+        document.id,
+        { heading: s.heading, body: s.body, mode, position: i },
+        by.actorId,
+        by.note,
+      ),
+    );
+  return { document, sections: made };
+}
+
 // ───────────────────────────── review ─────────────────────────────
 
 export interface ApproveInput {
@@ -539,7 +687,7 @@ export async function approveProposal(
   a: Access,
   id: string,
   input: ApproveInput = {},
-): Promise<{ proposal: Proposal; section: Section | null; scope: Scope | null }> {
+): Promise<Approval> {
   return tx(db, async (c) => {
     const { rows } = await c.query<{ status: ProposalStatus }>(
       'SELECT status FROM proposals WHERE id = $1 FOR UPDATE',
@@ -554,9 +702,18 @@ export async function approveProposal(
   });
 }
 
+/** What approving made: a section, a scope, or a document with its sections. */
+export interface Approval {
+  proposal: Proposal;
+  section: Section | null;
+  scope: Scope | null;
+  document: Document | null;
+  sections: Section[];
+}
+
 /**
- * Turn a proposal into the section or scope it proposes. Callers check who may approve; `auto`
- * means nobody reviewed it: an admin lets the agent who made it skip review.
+ * Turn a proposal into the section, scope or document it proposes. Callers check who may approve;
+ * `auto` means nobody reviewed it: an admin lets the agent who made it skip review.
  */
 async function applyApproval(
   c: Db,
@@ -564,7 +721,7 @@ async function applyApproval(
   p: Proposal,
   input: ApproveInput,
   auto?: AgentRules,
-): Promise<{ proposal: Proposal; section: Section | null; scope: Scope | null }> {
+): Promise<Approval> {
   const id = p.id;
   const heading = input.heading?.trim() || p.heading;
   const body = input.body ?? p.body;
@@ -578,6 +735,8 @@ async function applyApproval(
     : input.note || `Approved proposal from ${p.created_by_name ?? 'unknown'}`;
   let section: Section | null = null;
   let scope: Scope | null = null;
+  let document: Document | null = null;
+  let sections: Section[] = [];
   let level: Level = {
     organization_id: p.organization_id,
     project_id: p.project_id,
@@ -628,6 +787,25 @@ async function applyApproval(
     scope = auto
       ? await insertScope(c, { ...scopeLevel, scope_id: null }, scopeInput)
       : await createScope(c, a, scopeLevel, scopeInput);
+  } else if (p.kind === 'new_document') {
+    const spec = p.document_spec;
+    if (!spec) throw new AppError('conflict', 'This proposal has no document kind or slug');
+    const drafts = documentSections(body);
+    const taken = (await documentsAt(c, level)).find((d) => d.slug === spec.slug);
+    if (taken)
+      throw new AppError(
+        'conflict',
+        `There already is a document "${taken.title}" (${spec.slug}) here. Reject this proposal, or add its sections to that document.`,
+      );
+    ({ document, sections } = await createProposedDocument(
+      c,
+      level,
+      heading,
+      spec,
+      drafts,
+      assertMode(input.mode) ?? 'propose',
+      { actorId: a.actor.id, note },
+    ));
   } else {
     if (input.target) level = await resolveLevel(c, input.target);
     // Filing somewhere else (e.g. promoting to the group) needs edit rights there too.
@@ -663,14 +841,14 @@ async function applyApproval(
       level.organization_id,
       level.project_id,
       level.scope_id,
-      section?.document_id ?? null,
+      section?.document_id ?? document?.id ?? null,
       scope?.id ?? null,
       !!auto,
     ],
   );
   await c.query('UPDATE proposals SET updated_at = now() WHERE id = $1', [id]);
   await addEvent(c, a, id, 'approved', revision, auto ? note : (input.note ?? ''));
-  return { proposal: await loadProposal(c, id), section, scope };
+  return { proposal: await loadProposal(c, id), section, scope, document, sections };
 }
 
 export async function rejectProposal(db: Db, a: Access, id: string, note = ''): Promise<Proposal> {

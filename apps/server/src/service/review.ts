@@ -12,6 +12,7 @@ import {
   AUTHOR_OWES_REPLY,
   addEvent,
   canReview,
+  documentSections,
   getProposal,
   insertRevision,
   isOpen,
@@ -289,6 +290,8 @@ export async function reviseProposal(
     if (!canRevise(a, p)) throw forbidden('Only the author or a reviewer can revise this proposal');
     const heading = input.heading?.trim() || p.heading;
     if (heading === p.heading && input.body === p.body) throw badRequest('Nothing changed');
+    // A document's text must still split into sections, or approving it would fail later.
+    if (p.kind === 'new_document') documentSections(input.body);
     const revision = await insertRevision(c, a, p, heading, input.body, input.note ?? '');
     if (p.status === 'changes_requested' && isAuthor(a, p)) {
       await c.query('UPDATE proposals SET status = \'pending\' WHERE id = $1', [p.id]);
@@ -445,7 +448,15 @@ export function renderReviewForAgent(
   );
   out.push(`- Kind: ${p.kind.replace('_', ' ')}`);
   const spec = p.scope_spec;
-  if (spec) {
+  const doc = p.document_spec;
+  if (doc) {
+    out.push(
+      `- Title: ${p.heading}`,
+      `- Document kind: ${doc.kind.replace('_', ' ')}`,
+      `- Slug: ${doc.slug}`,
+      '- The text holds its sections: each "## " line starts one.',
+    );
+  } else if (spec) {
     const list = (xs: string[]) => (xs.length ? xs.join(', ') : 'any');
     out.push(
       `- Name: ${p.heading}`,

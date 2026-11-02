@@ -66,6 +66,7 @@ second organization under Settings › Organizations.
 - **Per-section edit modes.** Each section is **locked** (agents read only),
   **propose** (agent edits become proposals) or **open** (agents edit directly).
   Documents have a mode too, which decides whether agents may add sections.
+  Agents can propose a missing document, with its first sections, for a person to approve.
 - **Inbox**: every learning and proposed change in one sortable, filterable table.
   Opening a row shows who proposed it (person or agent), where it applies
   (organization › project › scope), the document and section, the file and
@@ -355,13 +356,14 @@ you paste into the organization's purpose.
 
 | Tool | What it does |
 |---|---|
-| `get_context` | The rules for a repo + path + manifest, from workspace to scope, with section ids and modes |
+| `get_context` | The rules for a repo + path + manifest, from workspace to scope, with document and section ids and modes, and the empty documents agents can fill |
 | `propose_learning` | File a correction as a learning under the most specific matching scope (or `level`: project, organization, workspace) |
 | `create_scope` | Suggest a scope for a part of the project (paths, stacks, one repository) or a kind of code across the organization; a person approves it, editors' tokens create it right away |
 | `resolve_project`, `register_repository`, `create_project` | Find or register the project for a repo |
 | `get_related` | Projects and terms linked to/from a project, with their purpose where readable |
 | `search`, `read_section` | Full-text search, read one section with its version |
 | `update_section`, `add_section` | Change content, subject to the section's or document's mode |
+| `propose_document` | Suggest a missing document (a glossary, the business logic, ...) with its first sections, reviewed as one text; a person approves it, editors' tokens create it right away |
 | `list_projects`, `list_scopes`, `list_organizations` | Discovery |
 | `list_skills`, `get_skill` | Guides the server offers agents, e.g. `init-openpurpose` for a guided first run: names and descriptions first, one skill's full text on request |
 | `get_api` | Endpoints and DTOs from a project's OpenAPI/Swagger spec: all endpoints, one endpoint in detail, or one DTO |

@@ -4,11 +4,13 @@ import type {
   ProposalKind,
   ProposalStatus,
   ScopeSpec,
+  DocumentSpec,
   Website,
 } from '@openpurpose/contracts';
 
 export type {
   DocKind,
+  DocumentSpec,
   EditMode,
   ProposalKind,
   ProposalStatus,
@@ -29,6 +31,10 @@ export const DOC_KINDS: DocKind[] = [
   'reference',
   'learnings',
 ];
+/** Kinds an agent may propose a document of. Learnings documents are made when one is approved. */
+export const PROPOSABLE_DOC_KINDS = DOC_KINDS.filter(
+  (k): k is DocumentSpec['kind'] => k !== 'learnings',
+);
 
 /** Order in which document kinds appear inside one level of the context. */
 export const KIND_ORDER: Record<DocKind, number> = {
@@ -142,6 +148,8 @@ export interface Proposal {
   scope_spec: ScopeSpec | null;
   /** new_scope only: the scope created on approval. */
   result_scope_id: string | null;
+  /** new_document only: kind and slug of the document to create. document_id is set on approval. */
+  document_spec: DocumentSpec | null;
   revision: number;
   updated_at: string;
   /** Approved without review: an admin lets the agent who made it skip review. */

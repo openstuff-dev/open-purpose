@@ -27,6 +27,8 @@ import {
   editSection,
   getProposalDetail,
   listProposals,
+  documentSections,
+  proposeDocument,
   proposeLearning,
   proposeScope,
 } from './service/proposals.js';
@@ -50,7 +52,7 @@ import {
   setResolved,
   waitingOn,
 } from './service/review.js';
-import type { Level, Scope } from './service/types.js';
+import { PROPOSABLE_DOC_KINDS, type DocumentSpec, type Level, type Scope } from './service/types.js';
 
 /** Said after a write an admin let the agent skip review for. */
 const AUTO_APPROVED =
@@ -76,6 +78,9 @@ Workflow:
    same remote/path/manifests. A person reviews it before it becomes a rule. Keep it to one rule, stated
    positively, with the reason. When a part of the code (a package, a folder, a stack) keeps collecting
    rules of its own and list_scopes has no scope for it, suggest one with create_scope.
+   get_context shows each document's id as [d:xxxxxxxx]; add sections with add_section. When a document is
+   missing (a new project often has no glossary or business logic yet), suggest it with its first sections
+   via propose_document, and tell the user in one line that you proposed it.
    Reviewers may comment on lines, suggest wording or request changes. get_context tells you when feedback
    is waiting on you; read it with get_review, then answer with reply_to_review, revise_proposal or
    apply_suggestion. Mention it to the user if their input is needed.
@@ -152,6 +157,7 @@ const json = (v: unknown): ToolResult => text(JSON.stringify(v, null, 2));
 const WRITE_TOOLS = [
   'update_section',
   'add_section',
+  'propose_document',
   'propose_learning',
   'reply_to_review',
   'revise_proposal',
@@ -255,6 +261,25 @@ export function createMcpServer(
     }
   };
   const ref = (orgId: string | null, slug: string) => `${a.org(orgId)?.slug ?? '?'}/${slug}`;
+
+  /** A scope by slug (or old slug) of the project, its organization or the workspace. */
+  const findScope = async (
+    db: Queryable,
+    slug: string,
+    projectId: string | null,
+    orgId: string | null,
+  ): Promise<Scope> => {
+    const { rows } = await db.query<Scope>(
+      `SELECT id, organization_id, project_id, name FROM scopes s
+        WHERE (slug = $1 OR EXISTS (SELECT 1 FROM slug_aliases x WHERE x.scope_id = s.id AND x.old_slug = $1))
+          AND ((project_id = $2::uuid) OR (project_id IS NULL AND organization_id = $3::uuid) OR (organization_id IS NULL))
+        ORDER BY slug = $1 DESC, project_id NULLS LAST, organization_id NULLS LAST LIMIT 1`,
+      [slug, projectId, orgId],
+    );
+    const s = rows.at(0);
+    if (!s) throw new AppError('not_found', `Scope "${slug}" not found; call list_scopes`);
+    return s;
+  };
 
   server.registerTool(
     'get_context',
@@ -681,9 +706,11 @@ export function createMcpServer(
     {
       title: 'Add section',
       description:
-        "Add a section to a document. Depends on the document's mode, like update_section. For lessons learned from a user's correction, use propose_learning instead.",
+        "Add a section to a document. get_context shows each document's id as [d:xxxxxxxx], empty ones included. Depends on the document's mode, like update_section. For lessons learned from a user's correction, use propose_learning instead. When the document doesn't exist yet, use propose_document.",
       inputSchema: {
-        document_id: z.string(),
+        document_id: z
+          .string()
+          .describe('Document id or its 8-character prefix, as shown in [d:xxxxxxxx]'),
         heading: z.string(),
         body: z.string(),
         reason: z.string(),
@@ -705,6 +732,107 @@ export function createMcpServer(
         return r.status === 'applied'
           ? text(`Added section ${r.section.id.slice(0, 8)}.`)
           : text(`Proposed for review (proposal ${r.proposal.id.slice(0, 8)}).`);
+      }),
+  );
+
+  server.registerTool(
+    'propose_document',
+    {
+      title: 'Propose document',
+      description:
+        'Suggest a new document, with its first sections, when a project, organization or scope lacks one, e.g. a glossary or the business logic of a new project. Check get_context first: it lists the documents that exist, empty ones included, and add_section adds to those. A person approves the document before it exists; if your token can edit there, it is created right away. Afterwards, tell the user in one line that you proposed it. Pass the same project/remote_url you used for get_context.',
+      inputSchema: {
+        title: z.string().describe('The document title, e.g. "Glossary" or "Business logic"'),
+        kind: z
+          .enum(PROPOSABLE_DOC_KINDS as [DocumentSpec['kind'], ...DocumentSpec['kind'][]])
+          .describe(
+            'purpose: what it is for and who uses it. business_logic: domain rules. glossary: one section per term. guidelines: how to build it. reference: anything else to look up.',
+          ),
+        slug: z.string().optional().describe('Lower-case, dashes; derived from title when omitted'),
+        sections: z
+          .array(
+            z.object({
+              heading: z.string().describe('The section heading, e.g. "Order lifecycle"'),
+              body: z.string().describe('Markdown. Use "###" or deeper for headings inside it.'),
+            }),
+          )
+          .optional()
+          .describe(
+            'Its first sections, reviewed together with the document. Write the ones you can fill from the code and README now.',
+          ),
+        reason: z.string().describe('Why this document is needed, in a sentence or two'),
+        project: locate.project,
+        remote_url: locate.remote_url,
+        level: z
+          .enum(['project', 'organization'])
+          .optional()
+          .describe(
+            'project (default): this project. organization: every project in your organization.',
+          ),
+        scope: z
+          .string()
+          .optional()
+          .describe('Put it under this scope slug instead, e.g. "angular-frontend"'),
+      },
+    },
+    (x) =>
+      run('propose_document', async (db, track) => {
+        const r = await resolveProject(db, a, { project: x.project, remote_url: x.remote_url });
+        const project = r.project;
+        track.projectId = project?.id;
+        const orgId = project?.organization_id ?? a.orgId;
+        let level: Level;
+        let label: string;
+        if (x.scope) {
+          const s = await findScope(db, x.scope, project?.id ?? null, orgId);
+          level = { organization_id: s.organization_id, project_id: s.project_id, scope_id: s.id };
+          label = s.name;
+        } else if (x.level === 'organization') {
+          if (!orgId)
+            throw new AppError('bad_request', 'No organization known; pass project or remote_url.');
+          level = { organization_id: orgId, project_id: null, scope_id: null };
+          label = a.org(orgId)?.name ?? orgId;
+        } else {
+          if (!project)
+            throw new AppError(
+              'bad_request',
+              'No project resolved; pass project or remote_url, or use level "organization".',
+            );
+          level = {
+            organization_id: project.organization_id,
+            project_id: project.id,
+            scope_id: null,
+          };
+          label = project.name;
+        }
+        const result = await proposeDocument(db, a, level, {
+          title: x.title,
+          kind: x.kind,
+          slug: x.slug,
+          sections: x.sections,
+          rationale: x.reason,
+          context: { remote: r.remote?.key ?? null },
+        });
+        const count = (n: number) => `${n} section${n === 1 ? '' : 's'}`;
+        if (result.status === 'applied') {
+          track.documentId = result.document.id;
+          const d = result.document;
+          const next = `Add more sections with add_section(document_id="${d.id.slice(0, 8)}").`;
+          return text(
+            result.proposal
+              ? `Document "${d.title}" \`[d:${d.id.slice(0, 8)}]\` approved automatically in **${label}** with ${count(result.sections.length)} (proposal ${result.proposal.id.slice(0, 8)}). ${AUTO_APPROVED} ${next}`
+              : `Created document "${d.title}" \`[d:${d.id.slice(0, 8)}]\` in **${label}** with ${count(result.sections.length)}. Tell the user in one line. ${next}`,
+          );
+        }
+        const p = result.proposal;
+        const sections = count(documentSections(p.body).length);
+        return text(
+          [
+            `Document "${p.heading}" proposed for **${label}** with ${sections} (proposal ${p.id.slice(0, 8)}).`,
+            'Tell the user in one line that you proposed it and that they can approve it in the OpenPurpose Inbox.',
+            "It exists once a person approves it, so add_section can't reach it yet. To change or add sections before then, call revise_proposal with the whole text: a \"## Heading\" line starts each section.",
+          ].join(' '),
+        );
       }),
   );
 
@@ -770,15 +898,7 @@ export function createMcpServer(
             label: project.name,
           };
         } else if (x.scope) {
-          const { rows } = await db.query<Scope>(
-            `SELECT id, organization_id, project_id, name FROM scopes s
-          WHERE (slug = $1 OR EXISTS (SELECT 1 FROM slug_aliases x WHERE x.scope_id = s.id AND x.old_slug = $1))
-            AND ((project_id = $2::uuid) OR (project_id IS NULL AND organization_id = $3::uuid) OR (organization_id IS NULL))
-          ORDER BY slug = $1 DESC, project_id NULLS LAST, organization_id NULLS LAST LIMIT 1`,
-            [x.scope, project?.id ?? null, orgId],
-          );
-          const s = rows.at(0);
-          if (!s) throw new AppError('not_found', `Scope "${x.scope}" not found; call list_scopes`);
+          const s = await findScope(db, x.scope, project?.id ?? null, orgId);
           target = {
             organization_id: s.organization_id,
             project_id: s.project_id,

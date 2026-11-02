@@ -44,7 +44,7 @@ Point them at the project's **What agents see** tab in the web UI, which shows t
 
 ## 5. Fill one gap
 
-Pick the most useful gap from step 4. Usually it is the project purpose: draft two or three sentences from the README and the code (what the project does, who uses it, what good looks like) and show the draft. When the person agrees, save it with `update_section` or `add_section`. Say where it went: a direct edit, or a proposal in the **Inbox** if the section or document is in propose mode.
+Pick the most useful gap from step 4. Usually it is the project purpose: draft two or three sentences from the README and the code (what the project does, who uses it, what good looks like) and show the draft. When the person agrees, save it with `update_section`, or with `add_section` and the document's `[d:…]` id from the context. If the document doesn't exist yet (a glossary or the business logic, say), propose it with `propose_document`, its first sections included. Say where it went: a direct edit, or a proposal in the **Inbox** if the section or document is in propose mode.
 
 If nothing is missing, skip this step and say so.
 

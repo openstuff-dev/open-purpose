@@ -1046,8 +1046,8 @@ async function apply(run: Run): Promise<void> {
     const { rows } = await c.query<{ id: string }>(
       `INSERT INTO proposals (kind, status, organization_id, project_id, scope_id, document_id, section_id, result_section_id,
                               base_version, heading, body, rationale, context, revision, created_by, created_at, updated_at,
-                              reviewed_by, reviewed_at, review_note, result_scope_id, scope_spec, auto_approved)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+                              reviewed_by, reviewed_at, review_note, result_scope_id, scope_spec, auto_approved, document_spec)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
        RETURNING id`,
       [
         p.kind,
@@ -1073,6 +1073,7 @@ async function apply(run: Run): Promise<void> {
         id(ids.scopes, p.result_scope ?? null),
         p.scope_spec ? JSON.stringify(scopeSpecIn(p.scope_spec)) : null,
         p.auto_approved ?? false,
+        p.document_spec ? JSON.stringify(p.document_spec) : null,
       ],
     );
     const proposalId = rows[0].id;

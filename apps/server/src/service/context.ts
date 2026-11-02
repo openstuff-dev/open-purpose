@@ -40,6 +40,8 @@ export interface ContextBlock {
   label: string;
   scope: (Pick<Scope, 'id' | 'slug' | 'name'> & { reason: string }) | null;
   documents: (Pick<Document, 'id' | 'kind' | 'title' | 'mode'> & { sections: ContextSection[] })[];
+  /** Documents at this level without sections yet, so an agent can add the first one. */
+  empty_documents: Pick<Document, 'id' | 'kind' | 'title' | 'mode'>[];
 }
 
 /**
@@ -298,6 +300,7 @@ export async function buildContext(
   for (const s of sections)
     sectionsByDoc.set(s.document_id, [...(sectionsByDoc.get(s.document_id) ?? []), s]);
 
+  const brief = (d: Document) => ({ id: d.id, kind: d.kind, title: d.title, mode: d.mode });
   const blocks: ContextBlock[] = levels.map((l, i) => ({
     level: l.kind,
     label: l.label,
@@ -320,6 +323,10 @@ export async function buildContext(
         sections: sectionsByDoc.get(d.id) ?? [],
       }))
       .filter((d) => d.sections.length > 0),
+    empty_documents: docsPerLevel[i]
+      .filter((d) => keepDoc(d) && !sectionsByDoc.has(d.id))
+      .sort(byKind)
+      .map(brief),
   }));
 
   const result: Omit<ContextResult, 'markdown'> = {
@@ -547,6 +554,9 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
   out.push(
     'Each section has a marker `[s:<id> · <mode>]`. **locked**: read-only for you. **propose**: your edits become proposals a person approves. **open**: you may edit directly.',
   );
+  out.push(
+    'Each document has a marker `[d:<id> · <mode>]`: pass the id to `add_section` to add a section to it. When a document is missing (a glossary, the business logic, ...), propose one with `propose_document`.',
+  );
   if (ctx.budget.shortened && ctx.budget.max_tokens !== null)
     out.push('', shortenedNotice(ctx.budget.shortened, ctx.budget.max_tokens));
 
@@ -556,7 +566,7 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
     any = true;
     out.push('', '---', '', `## ${block.label}`);
     for (const doc of block.documents) {
-      out.push('', `### ${doc.title}`);
+      out.push('', `### ${doc.title}  \`[d:${shortId(doc.id)} · ${doc.mode}]\``);
       for (const s of doc.sections) {
         out.push(
           '',
@@ -568,6 +578,18 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
     }
   }
   if (!any) out.push('', '_No guidelines have been written for this context yet._');
+
+  const empty = ctx.blocks.filter((b) => b.empty_documents.length);
+  if (empty.length) {
+    out.push('', '---', '', '## Empty documents');
+    out.push(
+      'These documents have no sections yet. Add the first one with `add_section` and the document id.',
+    );
+    for (const b of empty)
+      out.push(
+        `- **${b.label}**: ${b.empty_documents.map((d) => `${d.title} \`[d:${shortId(d.id)} · ${d.mode}]\``).join(', ')}`,
+      );
+  }
 
   if (ctx.related.length) {
     out.push('', '---', '', '## Related projects and terms');
