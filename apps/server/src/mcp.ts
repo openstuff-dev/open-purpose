@@ -88,7 +88,8 @@ Workflow:
 7. When you notice a real problem outside your task (a bug, a security risk, broken behaviour), don't fix it
    and don't let it get lost: call report_finding with the file, a one-line title, what's wrong and how you
    would fix it. Style preferences aren't findings. get_context lists known findings around your path: don't
-   report those again, and ask the user before fixing one. When you fix one, call resolve_finding. If you got a
+   report those again, and ask the user before fixing one. When you fix one, call resolve_finding. When one turns
+   out not to be a real problem and the user agrees, call dismiss_finding with the reason. If you got a
    detail of your own finding wrong (commit, file, lines, wording), correct it with update_finding.
 8. Skills are guides the server offers. When the user is new to OpenPurpose or asks you to set it up, call
    get_skill with "init-openpurpose": a guided first run in their repository. When they want to describe
@@ -161,6 +162,7 @@ const WRITE_TOOLS = [
   'report_finding',
   'update_finding',
   'resolve_finding',
+  'dismiss_finding',
 ];
 
 /** Tools that only read. Agent mode in the UI may call these, and nothing else. */
@@ -1100,6 +1102,30 @@ export function createMcpServer(
         });
         track.projectId = f.project_id;
         return text(`Finding \`${f.id.slice(0, 8)}\` "${f.title}" is solved.`);
+      }),
+  );
+
+  server.registerTool(
+    'dismiss_finding',
+    {
+      title: 'Dismiss finding',
+      description:
+        "Dismiss an open finding that isn't a real problem: it can't happen, it was already fixed elsewhere, or it's wrong about the code. " +
+        'Check the code first and ask the user before you dismiss one. The reason is shown to people, who can reopen it.',
+      inputSchema: {
+        id: z.string().describe("The finding's id, or its first 8 characters as listed"),
+        reason: z
+          .string()
+          .describe(
+            'Why it is not a real problem, in a sentence or two, e.g. "PKCE already rejects a code started in another browser."',
+          ),
+      },
+    },
+    (x) =>
+      run('dismiss_finding', async (db, track) => {
+        const f = await setFindingStatus(db, a, x.id, { status: 'dismissed', note: x.reason });
+        track.projectId = f.project_id;
+        return text(`Finding \`${f.id.slice(0, 8)}\` "${f.title}" is dismissed. A person can reopen it.`);
       }),
   );
 

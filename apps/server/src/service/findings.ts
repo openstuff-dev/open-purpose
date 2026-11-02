@@ -273,7 +273,8 @@ export interface FindingStatusChange {
 
 /**
  * People with edit rights move a finding to any status, including back from
- * solved or dismissed. Agents only mark one solved, and must say how.
+ * solved or dismissed. Agents only mark one solved (with the commit or PR) or dismissed (with
+ * the reason), and must say why.
  */
 export async function setFindingStatus(
   db: Queryable,
@@ -294,18 +295,23 @@ export async function setFindingStatus(
     if (!current) throw notFound('Finding');
     a.requireRead(current.organization_id, 'this finding');
     if (a.isAgent) {
-      if (change.status !== 'solved')
+      if (change.status !== 'solved' && change.status !== 'dismissed')
         throw forbidden(
-          'Agents can only mark a finding solved. A person decides what else happens to it.',
+          'Agents can only mark a finding solved or dismissed. A person decides what else happens to it.',
         );
       a.requireContribute(current.organization_id);
-      if (!change.solved_ref?.trim())
+      if (change.status === 'solved' && !change.solved_ref?.trim())
         throw badRequest('solved_ref (the commit or PR that fixed it) is required');
+      if (change.status === 'dismissed' && !change.note?.trim())
+        throw badRequest('reason (why the finding is not a real problem) is required');
     } else {
       a.requireEdit(current.organization_id);
     }
     if (current.status === change.status && change.status === 'solved')
       throw new AppError('conflict', 'This finding is already solved');
+    // An agent dismisses only an open finding: a solved or dismissed one is a person's to reopen.
+    if (a.isAgent && change.status === 'dismissed' && (current.status === 'solved' || current.status === 'dismissed'))
+      throw new AppError('conflict', `This finding is already ${current.status}`);
     const remindAfter = change.status === 'ask_later' ? change.remind_after || null : null;
     if (remindAfter && !/^\d{4}-\d{2}-\d{2}$/.test(remindAfter))
       throw badRequest('remind_after must be a date, YYYY-MM-DD');

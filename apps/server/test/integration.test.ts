@@ -2143,6 +2143,36 @@ definitions:`,
       dismissed: 0,
       solved: 1,
     });
+
+    // An agent dismisses an open finding, but only with a reason, and never a solved one.
+    expect((await jonas.call('dismiss_finding', { id: backendId, reason: ' ' })).text).toContain(
+      'reason',
+    );
+    expect(
+      (await jonas.call('dismiss_finding', { id: firstId, reason: 'Not a bug' })).text,
+    ).toContain('already solved');
+    expect(
+      (
+        await jonas.call('dismiss_finding', {
+          id: backendId,
+          reason: 'Exports are paged since v2, so a large month never runs in one request.',
+        })
+      ).text,
+    ).toContain('is dismissed');
+    expect(
+      (await jonas.call('dismiss_finding', { id: backendId, reason: 'Again' })).text,
+    ).toContain('already dismissed');
+    const dismissed = (await api('GET', `/findings?project_id=${projectId}&status=dismissed`))
+      .data;
+    expect(dismissed[0]).toMatchObject({
+      status_note: 'Exports are paged since v2, so a large month never runs in one request.',
+      status_by_name: 'Agent Jonas',
+      solved_ref: null,
+    });
+    // A person can reopen it.
+    expect(
+      (await api('PUT', `/findings/${dismissed[0].id}/status`, { status: 'new' })).status,
+    ).toBe(200);
     // A file at the root without an extension, like a Dockerfile, shows its own findings too.
     const docker = await report({ file: 'Dockerfile', title: 'Image runs as root' });
     const dockerId = /Finding `([0-9a-f]{8})`/.exec(docker.text)![1];
