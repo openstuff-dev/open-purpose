@@ -4,6 +4,7 @@ name: Release
 # - a tag v1.2.3 pushes :1.2.3, :1.2 and :latest (a pre-release like v1.3.0-rc.1 pushes only its own tag)
 # - every push to master pushes :edge
 # Nothing is pushed unless CI passes (on a tag, for every project) and the image starts.
+# A release tag is then handed to the hosted instance's deploy repo (the deploy job).
 on:
   push:
     branches:
@@ -102,3 +103,41 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
+
+  # Hands a release (not a pre-release, not :edge) to a hosted instance: sets the new version in
+  # its private deploy repo, which deploys it from there. The repo and its token are secrets in
+  # the op-deploy environment, which only v* tags may use, so this job prints only the version.
+  deploy:
+    needs: image
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: op-deploy
+    permissions: {}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: ${{ secrets.DEPLOY_REPO }}
+          token: ${{ secrets.DEPLOY_REPO_TOKEN }}
+          path: deploy
+
+      - name: Set the version and push it
+        working-directory: deploy
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          values=open-purpose/values.yaml chart=open-purpose/Chart.yaml
+          grep -q '^tag: ' "$values" && grep -q '^appVersion: ' "$chart" \
+            || { echo "::error::The deploy repo has no top-level tag/appVersion to set."; exit 1; }
+          sed -i -E "s/^tag: .*/tag: ${version}/" "$values"
+          sed -i -E "s/^appVersion: .*/appVersion: \"${version}\"/" "$chart"
+          if git diff --quiet; then echo "Already at $version"; exit 0; fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -q -am "Deploy OpenPurpose $version"
+          # Other pipelines push to the same branch; rebase onto theirs if one got in first.
+          for attempt in 1 2 3; do
+            git push -q origin HEAD:main && { echo "Handed over $version"; exit 0; }
+            git pull -q --rebase origin main
+          done
+          exit 1
