@@ -1516,13 +1516,25 @@ export class InboxPage {
     return loading;
   }
 
+  /** Only the newest load (and its later updates) may change what's shown. */
+  private asked = 0;
+
   private async load(): Promise<void> {
+    const ask = ++this.asked;
+    // A newer list behind the scenes keeps the reviewer's drafts: they belong to proposals by id.
+    const showList = (list: Proposal[]) => {
+      if (ask === this.asked) this.all.set(list);
+    };
+    const showCounts = (counts: ProposalCounts) => {
+      if (ask === this.asked) this.counts.set(counts);
+    };
     try {
       const level = this.level() === 'all' ? undefined : this.level();
       const [list, counts] = await Promise.all([
-        this.api.proposals(this.status(), level),
-        this.api.proposalCounts(level),
+        this.api.proposals(this.status(), level, showList),
+        this.api.proposalCounts(level, showCounts),
       ]);
+      if (ask !== this.asked) return;
       this.drafts.set({});
       this.targetsLoading.clear();
       this.all.set(list);

@@ -1,6 +1,6 @@
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject, untracked } from '@angular/core';
-import { GetCache, type OnFresh } from './get-cache';
+import { GetCache, type OnFresh, type StoreOptions } from './get-cache';
 import { Session } from './session';
 
 export type { OnFresh } from './get-cache';
@@ -73,12 +73,13 @@ type Params = Record<string, string | number | undefined | null>;
 /**
  * Thin typed wrapper over the REST API. Every method returns a Promise.
  *
- * GETs for the same path and parameters at the same time share one request. The pages people go
- * back and forth between (projects, a project, its documents and scopes, the graph) are also kept
- * in memory: a second visit gets the stored answer at once while it is fetched again behind the
- * scenes, and `onFresh` gets the new one if it changed. Any change sent to the server clears the
- * store, and so does signing in or out, switching workspace or organization and agent mode,
- * because those are part of every key.
+ * GETs for the same path and parameters at the same time share one request, and answers are kept
+ * in memory (see GetCache): for a minute a second visit sends no request at all. After that, a
+ * caller that passes `onFresh` gets the stored answer at once while it is fetched again behind the
+ * scenes, and `onFresh` gets the new one if it changed; a caller without it waits for the server.
+ * `'live'` GETs (typed searches, the pending poll) are never stored. Any change sent to the
+ * server clears the store, and so does signing in or out, switching workspace or organization
+ * and agent mode, because those are part of every key.
  */
 @Injectable({ providedIn: 'root' })
 export class Api {
@@ -93,7 +94,12 @@ export class Api {
     this.cache.forget();
   }
 
-  private get<T>(path: string, params?: Params, store?: { onFresh?: OnFresh<T> }): Promise<T> {
+  /** Loads every stored answer again on its next use (e.g. back on the tab after a while). */
+  expire(): void {
+    this.cache.expire();
+  }
+
+  private get<T>(path: string, params?: Params, store: StoreOptions<T> | 'live' = {}): Promise<T> {
     let p = new HttpParams();
     for (const [k, v] of Object.entries(params ?? {}))
       if (v !== undefined && v !== null && v !== '') p = p.set(k, String(v));
@@ -110,7 +116,7 @@ export class Api {
     return this.cache.get(
       key,
       () => firstValueFrom(this.http.get<T>(`/api${path}`, { params: p })),
-      store,
+      store === 'live' ? undefined : store,
     );
   }
 
@@ -131,7 +137,7 @@ export class Api {
   }
 
   // signing in: config, start and exchange need no token
-  authConfig = () => this.get<AuthConfig>('/auth/config');
+  authConfig = () => this.get<AuthConfig>('/auth/config', {}, { maxAge: Infinity });
   startSignIn = (method: AuthMethod, email?: string) =>
     this.send<AuthStartResult>('POST', '/auth/start', { method, email });
 
@@ -140,10 +146,12 @@ export class Api {
   /** Ends a browser session; an access token stays valid. */
   signOut = () => this.send<undefined>('POST', '/auth/sign-out');
   /** Works without a workspace: tells a pending person they're waiting. */
-  authStatus = () => this.get<AuthStatus>('/auth/status');
+  authStatus = () => this.get<AuthStatus>('/auth/status', {}, 'live');
 
   // sign-ups waiting for a server admin
-  signups = () => this.get<PendingSignup[]>('/signups', { status: 'pending' });
+  signups = (onFresh?: OnFresh<PendingSignup[]>) =>
+    this.get<PendingSignup[]>('/signups', { status: 'pending' }, { onFresh });
+
   /** Gives the person a workspace of their own, with them as its admin. */
   approveSignup = (id: string, workspace: string) =>
     this.send<{ group: GroupRef; organization: Organization }>('POST', `/signups/${id}/approve`, {
@@ -153,19 +161,21 @@ export class Api {
   rejectSignup = (id: string) => this.send<undefined>('POST', `/signups/${id}/reject`);
 
   me = () => this.get<Me>('/me');
-  counts = () => this.get<Counts>('/me/counts');
+  counts = (onFresh?: OnFresh<Counts>) => this.get<Counts>('/me/counts', {}, { onFresh });
   /** Agent mode: run one read-only MCP tool as the agent and get its text exactly. */
   agentTool = (name: string, args: Record<string, unknown>) =>
     this.send<{ text: string; is_error: boolean }>('POST', '/agent/tool', { name, args }, 'keep');
 
   renameMe = (name: string) => this.send('PATCH', '/me', { name });
-  myTokens = () => this.get<TokenRow[]>('/me/tokens');
+  myTokens = (onFresh?: OnFresh<TokenRow[]>) =>
+    this.get<TokenRow[]>('/me/tokens', {}, { onFresh });
+
   createMyToken = (label: string) => this.send<{ token: string }>('POST', '/me/tokens', { label });
   revokeMyToken = (id: string) => this.send<undefined>('DELETE', `/me/tokens/${id}`);
   updateGroup = (body: { name?: string; context_max_tokens?: number | null }) =>
     this.send('PUT', '/group', body);
 
-  groups = () => this.get<GroupRow[]>('/groups');
+  groups = (onFresh?: OnFresh<GroupRow[]>) => this.get<GroupRow[]>('/groups', {}, { onFresh });
   createGroup = (body: { name: string; organization_name?: string; admin_name?: string }) =>
     this.send<{ group: GroupRef; organization: Organization; token?: string }>(
       'POST',
@@ -205,9 +215,11 @@ export class Api {
   runGroupImport = (upload: ImportUpload, opts: { name?: string; slug?: string }) =>
     this.send<ImportReport>('POST', '/groups/import', { ...upload, ...opts });
 
-  organizations = () => this.get<Organization[]>('/organizations');
-  orgActivity = (id: string, period: ActivityPeriod) =>
-    this.get<OrgActivity>(`/organizations/${id}/activity`, { period });
+  organizations = (onFresh?: OnFresh<Organization[]>) =>
+    this.get<Organization[]>('/organizations', {}, { onFresh });
+
+  orgActivity = (id: string, period: ActivityPeriod, onFresh?: OnFresh<OrgActivity>) =>
+    this.get<OrgActivity>(`/organizations/${id}/activity`, { period }, { onFresh });
 
   createOrganization = (body: {
     name: string;
@@ -385,15 +397,19 @@ export class Api {
 
   findings = (
     q: { status?: FindingStatus[] | 'all'; organization_id?: string; project_id?: string } = {},
+    onFresh?: OnFresh<Finding[]>,
   ) =>
-    this.get<Finding[]>('/findings', {
-      ...q,
-      status: Array.isArray(q.status) ? q.status.join(',') : q.status,
-    });
+    this.get<Finding[]>(
+      '/findings',
+      { ...q, status: Array.isArray(q.status) ? q.status.join(',') : q.status },
+      { onFresh },
+    );
 
   finding = (id: string) => this.get<Finding>(`/findings/${id}`);
-  findingCounts = (q: { organization_id?: string; project_id?: string } = {}) =>
-    this.get<FindingCounts>('/findings/counts', q);
+  findingCounts = (
+    q: { organization_id?: string; project_id?: string } = {},
+    onFresh?: OnFresh<FindingCounts>,
+  ) => this.get<FindingCounts>('/findings/counts', q, { onFresh });
 
   setFindingStatus = (
     id: string,
@@ -405,8 +421,11 @@ export class Api {
     },
   ) => this.send<Finding>('PUT', `/findings/${id}/status`, body);
 
-  proposals = (status: ProposalStatus | 'all' = 'pending', level?: string) =>
-    this.get<Proposal[]>('/proposals', { status, level });
+  proposals = (
+    status: ProposalStatus | 'all' = 'pending',
+    level?: string,
+    onFresh?: OnFresh<Proposal[]>,
+  ) => this.get<Proposal[]>('/proposals', { status, level }, { onFresh });
 
   proposal = (id: string) => this.get<Proposal>(`/proposals/${id}`);
   review = (id: string) => this.get<Review>(`/proposals/${id}/review`);
@@ -435,7 +454,9 @@ export class Api {
   requestChanges = (id: string, note: string) =>
     this.send<Proposal>('POST', `/proposals/${id}/request-changes`, { note });
 
-  proposalCounts = (level?: string) => this.get<ProposalCounts>('/proposals/counts', { level });
+  proposalCounts = (level?: string, onFresh?: OnFresh<ProposalCounts>) =>
+    this.get<ProposalCounts>('/proposals/counts', { level }, { onFresh });
+
   approve = (
     id: string,
     body: { heading?: string; body?: string; note?: string; mode?: EditMode; target?: Level },
@@ -463,7 +484,7 @@ export class Api {
       near_organization_id?: string;
       within?: 'project' | 'organization';
     } = {},
-  ) => this.get<SearchHit[]>('/search', { q, ...near });
+  ) => this.get<SearchHit[]>('/search', { q, ...near }, 'live');
 
   graph = (
     opts: { focus?: string; depth?: number; missing?: boolean } = {},
@@ -486,11 +507,11 @@ export class Api {
       target,
       from_project: from.project ?? undefined,
       from_organization: from.organization ?? undefined,
-    });
+    }, 'live');
 
-  linkTargets = (q: string) => this.get<LinkTarget[]>('/link-targets', { q });
+  linkTargets = (q: string) => this.get<LinkTarget[]>('/link-targets', { q }, 'live');
 
-  members = () => this.get<Member[]>('/members');
+  members = (onFresh?: OnFresh<Member[]>) => this.get<Member[]>('/members', {}, { onFresh });
   createMember = (body: {
     name: string;
     kind: 'human' | 'agent';

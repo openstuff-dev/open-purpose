@@ -812,7 +812,11 @@ export class SettingsPage {
 
   private async loadTokens(): Promise<void> {
     try {
-      this.tokens.set(await this.api.myTokens());
+      this.tokens.set(
+        await this.api.myTokens((fresh) => {
+          this.tokens.set(fresh);
+        }),
+      );
     } catch (e) {
       this.notices.error(e);
     }

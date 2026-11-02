@@ -24,6 +24,7 @@ import {
 } from '@openstuff-dev/ui-angular';
 import { positionAnchors } from '@openstuff-dev/ui';
 import { Api } from './core/api';
+import { MAX_AGE_MS } from './core/get-cache';
 import { Badges } from './core/badges';
 import { isPublicUrl } from './app.routes';
 import { type AuthStatus, ROLE_LABEL } from './core/models';
@@ -398,9 +399,16 @@ export class App {
       this.publicPage.set(isPublicUrl(e.urlAfterRedirects));
       this.refreshStaleBadges();
     });
-    // Back on the tab after a while: pick up what others changed meanwhile.
+    // Back on the tab after a while: pick up what others changed meanwhile. What was loaded before
+    // still shows at once and is loaded again behind the scenes.
+    let hiddenAt = 0;
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') this.refreshStaleBadges();
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now();
+        return;
+      }
+      if (hiddenAt && Date.now() - hiddenAt > MAX_AGE_MS) this.api.expire();
+      this.refreshStaleBadges();
     });
   }
 

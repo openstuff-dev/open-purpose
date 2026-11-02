@@ -404,6 +404,10 @@ export class OrganizationPage {
     }
   };
 
+  /** Only the newest load (and its later update) may change what's shown. */
+  private activityAsked = 0;
+  private recentAsked = 0;
+
   constructor() {
     effect(() => {
       const id = this.session.orgId();
@@ -413,21 +417,29 @@ export class OrganizationPage {
       } catch {
         /* storage unavailable */
       }
-      if (id)
-        void this.api
-          .orgActivity(id, period)
-          .then((a) => { this.activity.set(a); })
-          .catch(() => { this.activity.set(null); })
-          .finally(() => { this.activityLoaded.set(true); });
+      if (!id) return;
+      const ask = ++this.activityAsked;
+      const show = (a: OrgActivity) => {
+        if (ask === this.activityAsked) this.activity.set(a);
+      };
+      void this.api
+        .orgActivity(id, period, show)
+        .then(show)
+        .catch(() => { this.activity.set(null); })
+        .finally(() => { this.activityLoaded.set(true); });
     });
     effect(() => {
       const id = this.session.orgId();
-      if (id)
-        void this.api
-          .projects({ organizationId: id })
-          .then((p) => { this.recent.set(p.slice(0, 6)); })
-          .catch(() => undefined)
-          .finally(() => { this.recentLoaded.set(true); });
+      if (!id) return;
+      const ask = ++this.recentAsked;
+      const show = (p: Project[]) => {
+        if (ask === this.recentAsked) this.recent.set(p.slice(0, 6));
+      };
+      void this.api
+        .projects({ organizationId: id }, show)
+        .then(show)
+        .catch(() => undefined)
+        .finally(() => { this.recentLoaded.set(true); });
     });
   }
 }
