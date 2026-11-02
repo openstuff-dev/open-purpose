@@ -123,6 +123,10 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
     bodyLimit: 5 * 1024 * 1024,
     trustProxy: config.trustProxy,
   });
+  if (config.trustProxy === true)
+    app.log.warn(
+      'OPENPURPOSE_TRUST_PROXY=true trusts X-Forwarded-For from anyone, so a client that reaches the server directly can fake its address and get around the sign-in limit. Set it to your proxy addresses instead, e.g. 10.0.0.0/8,127.0.0.1.',
+    );
   // Fails at startup on an unknown OPENPURPOSE_AUTH_PROVIDER.
   const provider = createProvider(config.auth);
   // Only the PKCE verifier between /api/auth/start and /api/auth/callback is a cookie.

@@ -27,8 +27,8 @@ export interface Config {
   auth: AuthConfig;
   /**
    * Behind a reverse proxy, trust its X-Forwarded-For so rate limits see the real client.
-   * OPENPURPOSE_TRUST_PROXY: true, or the proxy addresses (e.g. 10.0.0.0/8,127.0.0.1). Off by
-   * default.
+   * OPENPURPOSE_TRUST_PROXY: the proxy addresses (e.g. 10.0.0.0/8,127.0.0.1), or true to trust
+   * anyone (warned about at startup). Off by default.
    */
   trustProxy: boolean | string;
 }
