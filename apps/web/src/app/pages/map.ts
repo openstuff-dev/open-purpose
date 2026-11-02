@@ -262,7 +262,20 @@ export class MapPage implements AfterViewInit, OnDestroy {
   private sim: Simulation<SimNode, SimLink> | null = null;
   private fitted = false;
   private zoomer: ZoomBehavior<SVGSVGElement, unknown> | null = null;
-  private resize = () => { this.draw(); };
+  /** The size the map was last laid out for, as `width×height`. */
+  private drawnAt = '';
+  private resizing: ReturnType<typeof setTimeout> | undefined;
+  /**
+   * While the window is being resized the SVG scales what's drawn through its viewBox, which costs
+   * nothing. The map is laid out again once, when resizing stops, and only if its size changed.
+   */
+  private resize = () => {
+    clearTimeout(this.resizing);
+    this.resizing = setTimeout(() => {
+      const el = this.svgRef().nativeElement;
+      if (`${el.clientWidth}×${el.clientHeight}` !== this.drawnAt) this.draw();
+    }, 150);
+  };
 
   ngAfterViewInit(): void {
     const q = this.route.snapshot.queryParamMap;
@@ -281,6 +294,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this.sim?.stop();
     window.removeEventListener('resize', this.resize);
+    clearTimeout(this.resizing);
   }
 
   setFocus(projectId: string): void {
@@ -353,6 +367,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
 
   draw(): void {
     const svgEl = this.svgRef().nativeElement;
+    this.drawnAt = `${svgEl.clientWidth}×${svgEl.clientHeight}`;
     const width = svgEl.clientWidth || 800;
     const height = svgEl.clientHeight || 600;
     this.sim?.stop();
