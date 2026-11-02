@@ -7,7 +7,7 @@ import { claimSlug } from './aliases.js';
 import { insertDocument, insertSection } from './content.js';
 import type { Project, Repository, Website } from './types.js';
 
-const PROJECT_COLS =
+export const PROJECT_COLS =
   'p.id, p.organization_id, p.slug, p.name, p.summary, p.reviewed, p.websites, p.created_at, p.updated_at, p.archived_at';
 
 export interface ProjectListItem extends Project {

@@ -21,7 +21,7 @@ import { RateLimiter } from './auth/rate-limit.js';
 import type { Config } from './config.js';
 import { endScope, type Pool } from './db.js';
 import { cacheControl } from './domain/cache.js';
-import { AppError, badRequest, notFound } from './errors.js';
+import { AppError, badRequest } from './errors.js';
 import { callReadTool, createMcpServer } from './mcp.js';
 import * as activity from './service/activity.js';
 import * as admin from './service/admin.js';
@@ -37,6 +37,7 @@ import {
   trimRefs,
 } from './service/graph.js';
 import * as projects from './service/projects.js';
+import * as pages from './service/pages.js';
 import * as proposals from './service/proposals.js';
 import * as findings from './service/findings.js';
 import * as review from './service/review.js';
@@ -629,30 +630,8 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
         return reply.status(201).send(await projects.createProject(req.db, req.access, body));
       });
       api.get('/projects/:id', async (req) => {
-        const a = req.access;
-        const p = await projects.getProject(
-          req.db,
-          a,
-          decodeURIComponent((req.params as { id: string }).id),
-        );
-        const level = { organization_id: p.organization_id, project_id: p.id };
-        const repositories = await projects.listRepositories(req.db, p.id);
-        const scopes = await content.listScopes(req.db, a, level);
-        const documents = await content.listDocuments(req.db, a, { ...level, scope_id: null });
-        const org = a.org(p.organization_id);
-        if (!org) throw notFound('Organization');
-        const apiSpecs = await apis.listApis(req.db, a, p.id);
-        const aliases = await listAliases(req.db, 'project', p.id);
-        return {
-          ...p,
-          organization: { id: org.id, slug: org.slug, name: org.name },
-          can_edit: a.canEdit(p.organization_id),
-          repositories,
-          scopes,
-          documents,
-          apis: apiSpecs,
-          aliases,
-        };
+        const ref = decodeURIComponent((req.params as { id: string }).id);
+        return pages.projectPage(req.db, req.access, ref);
       });
       api.patch('/projects/:id', async (req) => {
         const { slug, take_alias, ...body } = parse(
@@ -907,36 +886,9 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
         );
         return reply.status(201).send(await content.createDocument(req.db, req.access, body, body));
       });
-      api.get('/documents/:id', async (req) => {
-        const a = req.access;
-        const doc = await content.getDocument(req.db, a, (req.params as { id: string }).id);
-        const rows = await content.listSections(req.db, [doc.id]);
-        const reads = await activity.sectionActivity(
-          req.db,
-          rows.map((s) => s.id),
-        );
-        const sections = rows.map((s) => ({
-          ...s,
-          activity: reads.get(s.id) ?? activity.NO_SECTION_ACTIVITY,
-        }));
-        const docActivity =
-          (await activity.documentActivity(req.db, [doc])).get(doc.id) ??
-          activity.noDocumentActivity(doc);
-        const project = doc.project_id
-          ? await projects.getProject(req.db, a, doc.project_id)
-          : null;
-        const scope = doc.scope_id ? await content.getScope(req.db, a, doc.scope_id) : null;
-        const org = a.org(doc.organization_id);
-        return {
-          ...doc,
-          ...docActivity,
-          sections,
-          project,
-          scope,
-          organization: org && { id: org.id, slug: org.slug, name: org.name },
-          can_edit: a.canEdit(doc.organization_id),
-        };
-      });
+      api.get('/documents/:id', async (req) =>
+        pages.documentPage(req.db, req.access, (req.params as { id: string }).id),
+      );
       api.patch('/documents/:id', async (req) => {
         const body = parse(
           z.object({

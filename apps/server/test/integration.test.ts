@@ -50,6 +50,26 @@ async function api<T = any>(
   return { status: res.status, data: text ? JSON.parse(text) : undefined };
 }
 
+/** The queries a request sends to the database, one per round trip, including the commit. */
+async function queriesSent(run: () => Promise<void>): Promise<string[]> {
+  // Every trip to the database costs 25-40 ms in production, so count them.
+  const sent: string[] = [];
+  const proto = pg.Client.prototype as unknown as { query: (...args: unknown[]) => unknown };
+  const query = proto.query;
+  proto.query = function (this: pg.Client, ...args: unknown[]) {
+    const q = args[0];
+    sent.push(typeof q === 'string' ? q : String((q as { text?: string }).text));
+    return query.apply(this, args);
+  };
+  try {
+    await run();
+    await new Promise((r) => setTimeout(r, 50)); // reads commit after the response
+  } finally {
+    proto.query = query;
+  }
+  return sent;
+}
+
 async function mcp(token: string) {
   const client = new Client({ name: 'test-agent', version: '1.0.0' });
   await client.connect(
@@ -146,23 +166,10 @@ describe('OpenPurpose with groups and organizations', () => {
   });
 
   it('answers a request in one database round trip plus its own queries', async () => {
-    // Every trip to the database costs 25-40 ms in production, so count them.
-    const sent: string[] = [];
-    const proto = pg.Client.prototype as unknown as { query: (...args: unknown[]) => unknown };
-    const query = proto.query;
-    proto.query = function (this: pg.Client, ...args: unknown[]) {
-      const q = args[0];
-      sent.push(typeof q === 'string' ? q : String((q as { text?: string }).text));
-      return query.apply(this, args);
-    };
-    try {
-      await api('GET', '/me/counts'); // warm up: last_used_at is written once a minute at most
-      sent.length = 0;
+    await api('GET', '/me/counts'); // warm up: last_used_at is written once a minute at most
+    const sent = await queriesSent(async () => {
       expect((await api('GET', '/me/counts')).status).toBe(200);
-      await new Promise((r) => setTimeout(r, 50)); // reads commit after the response
-    } finally {
-      proto.query = query;
-    }
+    });
     // Token, groups and access in one trip; the two counts; the commit. Reads are READ ONLY, so
     // committing after the response can't lose a write.
     expect(sent).toHaveLength(4);
@@ -1029,6 +1036,28 @@ definitions:`,
     ).toContain('getInvoicePdf');
     await jonas2.client.close();
     expect((await api('DELETE', `/apis/${fromUrl.data.id}`)).status).toBe(204);
+  });
+
+  it('loads the project and document pages in two round trips after access', async () => {
+    const list = (await api('GET', '/projects')).data as { id: string; slug: string }[];
+    const portal = list.find((p) => p.slug === 'customer-portal')!;
+    const page = (await api('GET', `/projects/${portal.id}`)).data;
+    expect(page.scopes.length).toBeGreaterThan(0);
+    expect(page.documents.length).toBeGreaterThan(0);
+    const doc = page.documents.find((d: any) => d.kind === 'guidelines');
+    for (const path of [
+      `/projects/${portal.id}`,
+      '/projects/customer-portal',
+      `/documents/${doc.id}`,
+      `/documents?project_id=${portal.id}`,
+    ]) {
+      await api('GET', path); // warm up: last_used_at is written once a minute at most
+      const sent = await queriesSent(async () => {
+        expect((await api('GET', path)).status).toBe(200);
+      });
+      // Access; the project or document (or the level); everything else; the commit.
+      expect([path, sent.length]).toEqual([path, 4]);
+    }
   });
 
   it('resolves the same slug per organization', async () => {

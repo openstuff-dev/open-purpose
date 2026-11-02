@@ -6,7 +6,13 @@ import { normalizePath } from '../domain/scopes.js';
 import { normalizeTags } from '../domain/stacks.js';
 import { slugify } from '../domain/remote.js';
 import { extractLinks } from '../domain/links.js';
-import { documentActivity, type DocumentActivity, noDocumentActivity } from './activity.js';
+import {
+  type DocumentActivity,
+  type DocumentReadRow,
+  lastReadSql,
+  TRACKING_SINCE_SQL,
+  withActivity,
+} from './activity.js';
 import { claimSlug } from './aliases.js';
 import type {
   DocKind,
@@ -99,7 +105,7 @@ export interface ScopeInput {
   take_alias?: boolean;
 }
 
-const SCOPE_COLS = `id, organization_id, project_id, slug, name, description, path_globs, stacks, position,
+export const SCOPE_COLS = `id, organization_id, project_id, slug, name, description, path_globs, stacks, position,
   ARRAY(SELECT sr.repository_id FROM scope_repositories sr WHERE sr.scope_id = scopes.id ORDER BY sr.created_at) AS repository_ids`;
 
 export function cleanGlobs(globs: string[] | undefined): string[] {
@@ -235,7 +241,7 @@ export async function deleteScope(db: Db, a: Access, id: string): Promise<void> 
 
 // ───────────────────────────── documents ─────────────────────────────
 
-const DOC_COLS =
+export const DOC_COLS =
   'id, organization_id, project_id, scope_id, kind, slug, title, mode, position, created_at, updated_at, disabled_at';
 
 /**
@@ -257,6 +263,23 @@ export async function documentsAt(
   return rows;
 }
 
+/**
+ * Documents at exactly one level with when agents last read them, in one query. `level` is the
+ * three SQL values for organization, project and scope (`$1` or a literal); with `forAgents`
+ * (`true`/`false` or a parameter) disabled documents are left out. Map rows with `withActivity`.
+ */
+export const documentsWithActivitySql = (
+  level: [string, string, string],
+  forAgents: string,
+) => `SELECT ${DOC_COLS}, ${lastReadSql('documents.id')} AS last_read_at,
+         ${TRACKING_SINCE_SQL} AS tracking_since
+    FROM documents
+   WHERE organization_id IS NOT DISTINCT FROM ${level[0]}::uuid
+     AND project_id IS NOT DISTINCT FROM ${level[1]}::uuid
+     AND scope_id IS NOT DISTINCT FROM ${level[2]}::uuid
+     AND (${forAgents}::boolean IS NOT TRUE OR disabled_at IS NULL)
+   ORDER BY kind, position, title`;
+
 /** Documents at a level, with how much agents use them. Agents only see enabled ones. */
 export async function listDocuments(
   db: Queryable,
@@ -265,9 +288,11 @@ export async function listDocuments(
 ): Promise<(Document & DocumentActivity)[]> {
   const lv = await resolveLevel(db, level);
   a.requireRead(lv.organization_id);
-  const docs = await documentsAt(db, lv, { forAgents: a.isAgent });
-  const activity = await documentActivity(db, docs);
-  return docs.map((d) => ({ ...d, ...(activity.get(d.id) ?? noDocumentActivity(d)) }));
+  const { rows } = await db.query<Document & DocumentReadRow>(
+    documentsWithActivitySql(['$1', '$2', '$3'], '$4'),
+    [lv.organization_id, lv.project_id, lv.scope_id, a.isAgent],
+  );
+  return rows.map(withActivity);
 }
 
 /** Internal: load without a permission check. */
@@ -413,7 +438,7 @@ export async function ensureLearningsDocument(db: Queryable, level: Level): Prom
 
 // ───────────────────────────── sections ─────────────────────────────
 
-const SECTION_COLS = `s.id, s.document_id, s.heading, s.body, s.mode, s.position, s.version, s.updated_at,
+export const SECTION_COLS = `s.id, s.document_id, s.heading, s.body, s.mode, s.position, s.version, s.updated_at,
   s.updated_by, a.name AS updated_by_name`;
 
 /** Accept a full section UUID or an unambiguous prefix of at least 8 hex characters. */

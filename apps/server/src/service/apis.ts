@@ -39,10 +39,10 @@ export interface ApiSpecMeta {
   updated_by_name: string | null;
 }
 
-const META = `s.id, s.project_id, COALESCE(NULLIF(s.name, ''), s.title) AS name, s.source_url, s.filename, s.source_format,
+export const API_META = `s.id, s.project_id, COALESCE(NULLIF(s.name, ''), s.title) AS name, s.source_url, s.filename, s.source_format,
   s.spec_version, s.title, s.version, s.endpoint_count, s.schema_count, s.fetched_at, s.fetch_error, s.updated_at,
   u.name AS updated_by_name`;
-const FROM = 'FROM api_specs s LEFT JOIN actors u ON u.id = s.updated_by';
+export const API_FROM = 'FROM api_specs s LEFT JOIN actors u ON u.id = s.updated_by';
 
 const isUuid = (s: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
@@ -291,7 +291,7 @@ export async function listApis(
 ): Promise<ApiSpecMeta[]> {
   a.requireRead(await projectOrg(db, projectId));
   const { rows } = await db.query<ApiSpecMeta>(
-    `SELECT ${META} ${FROM} WHERE s.project_id = $1 ORDER BY s.created_at`,
+    `SELECT ${API_META} ${API_FROM} WHERE s.project_id = $1 ORDER BY s.created_at`,
     [projectId],
   );
   return rows;
@@ -305,7 +305,7 @@ export async function apisOfProjects(
 ): Promise<(ApiSpecMeta & { organization_id: string })[]> {
   if (!projectIds.length) return [];
   const { rows } = await db.query<ApiSpecMeta & { organization_id: string }>(
-    `SELECT ${META}, p.organization_id ${FROM} JOIN projects p ON p.id = s.project_id
+    `SELECT ${API_META}, p.organization_id ${API_FROM} JOIN projects p ON p.id = s.project_id
       WHERE s.project_id = ANY($1::uuid[]) AND p.organization_id = ANY($2::uuid[]) ORDER BY s.created_at`,
     [projectIds, a.readableOrgIds()],
   );
@@ -318,7 +318,7 @@ async function metaRow(
 ): Promise<ApiSpecMeta & { organization_id: string }> {
   if (!isUuid(id)) throw notFound('API');
   const { rows } = await db.query<ApiSpecMeta & { organization_id: string }>(
-    `SELECT ${META}, p.organization_id ${FROM} JOIN projects p ON p.id = s.project_id WHERE s.id = $1`,
+    `SELECT ${API_META}, p.organization_id ${API_FROM} JOIN projects p ON p.id = s.project_id WHERE s.id = $1`,
     [id],
   );
   if (!rows[0]) throw notFound('API');
