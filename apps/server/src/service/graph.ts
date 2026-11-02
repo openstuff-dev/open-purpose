@@ -181,6 +181,7 @@ async function loadIndex(db: Queryable, a: Access, includeArchived: boolean): Pr
     `SELECT p.id, p.organization_id, p.slug, p.name, p.summary,
               (SELECT s.body FROM documents d JOIN sections s ON s.document_id = d.id
                 WHERE d.project_id = p.id AND d.scope_id IS NULL AND d.kind = 'purpose'
+                  AND s.archived_at IS NULL
                 ORDER BY d.position, s.position LIMIT 1) AS purpose,
               ARRAY(SELECT x.old_slug FROM slug_aliases x WHERE x.project_id = p.id) AS aliases
          FROM projects p WHERE $1 OR p.archived_at IS NULL`,
@@ -188,7 +189,8 @@ async function loadIndex(db: Queryable, a: Access, includeArchived: boolean): Pr
   );
   const { rows: terms } = await db.query<TermRow>(
     `SELECT s.id, s.heading, s.body, d.organization_id, d.project_id, d.id AS document_id
-         FROM sections s JOIN documents d ON d.id = s.document_id WHERE d.kind = 'glossary'`,
+         FROM sections s JOIN documents d ON d.id = s.document_id
+        WHERE d.kind = 'glossary' AND s.archived_at IS NULL`,
   );
   return new LinkIndex(a, projects, terms);
 }

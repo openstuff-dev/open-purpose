@@ -80,6 +80,8 @@ const KIND: Record<Proposal['kind'], { label: string; icon: string }> = {
   new_section: { label: 'New section', icon: 'plus' },
   new_scope: { label: 'New scope', icon: 'layers' },
   new_document: { label: 'New document', icon: 'file' },
+  archive_section: { label: 'Archive', icon: 'archive' },
+  move_section: { label: 'Move', icon: 'move-to' },
 };
 
 const STATUS_TONE: Record<ProposalStatus, Tone> = {
@@ -200,6 +202,8 @@ function ago(iso: string): string {
           <option value="new_section">New sections</option>
           <option value="new_scope">New scopes</option>
           <option value="new_document">New documents</option>
+          <option value="archive_section">Archives</option>
+          <option value="move_section">Moves</option>
         </select>
         <select os-select aria-label="Where" [ngModel]="level()" (ngModelChange)="setLevel($event)">
           <option value="all">Everywhere I can see</option>
@@ -497,7 +501,7 @@ function ago(iso: string): string {
               <dt>Section</dt>
               <dd>
                 <a
-                  [routerLink]="['/documents', p.document_id]"
+                  [routerLink]="['/documents', p.result_document_id ?? p.document_id]"
                   [fragment]="'s-' + p.section_id.slice(0, 8)"
                   >{{ p.current_heading }}</a
                 >
@@ -514,6 +518,22 @@ function ago(iso: string): string {
                   @if (p.current_version !== p.base_version) {
                     <span os-badge tone="warning">Changed since</span>
                   }
+                }
+              </dd>
+            }
+            @if (p.kind === 'move_section') {
+              <dt>Move to</dt>
+              <dd>
+                @if (p.target_document_id) {
+                  <a [routerLink]="['/documents', p.target_document_id]">{{
+                    p.target_document_title
+                  }}</a>
+                  <span class="quiet">
+                    in {{ p.target_location ?? session.group()?.name }},
+                    {{ p.target_position === 0 ? 'at the top' : 'at the end' }}</span
+                  >
+                } @else {
+                  <span class="quiet">That document was deleted</span>
                 }
               </dd>
             }
@@ -611,7 +631,11 @@ function ago(iso: string): string {
                         ? 'The new scope'
                         : p.kind === 'new_document'
                           ? 'The new document'
-                          : 'The new section'
+                          : p.kind === 'archive_section'
+                            ? 'The section to archive'
+                            : p.kind === 'move_section'
+                              ? 'The section to move'
+                              : 'The new section'
                 }}
                 @if (p.revision > 1) {
                   <span os-chip>Revision {{ p.revision }}</span>
@@ -705,7 +729,7 @@ function ago(iso: string): string {
                 [base]="baseText(p, rv)"
                 [threads]="rv?.threads ?? []"
                 [canComment]="!!rv?.can_comment && isOpen(p.status)"
-                [canRevise]="!!rv?.can_revise && isOpen(p.status)"
+                [canRevise]="!!rv?.can_revise && isOpen(p.status) && hasText(p)"
                 [me]="session.me()?.actor?.id ?? null"
                 (changed)="refresh(p)"
               />
@@ -782,7 +806,7 @@ function ago(iso: string): string {
                       [proposalId]="p.id"
                       [showAnchor]="t.line_start !== null"
                       [canComment]="!!rv?.can_comment && isOpen(p.status)"
-                      [canRevise]="!!rv?.can_revise && isOpen(p.status)"
+                      [canRevise]="!!rv?.can_revise && isOpen(p.status) && hasText(p)"
                       [canResolve]="!!rv?.can_revise || t.created_by === session.me()?.actor?.id"
                       (changed)="refresh(p)"
                     />
@@ -922,9 +946,11 @@ function ago(iso: string): string {
                     Discard edits
                   </button>
                 } @else {
-                  <button os-button type="button" (click)="r.editing = true; touch()">
-                    <app-icon name="pencil" />Edit
-                  </button>
+                  @if (hasText(p)) {
+                    <button os-button type="button" (click)="r.editing = true; touch()">
+                      <app-icon name="pencil" />Edit
+                    </button>
+                  }
                   <button os-button type="button" (click)="requestChanges(p)">
                     Request changes
                   </button>
@@ -934,6 +960,12 @@ function ago(iso: string): string {
                   <span class="quiet foot-hint">{{ modeLabel[r.mode] }} after approval</span>
                 } @else if (p.kind === 'new_scope') {
                   <span class="quiet foot-hint">Approving creates the scope</span>
+                } @else if (p.kind === 'archive_section') {
+                  <span class="quiet foot-hint"
+                    >Approving archives it. You can restore it later</span
+                  >
+                } @else if (p.kind === 'move_section') {
+                  <span class="quiet foot-hint">Approving moves it, with its history</span>
                 }
               </div>
             </footer>
@@ -965,9 +997,11 @@ function ago(iso: string): string {
                     Discard edits
                   </button>
                 } @else {
-                  <button os-button type="button" (click)="r.editing = true; touch()">
-                    <app-icon name="pencil" />Edit
-                  </button>
+                  @if (hasText(p)) {
+                    <button os-button type="button" (click)="r.editing = true; touch()">
+                      <app-icon name="pencil" />Edit
+                    </button>
+                  }
                   <button os-button variant="ghost" type="button" (click)="withdraw(p)">
                     Withdraw
                   </button>
@@ -1005,6 +1039,11 @@ export class InboxPage {
   readonly docKindLabel = KIND_LABEL;
 
   /** Approving these makes sections, so the reviewer picks what agents may do with them. */
+  /** Archive and move proposals hold a copy of the section for review only. */
+  hasText(p: Proposal): boolean {
+    return p.kind !== 'archive_section' && p.kind !== 'move_section';
+  }
+
   takesMode(p: Proposal): boolean {
     return p.kind === 'new_section' || p.kind === 'learning' || p.kind === 'new_document';
   }
@@ -1595,7 +1634,11 @@ export class InboxPage {
             ? `Created the scope ${p.heading}`
             : p.kind === 'new_document'
               ? `Created the document ${r.heading || p.heading}`
-              : 'Approved',
+              : p.kind === 'archive_section'
+                ? `Archived ${p.heading}. Agents no longer get it`
+                : p.kind === 'move_section'
+                  ? `Moved ${p.heading} to ${p.target_document_title ?? 'the other document'}`
+                  : 'Approved',
       );
       await this.afterDecision(p);
     } catch (e) {

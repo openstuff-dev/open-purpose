@@ -454,7 +454,8 @@ export async function ensureLearningsDocument(db: Queryable, level: Level): Prom
 // ───────────────────────────── sections ─────────────────────────────
 
 export const SECTION_COLS = `s.id, s.document_id, s.heading, s.body, s.mode, s.position, s.version, s.updated_at,
-  s.updated_by, a.name AS updated_by_name`;
+  s.updated_by, a.name AS updated_by_name, s.archived_at,
+  (SELECT x.name FROM actors x WHERE x.id = s.archived_by) AS archived_by_name`;
 
 /** Accept a full section UUID or an unambiguous prefix of at least 8 hex characters. */
 export async function resolveSectionRef(db: Queryable, ref: string): Promise<string> {
@@ -498,14 +499,21 @@ export async function getSection(
   const doc = await loadDocument(db, s.document_id);
   a.requireRead(doc.organization_id);
   if (a.isAgent && doc.disabled_at) throw disabledForAgents();
+  if (a.isAgent && s.archived_at)
+    throw new AppError(
+      'not_found',
+      `Section "${s.heading}" is archived, so agents can't read or change it. A person can restore it in OpenPurpose.`,
+    );
   return { ...s, organization_id: doc.organization_id };
 }
 
+/** The sections of documents, in order. Archived sections are left out. */
 export async function listSections(db: Queryable, documentIds: string[]): Promise<Section[]> {
   if (documentIds.length === 0) return [];
   const { rows } = await db.query<Section>(
     `SELECT ${SECTION_COLS} FROM sections s LEFT JOIN actors a ON a.id = s.updated_by
-      WHERE s.document_id = ANY($1::uuid[]) ORDER BY s.document_id, s.position, s.created_at`,
+      WHERE s.document_id = ANY($1::uuid[]) AND s.archived_at IS NULL
+      ORDER BY s.document_id, s.position, s.created_at`,
     [documentIds],
   );
   return rows;
@@ -578,7 +586,7 @@ export interface SectionChange {
   mode?: EditMode;
 }
 
-/** Internal: bump version, snapshot. No permission check. */
+/** Internal: bump version, snapshot. No permission check. Archived sections can't change. */
 export async function applySectionChange(
   c: Queryable,
   section: Section,
@@ -589,6 +597,8 @@ export async function applySectionChange(
   const heading = change.heading?.trim() || section.heading;
   const body = change.body ?? section.body;
   const mode = assertMode(change.mode) ?? section.mode;
+  if (section.archived_at)
+    throw new AppError('conflict', `Section "${section.heading}" is archived. Restore it first.`);
   if (heading === section.heading && body === section.body && mode === section.mode) return section;
   await c.query(
     `UPDATE sections SET heading = $2, body = $3, mode = $4, version = version + 1,
@@ -638,10 +648,92 @@ export async function reorderSections(
   });
 }
 
+/** Delete a section for good, with its history. Only archived sections: archive it first. */
 export async function deleteSection(db: Db, a: Access, ref: string): Promise<void> {
   const s = await getSection(db, a, ref);
   a.requireEdit(s.organization_id);
+  if (!s.archived_at)
+    throw new AppError(
+      'conflict',
+      `Archive "${s.heading}" before deleting it. Archived sections can be restored; deleted ones can't.`,
+    );
   await db.query('DELETE FROM sections WHERE id = $1', [s.id]);
+}
+
+/**
+ * Internal: archive a section. It stays in its document with its history, but agents no longer
+ * get it, and its [[links]] stop counting until it's restored. No permission check.
+ */
+export async function archiveSectionRow(
+  c: Queryable,
+  section: Section,
+  actorId: string | null,
+): Promise<Section> {
+  if (section.archived_at)
+    throw new AppError('conflict', `Section "${section.heading}" is already archived`);
+  await c.query('UPDATE sections SET archived_at = now(), archived_by = $2 WHERE id = $1', [
+    section.id,
+    actorId,
+  ]);
+  await c.query('DELETE FROM section_links WHERE section_id = $1', [section.id]);
+  await c.query('UPDATE documents SET updated_at = now() WHERE id = $1', [section.document_id]);
+  return loadSection(c, section.id);
+}
+
+/** Bring an archived section back. People with edit rights only. */
+export async function restoreSection(db: Db, a: Access, ref: string): Promise<Section> {
+  return tx(db, async (c) => {
+    const s = await getSection(c, a, ref, { forUpdate: true });
+    a.requireEdit(s.organization_id);
+    if (!s.archived_at) throw new AppError('conflict', `Section "${s.heading}" isn't archived`);
+    await c.query('UPDATE sections SET archived_at = NULL, archived_by = NULL WHERE id = $1', [
+      s.id,
+    ]);
+    await syncLinks(c, s.id, s.body);
+    await c.query('UPDATE documents SET updated_at = now() WHERE id = $1', [s.document_id]);
+    return loadSection(c, s.id);
+  });
+}
+
+/**
+ * Internal: move a section to another document, with its id, history and review threads. It goes
+ * to `position` (0 = first; past the end or null = last). Open proposals for the section follow
+ * it. No permission check.
+ */
+export async function moveSectionRow(
+  c: Queryable,
+  section: Section,
+  target: Document,
+  position: number | null,
+): Promise<Section> {
+  if (section.archived_at)
+    throw new AppError('conflict', `Section "${section.heading}" is archived. Restore it first.`);
+  if (target.id === section.document_id)
+    throw badRequest('The section is already in that document. Reorder it in the web app instead.');
+  const { rows } = await c.query<{ next: number }>(
+    'SELECT COALESCE(MAX(position) + 1, 0) AS next FROM sections WHERE document_id = $1',
+    [target.id],
+  );
+  const at = position === null ? rows[0].next : Math.max(0, Math.min(position, rows[0].next));
+  await c.query(
+    'UPDATE sections SET position = position + 1 WHERE document_id = $1 AND position >= $2',
+    [target.id, at],
+  );
+  await c.query('UPDATE sections SET document_id = $2, position = $3 WHERE id = $1', [
+    section.id,
+    target.id,
+    at,
+  ]);
+  await c.query(
+    `UPDATE proposals SET document_id = $2, organization_id = $3, project_id = $4, scope_id = $5
+      WHERE section_id = $1 AND status IN ('pending', 'changes_requested')
+        AND kind NOT IN ('archive_section', 'move_section')`,
+    [section.id, target.id, target.organization_id, target.project_id, target.scope_id],
+  );
+  await c.query('UPDATE documents SET updated_at = now() WHERE id = ANY($1::uuid[])', [
+    [section.document_id, target.id],
+  ]);
+  return loadSection(c, section.id);
 }
 
 export async function listVersions(
@@ -745,6 +837,7 @@ export async function searchSections(
        LEFT JOIN scopes sc ON sc.id = d.scope_id
        CROSS JOIN q
       WHERE (s.search @@ q.tsq OR s.heading ILIKE '%' || $1 || '%' OR s.body ILIKE '%' || $1 || '%')
+        AND s.archived_at IS NULL
         AND (d.organization_id IS NULL OR d.organization_id = ANY($2::uuid[]))
         AND ($3::uuid IS NULL OR d.organization_id IS NULL OR d.organization_id = $3::uuid)
         AND ($4::uuid IS NULL OR d.project_id IS NULL OR d.project_id = $4::uuid)

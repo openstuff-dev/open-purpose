@@ -7,6 +7,7 @@ import { normalizeTags } from '../domain/stacks.js';
 import { parseDocumentBody, renderDocumentBody, type SectionDraft } from '../domain/document-body.js';
 import {
   applySectionChange,
+  archiveSectionRow,
   assertMode,
   checkVersion,
   cleanGlobs,
@@ -18,7 +19,9 @@ import {
   insertDocument,
   insertScope,
   insertSection,
+  loadDocument,
   loadSection,
+  moveSectionRow,
   resolveDocumentRef,
   resolveLevel,
   type ScopeInput,
@@ -41,7 +44,7 @@ import type { DocumentSpec, ProposalCounts, ScopeSpec } from '@openpurpose/contr
 const PROPOSAL_COLS = `x.id, x.kind, x.status, x.organization_id, x.project_id, x.scope_id, x.document_id, x.section_id,
   x.base_version, x.heading, x.body, x.rationale, x.context, x.created_by, a.name AS created_by_name,
   x.created_at, x.reviewed_by, x.reviewed_at, x.review_note, x.result_section_id, x.scope_spec, x.result_scope_id,
-  x.document_spec, x.revision, x.updated_at, x.auto_approved`;
+  x.document_spec, x.target_document_id, x.target_position, x.revision, x.updated_at, x.auto_approved`;
 
 export const isOpen = (status: ProposalStatus) =>
   status === 'pending' || status === 'changes_requested';
@@ -67,8 +70,9 @@ async function insertProposal(
 ): Promise<Proposal> {
   const { rows } = await c.query<{ id: string }>(
     `INSERT INTO proposals (kind, organization_id, project_id, scope_id, document_id, section_id, base_version,
-                            heading, body, rationale, context, created_by, scope_spec, document_spec)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
+                            heading, body, rationale, context, created_by, scope_spec, document_spec,
+                            target_document_id, target_position)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
     [
       p.kind,
       p.organization_id ?? null,
@@ -84,6 +88,8 @@ async function insertProposal(
       a.actor.id,
       p.scope_spec ? JSON.stringify(p.scope_spec) : null,
       p.document_spec ? JSON.stringify(p.document_spec) : null,
+      p.target_document_id ?? null,
+      p.target_position ?? null,
     ],
   );
   const id = rows[0].id;
@@ -145,6 +151,9 @@ export interface ProposalListItem extends Proposal {
   created_by_kind: 'human' | 'agent' | null;
   reviewed_by_name: string | null;
   result_document_id: string | null;
+  /** move_section only: the document the section moves to, and where that document hangs. */
+  target_document_title: string | null;
+  target_location: string | null;
   /** new_scope only: the remote keys of the repositories it would be bound to. */
   scope_repositories: string[] | null;
   result_scope_slug: string | null;
@@ -203,7 +212,11 @@ export async function listProposals(
                  ELSE ARRAY(SELECT r.remote_key FROM repositories r
                              WHERE r.id::text IN (SELECT jsonb_array_elements_text(x.scope_spec->'repository_ids'))
                              ORDER BY r.remote_key) END AS scope_repositories,
-            rsc.slug AS result_scope_slug,
+            rsc.slug AS result_scope_slug, td.title AS target_document_title,
+            CASE WHEN td.id IS NULL THEN NULL
+                 ELSE COALESCE((SELECT y.name FROM scopes y WHERE y.id = td.scope_id),
+                               (SELECT y.name FROM projects y WHERE y.id = td.project_id),
+                               (SELECT y.name FROM organizations y WHERE y.id = td.organization_id)) END AS target_location,
             (SELECT count(*)::int FROM review_threads t WHERE t.proposal_id = x.id AND t.resolved_at IS NULL) AS open_threads,
             (SELECT count(*)::int FROM review_comments rc JOIN review_threads t ON t.id = rc.thread_id WHERE t.proposal_id = x.id) AS comment_count,
             CASE WHEN x.status NOT IN ('pending', 'changes_requested') THEN NULL
@@ -220,6 +233,7 @@ export async function listProposals(
        LEFT JOIN sections s ON s.id = x.section_id
        LEFT JOIN sections rs ON rs.id = x.result_section_id
        LEFT JOIN scopes rsc ON rsc.id = x.result_scope_id
+       LEFT JOIN documents td ON td.id = x.target_document_id
       WHERE ($1::proposal_status IS NULL OR x.status = $1)
         AND (x.organization_id IS NULL OR x.organization_id = ANY($2::uuid[]))
         AND ($3::uuid IS NULL OR x.organization_id = $3)
@@ -408,6 +422,131 @@ export async function addSection(
       heading: input.heading,
       body: input.body ?? '',
       rationale: input.rationale ?? input.note ?? '',
+    });
+    return proposed(c, a, rules, proposal);
+  });
+}
+
+// ───────────────────────────── archiving and moving ─────────────────────────────
+
+export interface SectionMoveInput {
+  /** Why: shown to the reviewer. */
+  rationale?: string;
+  context?: Record<string, unknown>;
+}
+
+/** Refuse a second open archive or move proposal for the same section. */
+async function assertNoOpenChange(c: Queryable, section: Section): Promise<void> {
+  const { rows } = await c.query<{ id: string; kind: string }>(
+    `SELECT id, kind FROM proposals
+      WHERE section_id = $1 AND kind IN ('archive_section', 'move_section')
+        AND status IN ('pending', 'changes_requested') LIMIT 1`,
+    [section.id],
+  );
+  if (rows[0])
+    throw new AppError(
+      'conflict',
+      `"${section.heading}" already has an open proposal to ${rows[0].kind === 'archive_section' ? 'archive' : 'move'} it (proposal ${rows[0].id.slice(0, 8)}). Wait for a person to review it.`,
+    );
+}
+
+/**
+ * Archive a section: it stays in its document, with its history, but agents no longer get it.
+ * Same policy as editSection: editors archive right away; agents archive "open" sections, propose
+ * for "propose" ones and can't touch "locked" ones.
+ */
+export async function archiveSection(
+  db: Db,
+  a: Access,
+  ref: string,
+  input: SectionMoveInput = {},
+): Promise<EditResult> {
+  return tx(db, async (c) => {
+    const section = await getSection(c, a, ref, { forUpdate: true });
+    a.requireContribute(section.organization_id);
+    if (a.canEdit(section.organization_id))
+      return { status: 'applied', section: await archiveSectionRow(c, section, a.actor.id) };
+    if (section.mode === 'locked')
+      throw new AppError(
+        'locked',
+        `Section "${section.heading}" is locked. Agents can read it but not archive it.`,
+      );
+    await assertNoOpenChange(c, section);
+    const rules = await agentRules(c, a);
+    if (section.mode === 'open' && rules.review !== 'always_propose')
+      return { status: 'applied', section: await archiveSectionRow(c, section, a.actor.id) };
+    const doc = await getDocument(c, a, section.document_id);
+    const proposal = await insertProposal(c, a, {
+      kind: 'archive_section',
+      organization_id: doc.organization_id,
+      project_id: doc.project_id,
+      scope_id: doc.scope_id,
+      document_id: doc.id,
+      section_id: section.id,
+      base_version: section.version,
+      heading: section.heading,
+      body: section.body,
+      rationale: input.rationale ?? '',
+      context: input.context ?? {},
+    });
+    return proposed(c, a, rules, proposal);
+  });
+}
+
+/**
+ * Move a section to another document of the same organization, keeping its id and history.
+ * Editors move right away. Agents move directly only when both the section and the target
+ * document are "open"; otherwise they propose. Locked sections and documents are refused.
+ */
+export async function moveSection(
+  db: Db,
+  a: Access,
+  ref: string,
+  targetRef: string,
+  input: SectionMoveInput & { position?: number | null } = {},
+): Promise<EditResult> {
+  return tx(db, async (c) => {
+    const section = await getSection(c, a, ref, { forUpdate: true });
+    a.requireContribute(section.organization_id);
+    const target = await getDocument(c, a, await resolveDocumentRef(c, targetRef));
+    if (target.organization_id !== section.organization_id)
+      throw badRequest(
+        'Sections move only within one organization. Pick a document of the same organization, or propose a new section there instead.',
+      );
+    if (target.id === section.document_id)
+      throw badRequest('The section is already in that document.');
+    const position = input.position ?? null;
+    if (a.canEdit(section.organization_id))
+      return { status: 'applied', section: await moveSectionRow(c, section, target, position) };
+    if (section.mode === 'locked')
+      throw new AppError(
+        'locked',
+        `Section "${section.heading}" is locked. Agents can read it but not move it.`,
+      );
+    if (target.mode === 'locked')
+      throw new AppError(
+        'locked',
+        `Document "${target.title}" is locked; agents cannot move sections into it.`,
+      );
+    await assertNoOpenChange(c, section);
+    const rules = await agentRules(c, a);
+    if (section.mode === 'open' && target.mode === 'open' && rules.review !== 'always_propose')
+      return { status: 'applied', section: await moveSectionRow(c, section, target, position) };
+    const doc = await getDocument(c, a, section.document_id);
+    const proposal = await insertProposal(c, a, {
+      kind: 'move_section',
+      organization_id: doc.organization_id,
+      project_id: doc.project_id,
+      scope_id: doc.scope_id,
+      document_id: doc.id,
+      section_id: section.id,
+      base_version: section.version,
+      heading: section.heading,
+      body: section.body,
+      rationale: input.rationale ?? '',
+      context: input.context ?? {},
+      target_document_id: target.id,
+      target_position: position,
     });
     return proposed(c, a, rules, proposal);
   });
@@ -723,8 +862,10 @@ async function applyApproval(
   auto?: AgentRules,
 ): Promise<Approval> {
   const id = p.id;
-  const heading = input.heading?.trim() || p.heading;
-  const body = input.body ?? p.body;
+  // Archiving and moving don't change the text: the proposal holds a copy for review only.
+  const keepsText = p.kind === 'archive_section' || p.kind === 'move_section';
+  const heading = keepsText ? p.heading : input.heading?.trim() || p.heading;
+  const body = keepsText ? p.body : (input.body ?? p.body);
   let revision = p.revision;
   if (heading !== p.heading || body !== p.body) {
     // Edits made while approving become a revision too, so the history shows what was changed.
@@ -787,6 +928,23 @@ async function applyApproval(
     scope = auto
       ? await insertScope(c, { ...scopeLevel, scope_id: null }, scopeInput)
       : await createScope(c, a, scopeLevel, scopeInput);
+  } else if (p.kind === 'archive_section' || p.kind === 'move_section') {
+    if (!p.section_id)
+      throw new AppError('conflict', 'The section this proposal is about no longer exists');
+    const current = await loadSection(c, p.section_id, { forUpdate: true });
+    if (p.kind === 'archive_section') {
+      section = await archiveSectionRow(c, current, a.actor.id);
+    } else {
+      if (!p.target_document_id)
+        throw new AppError('conflict', 'The document this section should move to no longer exists');
+      const [from, to] = [
+        await loadDocument(c, current.document_id),
+        await loadDocument(c, p.target_document_id),
+      ];
+      if (from.organization_id !== to.organization_id)
+        throw new AppError('conflict', 'Sections move only within one organization');
+      section = await moveSectionRow(c, current, to, p.target_position);
+    }
   } else if (p.kind === 'new_document') {
     const spec = p.document_spec;
     if (!spec) throw new AppError('conflict', 'This proposal has no document kind or slug');

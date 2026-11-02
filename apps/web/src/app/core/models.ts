@@ -216,10 +216,24 @@ export interface Section {
   updated_at: string;
   updated_by: string | null;
   updated_by_name: string | null;
+  /** Archived: kept with its history, but agents don't get it. */
+  archived_at: string | null;
+  archived_by_name: string | null;
+}
+
+/** A document a section can move to. */
+export interface MoveTarget {
+  id: string;
+  title: string;
+  kind: DocKind;
+  /** Where it hangs, e.g. "Customer Portal › Frontend". */
+  where: string;
 }
 
 export interface DocDetail extends Omit<Doc, 'staleness'>, DocumentActivity {
   sections: (Section & { activity: SectionActivity })[];
+  /** Newest first. */
+  archived_sections: Section[];
   project: Project | null;
   scope: Scope | null;
   organization: OrgRef | null;
@@ -328,6 +342,11 @@ export interface Proposal {
   result_scope_id: string | null;
   /** new_document only: the kind and slug of the document to create. */
   document_spec: DocumentSpec | null;
+  /** move_section only: the document the section moves to, and its position there (null = last). */
+  target_document_id: string | null;
+  target_position: number | null;
+  target_document_title: string | null;
+  target_location: string | null;
   /** Approved without review: an admin lets the agent who made it skip review. */
   auto_approved: boolean;
   project_slug: string | null;

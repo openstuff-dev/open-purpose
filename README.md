@@ -82,6 +82,10 @@ second organization under Settings › Organizations.
   the change back to the reviewers. Threads follow their lines across revisions and
   are marked outdated when the lines are gone.
 - **Full history** per section, with author (person or agent), note and one-click restore.
+- **Archive and move sections**: an archived section stays in its document, out of agents'
+  context, until someone restores it; only archived sections can be deleted for good. A section
+  can move to another document of its organization with its id and history. Agents propose both,
+  as far as the edit modes allow.
 - **Map** of projects and terms, clustered and coloured by organization, with a
   focus mode ("everything within two steps of Order Service"). Agents get the
   same graph: `get_context` lists related projects, and `get_related` returns
@@ -363,6 +367,7 @@ you paste into the organization's purpose.
 | `get_related` | Projects and terms linked to/from a project, with their purpose where readable |
 | `search`, `read_section` | Full-text search, read one section with its version |
 | `update_section`, `add_section` | Change content, subject to the section's or document's mode |
+| `archive_section`, `move_section` | Archive an outdated or repeated section (agents stop getting it; a person can restore it), or move one to another document of the organization with its id and history. Subject to the section's and target document's modes |
 | `propose_document` | Suggest a missing document (a glossary, the business logic, ...) with its first sections, reviewed as one text; a person approves it, editors' tokens create it right away |
 | `list_projects`, `list_scopes`, `list_organizations` | Discovery |
 | `list_skills`, `get_skill` | Guides the server offers agents, e.g. `init-openpurpose` for a guided first run: names and descriptions first, one skill's full text on request |

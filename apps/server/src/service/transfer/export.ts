@@ -112,7 +112,8 @@ export async function exportContent(
   type SectionRow = Omit<ExportDocument['sections'][number], 'versions'> & { document_id: string };
   const sections = (
     await db.query<SectionRow>(
-      `SELECT s.id AS key, s.document_id, s.heading, s.body, s.mode, s.position, s.version, s.created_at, s.updated_at, s.updated_by
+      `SELECT s.id AS key, s.document_id, s.heading, s.body, s.mode, s.position, s.version, s.created_at, s.updated_at, s.updated_by,
+            s.archived_at
        FROM sections s JOIN documents d ON d.id = s.document_id
       WHERE $1::uuid IS NULL OR d.organization_id = $1 ORDER BY s.position, s.created_at`,
       [org],
@@ -248,7 +249,8 @@ async function exportProposals(
     await db.query<Row>(
       `SELECT id AS key, kind, status, organization_id AS organization, project_id AS project, scope_id AS scope,
             document_id AS document, section_id AS section, result_section_id AS result_section,
-            result_scope_id AS result_scope, scope_spec, document_spec, base_version, heading,
+            result_scope_id AS result_scope, scope_spec, document_spec, target_document_id AS target_document,
+            target_position, base_version, heading,
             body, rationale, context, revision, created_by, created_at, updated_at, reviewed_by, reviewed_at, review_note,
             auto_approved
        FROM proposals WHERE $1::uuid IS NULL OR organization_id = $1 ORDER BY created_at`,

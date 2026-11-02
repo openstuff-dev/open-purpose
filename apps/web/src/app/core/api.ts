@@ -37,6 +37,7 @@ import type {
   SearchHit,
   Section,
   SectionVersion,
+  MoveTarget,
   GraphNode,
   TokenRow,
   ProposalCounts,
@@ -368,7 +369,14 @@ export class Api {
     },
   ) => this.send<EditResult>('PATCH', `/sections/${id}`, body);
 
+  /** Only archived sections can be deleted. */
   deleteSection = (id: string) => this.send<undefined>('DELETE', `/sections/${id}`);
+  archiveSection = (id: string) => this.send<EditResult>('POST', `/sections/${id}/archive`, {});
+  restoreSection = (id: string) => this.send<Section>('POST', `/sections/${id}/restore`, {});
+  moveSection = (id: string, body: { document_id: string; position?: number | null }) =>
+    this.send<EditResult>('POST', `/sections/${id}/move`, body);
+
+  moveTargets = (docId: string) => this.get<MoveTarget[]>(`/documents/${docId}/move-targets`);
   versions = (id: string) => this.get<SectionVersion[]>(`/sections/${id}/versions`);
   revert = (id: string, version: number) =>
     this.send<Section>('POST', `/sections/${id}/revert`, { version });

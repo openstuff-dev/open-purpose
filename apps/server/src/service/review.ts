@@ -288,6 +288,7 @@ export async function reviseProposal(
     const p = await openProposal(c, a, id);
     if (!isOpen(p.status)) throw new AppError('conflict', `Proposal is already ${p.status}`);
     if (!canRevise(a, p)) throw forbidden('Only the author or a reviewer can revise this proposal');
+    assertHasText(p);
     const heading = input.heading?.trim() || p.heading;
     if (heading === p.heading && input.body === p.body) throw badRequest('Nothing changed');
     // A document's text must still split into sections, or approving it would fail later.
@@ -306,6 +307,14 @@ export async function reviseProposal(
     }
     return getProposal(c, a, p.id);
   });
+}
+
+/** Archive and move proposals hold a copy of the section for review only: nothing to revise. */
+function assertHasText(p: Pick<Proposal, 'kind'>): void {
+  if (p.kind === 'archive_section' || p.kind === 'move_section')
+    throw badRequest(
+      `This proposal ${p.kind === 'archive_section' ? 'archives' : 'moves'} a section and has no text to revise. Answer the reviewer with reply_to_review.`,
+    );
 }
 
 /** Replace the thread's lines with the suggestion: a new revision, and the thread is resolved. */
@@ -338,6 +347,7 @@ export async function applySuggestion(db: Db, a: Access, commentId: string): Pro
     const p = await openProposal(c, a, s.proposal_id);
     if (!isOpen(p.status)) throw new AppError('conflict', `Proposal is already ${p.status}`);
     if (!canRevise(a, p)) throw forbidden('Only the author or a reviewer can apply suggestions');
+    assertHasText(p);
     const at =
       s.revision === p.revision
         ? { start: s.line_start, end: s.line_end }
@@ -449,7 +459,15 @@ export function renderReviewForAgent(
   out.push(`- Kind: ${p.kind.replace('_', ' ')}`);
   const spec = p.scope_spec;
   const doc = p.document_spec;
-  if (doc) {
+  if (p.kind === 'archive_section' || p.kind === 'move_section') {
+    out.push(
+      `- Section: ${p.heading}${p.section_id ? ` \`[s:${p.section_id.slice(0, 8)}]\`` : ''}`,
+      p.kind === 'archive_section'
+        ? '- Archives the section: agents stop getting it, and a person can restore it.'
+        : `- Moves the section to the document ${p.target_document_id ? `\`[d:${p.target_document_id.slice(0, 8)}]\`` : '(no longer there)'}${p.target_position === null ? '' : `, at position ${p.target_position}`}.`,
+      '- The text below is the section as it was proposed, for reference. It cannot be revised.',
+    );
+  } else if (doc) {
     out.push(
       `- Title: ${p.heading}`,
       `- Document kind: ${doc.kind.replace('_', ' ')}`,

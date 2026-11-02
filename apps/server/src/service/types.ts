@@ -108,6 +108,9 @@ export interface Section {
   updated_at: string;
   updated_by: string | null;
   updated_by_name?: string | null;
+  /** Archived sections stay in their document but agents don't get them. */
+  archived_at: string | null;
+  archived_by_name?: string | null;
 }
 
 export interface SectionVersion {
@@ -150,6 +153,9 @@ export interface Proposal {
   result_scope_id: string | null;
   /** new_document only: kind and slug of the document to create. document_id is set on approval. */
   document_spec: DocumentSpec | null;
+  /** move_section only: the document the section moves to, and its position there (null = last). */
+  target_document_id: string | null;
+  target_position: number | null;
   revision: number;
   updated_at: string;
   /** Approved without review: an admin lets the agent who made it skip review. */

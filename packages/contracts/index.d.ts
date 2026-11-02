@@ -16,7 +16,13 @@ export type EditMode = 'locked' | 'propose' | 'open';
 export type DocKind =
   'purpose' | 'business_logic' | 'glossary' | 'guidelines' | 'reference' | 'learnings';
 export type ProposalKind =
-  'edit_section' | 'new_section' | 'learning' | 'new_scope' | 'new_document';
+  | 'edit_section' |
+  'new_section' |
+  'learning' |
+  'new_scope' |
+  'new_document' |
+  'archive_section' |
+  'move_section';
 
 /** What a new_scope proposal creates, besides its name (heading) and description (body). */
 export interface ScopeSpec {
@@ -595,6 +601,8 @@ export interface ExportSection {
   created_at: string;
   updated_at: string;
   updated_by: string | null;
+  /** Archived: kept with its history, but agents don't get it. Missing in older files. */
+  archived_at?: string | null;
   /** Every version, oldest first. Empty unless `includes.history`. */
   versions: {
     version: number;
@@ -623,6 +631,9 @@ export interface ExportProposal {
   scope_spec?: ScopeSpec | null;
   /** new_document proposals: the kind and slug of the document it asks for. */
   document_spec?: DocumentSpec | null;
+  /** move_section proposals: the document the section moves to, and its position there. */
+  target_document?: string | null;
+  target_position?: number | null;
   base_version: number | null;
   heading: string;
   body: string;

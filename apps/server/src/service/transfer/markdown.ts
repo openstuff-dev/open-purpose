@@ -18,7 +18,10 @@ only \`manifest.json\`; changes to the Markdown files are not imported.
 `;
 
 function documentMarkdown(d: ExportDocument): string {
-  const sections = d.sections.map((s) => `## ${s.heading}\n\n${s.body.trim()}\n`);
+  // Archived sections stay in manifest.json only.
+  const sections = d.sections
+    .filter((s) => !s.archived_at)
+    .map((s) => `## ${s.heading}\n\n${s.body.trim()}\n`);
   return [`# ${d.title}\n`, ...sections].join('\n');
 }
 
