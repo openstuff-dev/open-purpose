@@ -1678,6 +1678,26 @@ definitions:`,
     expect((await api('POST', '/me/tokens', {}, { token: t.lars })).status).toBe(403);
   });
 
+  it("doesn't let agents manage their own account, tokens or permissions", async () => {
+    const lars = { token: t.lars };
+    const id = (await api('GET', '/me', undefined, lars)).data.actor.id as string;
+    expect((await api('POST', `/members/${id}/tokens`, {}, lars)).status).toBe(403);
+    expect((await api('PATCH', `/members/${id}`, { review: 'auto_approve' }, lars)).status).toBe(
+      403,
+    );
+    expect((await api('PATCH', `/members/${id}`, { accept_findings: true }, lars)).status).toBe(
+      403,
+    );
+    expect((await api('PATCH', `/members/${id}`, { name: 'Lars the Great' }, lars)).status).toBe(
+      403,
+    );
+    const own = await api('GET', '/me/tokens', undefined, lars);
+    expect((await api('DELETE', `/tokens/${own.data[0].id}`, undefined, lars)).status).toBe(403);
+    const member = (await api('GET', '/members')).data.find((m: any) => m.id === id);
+    expect(member.permissions).toMatchObject({ review: 'edit_modes', accept_findings: false });
+    expect(member.name).toBe('Agent Lars');
+  });
+
   it('files findings agents report, lets people sort them and agents solve them', async () => {
     const jonas = await mcp(t.jonas);
     const report = (args: Record<string, unknown>) =>

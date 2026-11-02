@@ -487,6 +487,8 @@ async function canManageActor(
   kind: ActorKind,
   memberships: { organization_id: string | null }[],
 ): Promise<boolean> {
+  // Agents manage no accounts, not even their own: no tokens, no names, no permissions.
+  if (a.isAgent) return false;
   if (actorId === a.actor.id) return true;
   if (a.actor.is_superadmin) return true;
   const levelsOk = memberships.every((m) => a.canAdmin(m.organization_id));
@@ -630,7 +632,8 @@ async function requireManage(
   pool: Pool,
   a: Access,
   actorId: string,
-): Promise<{ id: string; name: string; kind: ActorKind }> {
+): Promise<Awaited<ReturnType<typeof loadMember>>> {
+  if (a.isAgent) throw forbidden('Agents cannot manage accounts or tokens');
   const m = await loadMember(db, actorId);
   if (!(await canManageActor(pool, a, actorId, m.kind, m.memberships))) {
     throw forbidden(
@@ -652,6 +655,8 @@ export async function updateActor(
   const permissions = input.review !== undefined || input.accept_findings !== undefined;
   if (permissions) {
     if (m.kind !== 'agent') throw badRequest('Only agents have permissions; people have roles');
+    if (!m.memberships.every((x) => a.canAdmin(x.organization_id)))
+      throw forbidden(`Only admins of ${m.name}'s organization can change what it may do`);
     if (input.review !== undefined && !AGENT_REVIEWS.includes(input.review))
       throw badRequest(`review must be one of ${AGENT_REVIEWS.join(', ')}`);
   }
