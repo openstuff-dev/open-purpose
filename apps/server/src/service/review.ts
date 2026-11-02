@@ -3,6 +3,7 @@
  * text, suggestions that can be applied with one click, "request changes",
  * replies and new revisions from the author (a person or an agent).
  */
+import type pg from 'pg';
 import type { Access } from '../auth.js';
 import type { Db, Queryable } from '../db.js';
 import { tx } from '../db.js';
@@ -81,45 +82,42 @@ async function openProposal(db: Queryable, a: Access, id: string): Promise<Propo
 
 // ───────────────────────────── reading ─────────────────────────────
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function getReview(db: Queryable, a: Access, proposalId: string): Promise<Review> {
   const p = await openProposal(db, a, proposalId);
-  const revisions = (
-    await db.query<ReviewRevision>(
-      `SELECT r.revision, r.heading, r.body, r.note, ac.name AS actor_name, ac.kind AS actor_kind, r.created_at
-       FROM proposal_revisions r LEFT JOIN actors ac ON ac.id = r.actor_id
-      WHERE r.proposal_id = $1 ORDER BY r.revision`,
-      [p.id],
-    )
-  ).rows;
-  const threads = (
-    await db.query<Omit<ReviewThread, 'comments' | 'outdated'>>(
-      `SELECT t.id, t.proposal_id, t.revision, t.line_start, t.line_end, t.anchor, t.resolved_at,
-            rb.name AS resolved_by_name, t.created_by, t.created_at
-       FROM review_threads t LEFT JOIN actors rb ON rb.id = t.resolved_by
-      WHERE t.proposal_id = $1 ORDER BY t.created_at`,
-      [p.id],
-    )
-  ).rows;
-  const comments = (
-    await db.query<ReviewComment>(
-      `SELECT c.id, c.thread_id, c.actor_id, ac.name AS actor_name, ac.kind AS actor_kind, c.body, c.suggestion,
-            c.applied_at, ap.name AS applied_by_name, c.created_at
-       FROM review_comments c
-       JOIN review_threads t ON t.id = c.thread_id
-       LEFT JOIN actors ac ON ac.id = c.actor_id
-       LEFT JOIN actors ap ON ap.id = c.applied_by
-      WHERE t.proposal_id = $1 ORDER BY c.created_at`,
-      [p.id],
-    )
-  ).rows;
-  const events = (
-    await db.query<ReviewEvent>(
-      `SELECT e.id, e.kind, e.revision, e.note, ac.name AS actor_name, ac.kind AS actor_kind, e.created_at
-       FROM proposal_events e LEFT JOIN actors ac ON ac.id = e.actor_id
-      WHERE e.proposal_id = $1 ORDER BY e.created_at`,
-      [p.id],
-    )
-  ).rows;
+  // One round trip: every query of a request runs on the same connection, one at a time, so
+  // Promise.all would not save anything. Several statements can't take $1, so the id goes in
+  // as a literal; it comes from the database and is checked to be a uuid.
+  if (!UUID.test(p.id)) throw notFound('Proposal');
+  const id = `'${p.id}'::uuid`;
+  const [revisionsRes, threadsRes, commentsRes, eventsRes] = (await db.query(`
+    SELECT r.revision, r.heading, r.body, r.note, ac.name AS actor_name, ac.kind AS actor_kind, r.created_at
+      FROM proposal_revisions r LEFT JOIN actors ac ON ac.id = r.actor_id
+     WHERE r.proposal_id = ${id} ORDER BY r.revision;
+    SELECT t.id, t.proposal_id, t.revision, t.line_start, t.line_end, t.anchor, t.resolved_at,
+           rb.name AS resolved_by_name, t.created_by, t.created_at
+      FROM review_threads t LEFT JOIN actors rb ON rb.id = t.resolved_by
+     WHERE t.proposal_id = ${id} ORDER BY t.created_at;
+    SELECT c.id, c.thread_id, c.actor_id, ac.name AS actor_name, ac.kind AS actor_kind, c.body, c.suggestion,
+           c.applied_at, ap.name AS applied_by_name, c.created_at
+      FROM review_comments c
+      JOIN review_threads t ON t.id = c.thread_id
+      LEFT JOIN actors ac ON ac.id = c.actor_id
+      LEFT JOIN actors ap ON ap.id = c.applied_by
+     WHERE t.proposal_id = ${id} ORDER BY c.created_at;
+    SELECT e.id, e.kind, e.revision, e.note, ac.name AS actor_name, ac.kind AS actor_kind, e.created_at
+      FROM proposal_events e LEFT JOIN actors ac ON ac.id = e.actor_id
+     WHERE e.proposal_id = ${id} ORDER BY e.created_at`)) as unknown as [
+    pg.QueryResult<ReviewRevision>,
+    pg.QueryResult<Omit<ReviewThread, 'comments' | 'outdated'>>,
+    pg.QueryResult<ReviewComment>,
+    pg.QueryResult<ReviewEvent>,
+  ];
+  const revisions = revisionsRes.rows;
+  const threads = threadsRes.rows;
+  const comments = commentsRes.rows;
+  const events = eventsRes.rows;
 
   const byThread = new Map<string, ReviewComment[]>();
   for (const c of comments) byThread.set(c.thread_id, [...(byThread.get(c.thread_id) ?? []), c]);
