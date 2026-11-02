@@ -1475,6 +1475,20 @@ definitions:`,
     }
   });
 
+  it('loads the activity overview in one round trip after access', async () => {
+    const path = `/organizations/${o.logistics}/activity?period=30d`;
+    await api('GET', path); // warm up: last_used_at is written once a minute at most
+    for (const period of ['7d', '30d', 'all']) {
+      const sent = await queriesSent(async () => {
+        const res = await api('GET', `/organizations/${o.logistics}/activity?period=${period}`);
+        expect(res.status).toBe(200);
+        expect(res.data.reads.count).toBeGreaterThan(0);
+      });
+      // Access; the whole overview; the commit.
+      expect(sent).toHaveLength(3);
+    }
+  });
+
   it('warns about documents agents stopped requesting, and hides disabled ones from agents', async () => {
     const doc = (
       await api('POST', '/documents', {
