@@ -20,7 +20,7 @@ import {
   type Actor,
 } from './auth.js';
 import { createProvider, SignInError } from './auth/providers/index.js';
-import { RateLimiter } from './auth/rate-limit.js';
+import { clientKey, RateLimiter } from './auth/rate-limit.js';
 import type { Config } from './config.js';
 import { endScope, type Pool } from './db.js';
 import { cacheControl } from './domain/cache.js';
@@ -332,7 +332,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
         if (method.kind === 'magic_link' && !body.email)
           throw badRequest('Enter your email address');
         const email = body.email?.trim().toLowerCase();
-        if (!startsPerIp.take(`ip:${req.ip}`) || (email && !startsPerEmail.take(`email:${email}`)))
+        if (!startsPerIp.take(`ip:${clientKey(req.ip)}`) || (email && !startsPerEmail.take(`email:${email}`)))
           throw new AppError(
             'too_many_requests',
             'Too many sign-in attempts. Try again in 15 minutes.',

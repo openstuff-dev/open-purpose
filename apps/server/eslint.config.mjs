@@ -7,7 +7,13 @@ export default [
     // One project service serves every file, so the option goes on all of them.
     files: ['**/*.ts'],
     languageOptions: {
-      parserOptions: { projectService: { allowDefaultProject: ['test/*.ts', 'vitest.config.ts'] } },
+      parserOptions: {
+        projectService: {
+          allowDefaultProject: ['test/*.ts', 'vitest.config.ts'],
+          // One per test file; raise it when there are more.
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 20,
+        },
+      },
     },
   },
   {
