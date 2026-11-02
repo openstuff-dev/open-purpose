@@ -1,3 +1,4 @@
+import type pg from 'pg';
 import type { Access } from '../auth.js';
 import type { Queryable } from '../db.js';
 import type {
@@ -193,79 +194,62 @@ const PERIOD_DAYS: Record<ActivityPeriod, number | null> = { '7d': 7, '30d': 30,
 /** All time shows a GitHub-style year of days. */
 const ALL_DAYS = 53 * 7;
 
-interface Window {
-  /** Start of the period; -infinity for all time. */
-  start: string;
-  /** Start of the period before; null for all time. */
-  prev: string | null;
-  /** First day of the daily series. */
-  first_day: string;
-  days: string[];
-}
-
-async function windowOf(db: Queryable, period: ActivityPeriod): Promise<Window> {
+/**
+ * The period as SQL, from the database's own date: `start` of the period (-infinity for all
+ * time), `prev` the start of the period before (null for all time), `first_day` of the daily
+ * series, and `days`.
+ */
+const windowSql = (period: ActivityPeriod) => {
   const n = PERIOD_DAYS[period];
   const shown = n ?? ALL_DAYS;
-  const { rows } = await db.query<Window>(
-    `SELECT CASE WHEN $1::int IS NULL THEN '-infinity' ELSE (current_date - ($1::int - 1))::timestamptz::text END AS start,
-            CASE WHEN $1::int IS NULL THEN NULL ELSE (current_date - (2 * $1::int - 1))::timestamptz::text END AS prev,
-            (current_date - ($2::int - 1))::text AS first_day,
-            ARRAY(SELECT g::date::text FROM generate_series(current_date - ($2::int - 1), current_date, interval '1 day') g) AS days`,
-    [n, shown],
-  );
-  return rows[0];
-}
+  return `SELECT ${n === null ? `'-infinity'::timestamptz` : `(current_date - ${n - 1})::timestamptz`} AS start,
+          ${n === null ? 'NULL::timestamptz' : `(current_date - ${2 * n - 1})::timestamptz`} AS prev,
+          current_date - ${shown - 1} AS first_day,
+          ARRAY(SELECT g::date::text FROM generate_series(current_date - ${shown - 1}, current_date, interval '1 day') g) AS days`;
+};
+
+/** The earliest time an event can matter for the window `w`. */
+const FROM_W = '(SELECT COALESCE(prev, start) FROM w)';
 
 /**
- * Count events per key over a window: the top `limit` keys by count in the period,
- * with the previous period and one count per day. `events` is SQL that yields
- * (key, at) rows; $1 is the window start (events before COALESCE(prev, start)
- * may be filtered out by it), followed by `params`.
+ * Count events per key over the window: the top `limit` keys by count in the period, with the
+ * previous period, one count per day and whatever `label` (SQL selecting from `l`, joined on
+ * `l.id = top.key`) names them by. `events` is SQL that yields (key, at) rows and may use
+ * FROM_W to skip events too old to matter.
  */
-async function ranked(
-  db: Queryable,
-  w: Window,
+const rankedSql = (
+  period: ActivityPeriod,
   events: string,
-  params: unknown[],
-  limit: number | null,
-) {
-  const p = params.length;
-  const { rows } = await db.query<ActivityFigure & { key: string }>(
-    `WITH ev AS (${events}),
-          top AS (SELECT key, count(*) FILTER (WHERE at >= $1::timestamptz)::int AS count FROM ev
-                   GROUP BY key HAVING count(*) FILTER (WHERE at >= $1::timestamptz) > 0
-                   ORDER BY 2 DESC ${limit ? `LIMIT ${limit}` : ''})
-     SELECT top.key, top.count,
-            CASE WHEN $${p + 2}::timestamptz IS NULL THEN NULL
-                 ELSE (SELECT count(*)::int FROM ev WHERE ev.key = top.key AND ev.at >= $${p + 2}::timestamptz AND ev.at < $1::timestamptz) END AS previous,
-            ARRAY(SELECT count(ev.at)::int
-                    FROM generate_series($${p + 3}::date, current_date, interval '1 day') g
-                    LEFT JOIN ev ON ev.key = top.key AND ev.at >= g AND ev.at < g + interval '1 day'
-                   GROUP BY g ORDER BY g) AS daily
-       FROM top ORDER BY top.count DESC, top.key`,
-    [w.start, ...params, w.prev, w.first_day],
-  );
-  return rows;
-}
+  limit: number,
+  label?: { from: string; columns: string },
+) => `WITH w AS (${windowSql(period)}),
+       ev AS (${events}),
+       top AS (SELECT key, count(*) FILTER (WHERE at >= (SELECT start FROM w))::int AS count FROM ev
+                GROUP BY key HAVING count(*) FILTER (WHERE at >= (SELECT start FROM w)) > 0
+                ORDER BY 2 DESC LIMIT ${limit})
+  SELECT top.key, top.count,
+         CASE WHEN (SELECT prev FROM w) IS NULL THEN NULL
+              ELSE (SELECT count(*)::int FROM ev WHERE ev.key = top.key
+                       AND ev.at >= (SELECT prev FROM w) AND ev.at < (SELECT start FROM w)) END AS previous,
+         ARRAY(SELECT count(ev.at)::int
+                 FROM generate_series((SELECT first_day FROM w), current_date, interval '1 day') g
+                 LEFT JOIN ev ON ev.key = top.key AND ev.at >= g AND ev.at < g + interval '1 day'
+                GROUP BY g ORDER BY g) AS daily
+         ${label ? `, ${label.columns}` : ''}
+    FROM top ${label ? `LEFT JOIN ${label.from} ON l.id = top.key` : ''}
+   ORDER BY top.count DESC, top.key`;
 
-/** The earliest time an event can matter for this window. */
-const FROM = (n: number) => `COALESCE($${n}::timestamptz, $1::timestamptz)`;
+type Ranked<T = object> = ActivityFigure & { key: string } & Partial<T>;
 
-function zero(w: Window, prev: boolean): ActivityFigure {
-  return { count: 0, previous: prev ? 0 : null, daily: w.days.map(() => 0) };
-}
+const DOC_LABEL = {
+  from: `(SELECT d.id, d.title, concat_ws(' › ', p.name, sc.name) AS "where" FROM documents d
+           LEFT JOIN projects p ON p.id = d.project_id LEFT JOIN scopes sc ON sc.id = d.scope_id) l`,
+  columns: 'l.title, l."where"',
+};
 
-async function names<T>(db: Queryable, sql: string, ids: string[]): Promise<Map<string, T>> {
-  if (!ids.length) return new Map();
-  const { rows } = await db.query<T & { id: string }>(sql, [ids]);
-  return new Map(rows.map((r) => [r.id, r]));
-}
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const DOC_NAMES = `SELECT d.id, d.title, concat_ws(' › ', p.name, sc.name) AS "where"
-                     FROM documents d LEFT JOIN projects p ON p.id = d.project_id LEFT JOIN scopes sc ON sc.id = d.scope_id
-                    WHERE d.id = ANY($1::uuid[])`;
-
-/** What agents did in and with an organization over a period. */
+/** What agents did in and with an organization over a period, in one round trip. */
 export async function organizationActivity(
   db: Queryable,
   a: Access,
@@ -273,93 +257,83 @@ export async function organizationActivity(
   period: ActivityPeriod,
 ): Promise<OrgActivity> {
   a.requireRead(orgId);
-  const w = await windowOf(db, period);
-  const n = 2; // $2 = the organization in every query below; prev is $3.
-  const hasPrev = w.prev !== null;
+  // Several statements can't take $1, so the organization goes in as a literal. requireRead
+  // only passes for organizations loaded from the database, and their ids are uuids.
+  if (!UUID.test(orgId)) throw new Error(`Not a uuid: ${orgId}`);
+  const org = `'${orgId}'::uuid`;
 
   // Requests made by the organization's agents.
   const requests = (kind: 'read' | 'write', key: string) =>
     `SELECT ${key} AS key, created_at AS at FROM agent_requests
-      WHERE organization_id = $2 AND kind = '${kind}' AND ${key} IS NOT NULL AND created_at >= ${FROM(n + 1)}`;
-  const totals = async (kind: 'read' | 'write') =>
-    (await ranked(db, w, requests(kind, 'organization_id'), [orgId], 1))[0] ?? zero(w, hasPrev);
+      WHERE organization_id = ${org} AND kind = '${kind}' AND ${key} IS NOT NULL AND created_at >= ${FROM_W}`;
 
-  const [reads, writes, docReads, projectReads, docWrites, writers] = [
-    await totals('read'),
-    await totals('write'),
-    // Reads of this organization's documents and the group-wide ones its agents get too, by any
-    // agent.
-    await ranked(
-      db,
-      w,
-      `SELECT DISTINCT r.document_id AS key, r.request_id, r.created_at AS at
+  const [win, reads, writes, docReads, projectReads, docWrites, writers, sinceRes, docsRes] =
+    (await db.query(`
+    ${windowSql(period)};
+    ${rankedSql(period, requests('read', 'organization_id'), 1)};
+    ${rankedSql(period, requests('write', 'organization_id'), 1)};
+    ${rankedSql(
+        period,
+        // Reads of this organization's documents and the group-wide ones its agents get too, by
+        // any agent.
+        `SELECT DISTINCT r.document_id AS key, r.request_id, r.created_at AS at
          FROM section_reads r JOIN documents d ON d.id = r.document_id
-        WHERE (d.organization_id = $2 OR d.organization_id IS NULL) AND r.created_at >= ${FROM(n + 1)}`,
-      [orgId],
-      3,
-    ),
-    await ranked(
-      db,
-      w,
-      `SELECT r.project_id AS key, r.created_at AS at
+        WHERE (d.organization_id = ${org} OR d.organization_id IS NULL) AND r.created_at >= ${FROM_W}`,
+        3,
+        DOC_LABEL,
+      )};
+    ${rankedSql(
+        period,
+        `SELECT r.project_id AS key, r.created_at AS at
          FROM agent_requests r JOIN projects p ON p.id = r.project_id
-        WHERE p.organization_id = $2 AND r.kind = 'read' AND r.created_at >= ${FROM(n + 1)}`,
-      [orgId],
-      3,
-    ),
-    await ranked(
-      db,
-      w,
-      `SELECT r.document_id AS key, r.created_at AS at
+        WHERE p.organization_id = ${org} AND r.kind = 'read' AND r.created_at >= ${FROM_W}`,
+        3,
+        { from: 'projects l', columns: 'l.name, l.slug' },
+      )};
+    ${rankedSql(
+        period,
+        `SELECT r.document_id AS key, r.created_at AS at
          FROM agent_requests r JOIN documents d ON d.id = r.document_id
-        WHERE (d.organization_id = $2 OR d.organization_id IS NULL) AND r.kind = 'write' AND r.created_at >= ${FROM(n + 1)}`,
-      [orgId],
-      3,
-    ),
-    await ranked(db, w, requests('write', 'actor_id'), [orgId], 3),
-  ];
-
-  const docNames = await names<{ title: string; where: string }>(
-    db,
-    DOC_NAMES,
-    [...docReads, ...docWrites].map((r) => r.key),
-  );
-  const projectNames = await names<{ name: string; slug: string }>(
-    db,
-    'SELECT id, name, slug FROM projects WHERE id = ANY($1::uuid[])',
-    projectReads.map((r) => r.key),
-  );
-  const actorNames = await names<{ name: string }>(
-    db,
-    'SELECT id, name FROM actors WHERE id = ANY($1::uuid[])',
-    writers.map((r) => r.key),
-  );
+        WHERE (d.organization_id = ${org} OR d.organization_id IS NULL) AND r.kind = 'write' AND r.created_at >= ${FROM_W}`,
+        3,
+        DOC_LABEL,
+      )};
+    ${rankedSql(period, requests('write', 'actor_id'), 3, { from: 'actors l', columns: 'l.name' })};
+    SELECT ${TRACKING_SINCE_SQL} AS at;
+    SELECT d.id, d.title, concat_ws(' › ', p.name, sc.name) AS "where", d.created_at,
+           ${lastReadSql('d.id')} AS last_read_at
+      FROM documents d LEFT JOIN projects p ON p.id = d.project_id LEFT JOIN scopes sc ON sc.id = d.scope_id
+     WHERE d.organization_id = ${org} AND d.disabled_at IS NULL AND (p.id IS NULL OR p.archived_at IS NULL)
+     ORDER BY d.title`)) as unknown as [
+      pg.QueryResult<{ days: string[] }>,
+      pg.QueryResult<Ranked>,
+      pg.QueryResult<Ranked>,
+      pg.QueryResult<Ranked<{ title: string; where: string }>>,
+      pg.QueryResult<Ranked<{ name: string; slug: string }>>,
+      pg.QueryResult<Ranked<{ title: string; where: string }>>,
+      pg.QueryResult<Ranked<{ name: string }>>,
+      pg.QueryResult<{ at: string | null }>,
+      pg.QueryResult<{
+        id: string;
+        title: string;
+        where: string;
+        created_at: string;
+        last_read_at: string | null;
+      }>,
+    ];
+  const days = win.rows[0].days;
+  const hasPrev = period !== 'all';
+  const zero: ActivityFigure = { count: 0, previous: hasPrev ? 0 : null, daily: days.map(() => 0) };
   const fig = (r: ActivityFigure) => ({ count: r.count, previous: r.previous, daily: r.daily });
-  const doc = (r: ActivityFigure & { key: string }) => ({
+  const doc = (r: Ranked<{ title: string; where: string }>) => ({
     id: r.key,
-    title: docNames.get(r.key)?.title ?? 'Deleted document',
-    where: docNames.get(r.key)?.where ?? '',
+    title: r.title ?? 'Deleted document',
+    where: r.where ?? '',
     ...fig(r),
   });
 
-  const since = (
-    await db.query<{ at: string | null }>(`SELECT ${TRACKING_SINCE_SQL} AS at`)
-  ).rows[0].at;
-  const { rows: docs } = await db.query<{
-    id: string;
-    title: string;
-    where: string;
-    created_at: string;
-    last_read_at: string | null;
-  }>(
-    `SELECT d.id, d.title, concat_ws(' › ', p.name, sc.name) AS "where", d.created_at,
-            (SELECT max(r.created_at) FROM section_reads r WHERE r.document_id = d.id) AS last_read_at
-       FROM documents d LEFT JOIN projects p ON p.id = d.project_id LEFT JOIN scopes sc ON sc.id = d.scope_id
-      WHERE d.organization_id = $1 AND d.disabled_at IS NULL AND (p.id IS NULL OR p.archived_at IS NULL)
-      ORDER BY d.title`,
-    [orgId],
-  );
-  const stale = docs
+  const since = sinceRes.rows[0].at;
+  const stale = docsRes.rows
     .map((d) => ({
       id: d.id,
       title: d.title,
@@ -373,21 +347,21 @@ export async function organizationActivity(
 
   return {
     period,
-    days: w.days,
+    days,
     tracking_since: since,
-    reads: fig(reads),
-    writes: fig(writes),
-    most_read_documents: docReads.map(doc),
-    most_read_projects: projectReads.map((r) => ({
+    reads: fig(reads.rows[0] ?? zero),
+    writes: fig(writes.rows[0] ?? zero),
+    most_read_documents: docReads.rows.map(doc),
+    most_read_projects: projectReads.rows.map((r) => ({
       id: r.key,
-      name: projectNames.get(r.key)?.name ?? 'Deleted project',
-      slug: projectNames.get(r.key)?.slug ?? '',
+      name: r.name ?? 'Deleted project',
+      slug: r.slug ?? '',
       ...fig(r),
     })),
-    most_written_documents: docWrites.map(doc),
-    top_writers: writers.map((r) => ({
+    most_written_documents: docWrites.rows.map(doc),
+    top_writers: writers.rows.map((r) => ({
       id: r.key,
-      name: actorNames.get(r.key)?.name ?? 'Removed agent',
+      name: r.name ?? 'Removed agent',
       ...fig(r),
     })),
     stale_documents: stale,
