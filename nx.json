@@ -13,10 +13,7 @@
         "default",
         "{workspaceRoot}/eslint.config.mjs",
         {
-          "externalDependencies": [
-            "eslint",
-            "@openstuff-dev/lint"
-          ]
+          "externalDependencies": ["eslint", "@openstuff-dev/lint"]
         }
       ]
     },
@@ -26,10 +23,7 @@
         "default",
         "{workspaceRoot}/stylelint.config.mjs",
         {
-          "externalDependencies": [
-            "stylelint",
-            "@openstuff-dev/lint"
-          ]
+          "externalDependencies": ["stylelint", "@openstuff-dev/lint"]
         }
       ]
     }
@@ -42,5 +36,6 @@
         "targetName": "lint"
       }
     }
-  ]
+  ],
+  "analytics": true
 }
