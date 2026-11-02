@@ -367,7 +367,12 @@ export function parseExportFile(input: unknown): ExportFile {
     if (!p) fail(`finding "${f.title}" belongs to a project that isn't in the file.`);
     if (p.organization !== f.organization)
       fail(`finding "${f.title}" and its project are in different organizations.`);
-    if (f.scope && scopes.get(f.scope)?.project !== f.project)
+    // Its project's scope, or one of its organization's that spans projects.
+    const s = f.scope ? scopes.get(f.scope) : undefined;
+    if (
+      f.scope &&
+      !(s && (s.project === f.project || (!s.project && s.organization === f.organization)))
+    )
       fail(`finding "${f.title}" is filed under a scope of another project.`);
   }
   for (const g of file.read_grants) {

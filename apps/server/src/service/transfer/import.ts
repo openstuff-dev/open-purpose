@@ -1128,13 +1128,18 @@ async function apply(run: Run): Promise<void> {
     const orgId = orgOf(f.organization);
     const projectId = id(ids.projects, f.project);
     if (!orgId || !projectId) continue;
-    // Merging a file back into where it came from: its findings are already here.
+    // Already here: merged back into where it came from (same id), or imported from this file
+    // before (a new id, but the same project, title and time it was reported). The file holds
+    // milliseconds, the database microseconds.
     if (
       (
-        await c.query('SELECT 1 FROM findings WHERE id::text = $1 AND organization_id = $2', [
-          f.key,
-          orgId,
-        ])
+        await c.query(
+          `SELECT 1 FROM findings WHERE organization_id = $2
+              AND (id::text = $1
+                   OR (project_id = $3 AND title = $4 AND date_trunc('milliseconds', created_at) = $5))
+            LIMIT 1`,
+          [f.key, orgId, projectId, f.title, f.created_at],
+        )
       ).rowCount
     )
       continue;
