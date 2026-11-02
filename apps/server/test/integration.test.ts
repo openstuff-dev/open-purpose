@@ -2475,6 +2475,69 @@ definitions:`,
     });
   });
 
+  it('merges the same export twice without copying its findings again', async () => {
+    const file = (await api('GET', `/export?organization_id=${o.logistics}`)).data;
+    expect(file.findings.length).toBeGreaterThan(0);
+    const findings = async () =>
+      (await api('GET', `/findings?organization_id=${o.logistics}&status=all`)).data.length;
+    const before = await findings();
+    const into = { [file.organizations[0].key]: { action: 'merge', into: o.logistics } };
+    for (let i = 0; i < 2; i++) {
+      const res = await api('POST', '/import', { file, organizations: into });
+      expect(res.status).toBe(201);
+      expect(res.data.counts.findings).toBe(0);
+    }
+    expect(await findings()).toBe(before);
+
+    // Imported as a new organization, the findings get ids of their own. Merging the same file
+    // into that copy (a restore run twice) doesn't add them again.
+    const asNew = { [file.organizations[0].key]: { action: 'new', slug: 'logistics-twice' } };
+    const copy = await api('POST', '/import', { file, organizations: asNew });
+    expect(copy.data.counts.findings).toBe(file.findings.length);
+    const copyId = copy.data.organizations[0].id;
+    const intoCopy = { [file.organizations[0].key]: { action: 'merge', into: copyId } };
+    const merged = await api('POST', '/import', { file, organizations: intoCopy });
+    expect(merged.status).toBe(201);
+    expect(merged.data.counts.findings).toBe(0);
+    expect(
+      (await api('GET', `/findings?organization_id=${copyId}&status=all`)).data.length,
+    ).toBe(file.findings.length);
+  });
+
+  it('imports findings filed under an organization scope, not under another project’s', async () => {
+    const file = (await api('GET', `/export?organization_id=${o.logistics}`)).data;
+    const orgScope = file.scopes.find((s: any) => s.slug === 'angular' && !s.project);
+    const other = file.projects.find((p: any) => p.key !== file.findings[0].project);
+    expect(orgScope).toBeTruthy();
+    expect(other).toBeTruthy();
+    // A scope of another project, added to the file.
+    const otherScope = { ...orgScope, key: 'other-scope', slug: 'other-scope', project: other.key };
+    const withScope = (scope: string) => ({
+      ...file,
+      scopes: [...file.scopes, otherScope],
+      findings: [{ ...file.findings[0], scope }, ...file.findings.slice(1)],
+    });
+    const asNew = (slug: string) => ({ [file.organizations[0].key]: { action: 'new', slug } });
+
+    const res = await api('POST', '/import', {
+      file: withScope(orgScope.key),
+      organizations: asNew('logistics-scoped'),
+    });
+    expect(res.status).toBe(201);
+    const copyId = res.data.organizations[0].id;
+    const again = (await api('GET', `/export?organization_id=${copyId}`)).data;
+    const title = file.findings[0].title;
+    const scopeOf = (f: any) => again.scopes.find((s: any) => s.key === f.scope);
+    expect(scopeOf(again.findings.find((f: any) => f.title === title))).toMatchObject({
+      slug: 'angular',
+      project: null,
+    });
+
+    const bad = await api('POST', '/import/preview', { file: withScope(otherScope.key) });
+    expect(bad.status).toBe(400);
+    expect(bad.data.message).toContain('scope of another project');
+  });
+
   it('restores a whole group as a new group', async () => {
     const file = (await api('GET', '/export?people=1')).data;
     expect(file.source.kind).toBe('group');
