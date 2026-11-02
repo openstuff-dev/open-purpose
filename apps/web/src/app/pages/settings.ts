@@ -54,7 +54,10 @@ organization, the project and the part of the code you are in (a repository or a
    \`get_context\` shows each document's id as \`[d:…]\`: add sections with
    \`add_section\`. When a document is missing (a new project often has no
    glossary or business logic yet), call \`propose_document\` with its first
-   sections and tell me in one line that you proposed it.
+   sections and tell me in one line that you proposed it. When a section is
+   outdated or repeats another, call \`archive_section\`; when it belongs in
+   another document, call \`move_section\`. Give the reason and tell me in one
+   line what you archived or moved.
 4. When I correct you and the correction should apply next time, call
    \`propose_learning\` with the same remote/path/manifests. Say in one line that
    you did. Do not propose one-off preferences or task-specific details.

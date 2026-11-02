@@ -24,7 +24,9 @@ import {
 } from './service/projects.js';
 import {
   addSection,
+  archiveSection,
   editSection,
+  moveSection,
   getProposalDetail,
   listProposals,
   documentSections,
@@ -80,7 +82,9 @@ Workflow:
    rules of its own and list_scopes has no scope for it, suggest one with create_scope.
    get_context shows each document's id as [d:xxxxxxxx]; add sections with add_section. When a document is
    missing (a new project often has no glossary or business logic yet), suggest it with its first sections
-   via propose_document, and tell the user in one line that you proposed it.
+   via propose_document, and tell the user in one line that you proposed it. When a section is outdated or
+   repeats another one, archive it with archive_section; when it belongs in another document, move it there
+   with move_section. Give the reason, and tell the user in one line what you archived or moved.
    Reviewers may comment on lines, suggest wording or request changes. get_context tells you when feedback
    is waiting on you; read it with get_review, then answer with reply_to_review, revise_proposal or
    apply_suggestion. Mention it to the user if their input is needed.
@@ -157,6 +161,8 @@ const json = (v: unknown): ToolResult => text(JSON.stringify(v, null, 2));
 const WRITE_TOOLS = [
   'update_section',
   'add_section',
+  'archive_section',
+  'move_section',
   'propose_document',
   'propose_learning',
   'reply_to_review',
@@ -732,6 +738,76 @@ export function createMcpServer(
         return r.status === 'applied'
           ? text(`Added section ${r.section.id.slice(0, 8)}.`)
           : text(`Proposed for review (proposal ${r.proposal.id.slice(0, 8)}).`);
+      }),
+  );
+
+  server.registerTool(
+    'archive_section',
+    {
+      title: 'Archive section',
+      description:
+        'Archive a section that is outdated or repeats another one. Agents stop getting it, and a person can restore it in OpenPurpose with its history. Depends on the section\'s mode, like update_section: "open" sections are archived now, "propose" sections create a proposal, "locked" ones are refused. To fix a section, use update_section instead.',
+      inputSchema: {
+        section_id: z
+          .string()
+          .describe('Section id or its 8-character prefix, as shown in [s:xxxxxxxx]'),
+        reason: z
+          .string()
+          .min(1)
+          .describe('Why it should go, shown to the reviewer, e.g. "Repeats the Glossary term Scope"'),
+      },
+    },
+    (x) =>
+      run('archive_section', async (db, track) => {
+        const r = await archiveSection(db, a, x.section_id, { rationale: x.reason });
+        track.documentId = r.status === 'applied' ? r.section.document_id : r.proposal.document_id;
+        const name = r.status === 'applied' ? r.section.heading : r.proposal.heading;
+        if (r.status === 'proposed')
+          return text(
+            `Proposed archiving "${name}" (proposal ${r.proposal.id.slice(0, 8)}). Tell the user in one line that you proposed it and that they can approve it in the OpenPurpose Inbox.`,
+          );
+        return text(
+          `${r.proposal ? `Approved automatically (proposal ${r.proposal.id.slice(0, 8)}): archived` : 'Archived'} "${name}". Agents no longer get it; a person can restore it in OpenPurpose. Tell the user in one line that you archived it.`,
+        );
+      }),
+  );
+
+  server.registerTool(
+    'move_section',
+    {
+      title: 'Move section',
+      description:
+        "Move a section to another document of your organization, e.g. a term from Guidelines into the Glossary, or a learning that became a guideline. It keeps its id and history. get_context shows document ids as [d:xxxxxxxx]. Moves now when both the section and the target document are \"open\"; otherwise it creates a proposal. Locked sections and documents are refused. When the target document doesn't exist yet, create it with propose_document first.",
+      inputSchema: {
+        section_id: z
+          .string()
+          .describe('Section id or its 8-character prefix, as shown in [s:xxxxxxxx]'),
+        document_id: z
+          .string()
+          .describe('The document to move it to: its id or 8-character prefix, as in [d:xxxxxxxx]'),
+        position: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe('Where in that document: 0 = first. Leave out to put it last.'),
+        reason: z.string().min(1).describe('Why it belongs there, shown to the reviewer'),
+      },
+    },
+    (x) =>
+      run('move_section', async (db, track) => {
+        const r = await moveSection(db, a, x.section_id, x.document_id, {
+          position: x.position ?? null,
+          rationale: x.reason,
+        });
+        track.documentId = r.status === 'applied' ? r.section.document_id : r.proposal.document_id;
+        if (r.status === 'proposed')
+          return text(
+            `Proposed moving "${r.proposal.heading}" (proposal ${r.proposal.id.slice(0, 8)}). Tell the user in one line that you proposed it and that they can approve it in the OpenPurpose Inbox.`,
+          );
+        return text(
+          `${r.proposal ? `Approved automatically (proposal ${r.proposal.id.slice(0, 8)}): moved` : 'Moved'} "${r.section.heading}" to document [d:${r.section.document_id.slice(0, 8)}]. Its id stays [s:${r.section.id.slice(0, 8)}]. Tell the user in one line that you moved it.`,
+        );
       }),
   );
 

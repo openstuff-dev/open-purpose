@@ -16,6 +16,12 @@ import {
   Chip,
   ConfirmDialog,
   Control,
+  Dialog,
+  DialogBody,
+  DialogClose,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Field,
   Callout,
   EmptyState, Breadcrumbs } from '@openstuff-dev/ui-angular';
@@ -28,6 +34,7 @@ import {
   type EditMode,
   type GraphNode,
   type LinkRef,
+  type MoveTarget,
   type Section,
   type SectionVersion,
 } from '../core/models';
@@ -69,6 +76,12 @@ interface Draft {
     Control,
     Chip,
     Badge,
+    Dialog,
+    DialogHeader,
+    DialogTitle,
+    DialogBody,
+    DialogFooter,
+    DialogClose,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -329,15 +342,11 @@ interface Draft {
                     >
                       Down
                     </button>
-                    <button
-                      os-button
-                      variant="link"
-                      size="sm"
-                      tone="danger"
-                      type="button"
-                      (click)="removeSection(s)"
-                    >
-                      Delete
+                    <button os-button variant="link" size="sm" type="button" (click)="startMove(s)">
+                      Move to…
+                    </button>
+                    <button os-button variant="link" size="sm" type="button" (click)="archive(s)">
+                      Archive
                     </button>
                   }
                 </span>
@@ -393,6 +402,89 @@ interface Draft {
           <os-empty-state title="No sections yet" bordered />
         }
       </div>
+
+      @if (d.archived_sections.length) {
+        <details class="archived-sections">
+          <summary>Archived sections ({{ d.archived_sections.length }})</summary>
+          <p class="quiet">
+            Agents don't get these. Restore one to bring it back with its history.
+          </p>
+          <ul class="history">
+            @for (s of d.archived_sections; track s.id) {
+              <li>
+                <details>
+                  <summary>
+                    {{ s.heading }}
+                    <span class="quiet"
+                      >archived
+                      @if (s.archived_by_name) {
+                        by {{ s.archived_by_name }},
+                      }
+                      {{ s.archived_at | date: 'd MMM y, HH:mm' }}</span
+                    >
+                  </summary>
+                  <app-md
+                    [text]="s.body"
+                    [fromProject]="d.project_id"
+                    [fromOrganization]="d.organization_id"
+                  />
+                </details>
+                @if (d.can_edit) {
+                  <span class="section-actions">
+                    <button os-button variant="link" size="sm" type="button" (click)="restore(s)">
+                      Restore
+                    </button>
+                    <button
+                      os-button
+                      variant="link"
+                      size="sm"
+                      tone="danger"
+                      type="button"
+                      (click)="removeSection(s)"
+                    >
+                      Delete for good
+                    </button>
+                  </span>
+                }
+              </li>
+            }
+          </ul>
+        </details>
+      }
+
+      <dialog os-dialog size="sm" [open]="!!moving()" (openChange)="$event || moving.set(null)">
+        @if (moving(); as s) {
+          <form (ngSubmit)="moveSection(s)">
+            <header os-dialog-header>
+              <h2 os-dialog-title>Move “{{ s.heading }}”</h2>
+            </header>
+            <div os-dialog-body>
+              <p class="quiet">
+                It keeps its id and history. Agents that get the other document get it from now on.
+              </p>
+              <os-field label="To document">
+                <select os-select name="target" [(ngModel)]="moveTo" required>
+                  @for (t of moveTargets(); track t.id) {
+                    <option [value]="t.id">{{ t.title }} ({{ t.where }})</option>
+                  }
+                </select>
+              </os-field>
+              <os-field label="Where in it">
+                <select os-select name="position" [(ngModel)]="moveFirst">
+                  <option [ngValue]="false">At the end</option>
+                  <option [ngValue]="true">At the top</option>
+                </select>
+              </os-field>
+            </div>
+            <footer os-dialog-footer>
+              <button os-button type="button" os-dialog-close>Cancel</button>
+              <button os-button variant="primary" type="submit" [disabled]="!moveTo">
+                Move section
+              </button>
+            </footer>
+          </form>
+        }
+      </dialog>
 
       @if (d.can_edit) {
         @if (adding()) {
@@ -460,6 +552,10 @@ export class DocumentPage {
   readonly versions = signal<SectionVersion[]>([]);
   readonly refs = signal<{ source: GraphNode; refs: LinkRef[] }[]>([]);
   readonly adding = signal(false);
+  readonly moving = signal<Section | null>(null);
+  readonly moveTargets = signal<MoveTarget[]>([]);
+  moveTo = '';
+  moveFirst = false;
   readonly editingTitle = signal(false);
   readonly newMode = signal<EditMode>('propose');
   readonly kindLabel = KIND_LABEL;
@@ -660,10 +756,62 @@ export class DocumentPage {
     }
   }
 
+  async archive(s: Section): Promise<void> {
+    try {
+      await this.api.archiveSection(s.id);
+      this.notices.ok(`Archived ${s.heading}. Agents no longer get it`);
+      await this.reload();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  async restore(s: Section): Promise<void> {
+    try {
+      await this.api.restoreSection(s.id);
+      this.notices.ok(`Restored ${s.heading}`);
+      await this.reload();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  async startMove(s: Section): Promise<void> {
+    try {
+      const targets = await this.api.moveTargets(this.id());
+      if (!targets.length) {
+        this.notices.error('There is no other document to move it to. Create one first.');
+        return;
+      }
+      this.moveTargets.set(targets);
+      this.moveTo = targets[0].id;
+      this.moveFirst = false;
+      this.moving.set(s);
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  async moveSection(s: Section): Promise<void> {
+    const to = this.moveTargets().find((t) => t.id === this.moveTo);
+    if (!to) return;
+    try {
+      await this.api.moveSection(s.id, {
+        document_id: to.id,
+        position: this.moveFirst ? 0 : null,
+      });
+      this.moving.set(null);
+      this.notices.ok(`Moved ${s.heading} to ${to.title}`);
+      await this.reload();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
   async removeSection(s: Section): Promise<void> {
     const remove = await this.confirmDialog.confirm({
-      title: `Delete “${s.heading}”?`,
-      message: 'Its history is deleted too.',
+      title: `Delete “${s.heading}” for good?`,
+      message: "Its history is deleted too, and it can't be restored.",
       confirmLabel: 'Delete section',
       danger: true,
     });

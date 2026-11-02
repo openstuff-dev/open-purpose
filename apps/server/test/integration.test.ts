@@ -89,6 +89,12 @@ async function mcp(token: string) {
   return { client, call };
 }
 
+/** Delete a section for good: only archived sections can be deleted. */
+async function removeSection(id: string) {
+  await api('POST', `/sections/${id}/archive`, {});
+  expect((await api('DELETE', `/sections/${id}`)).status).toBe(204);
+}
+
 const FRONTEND_PKG = JSON.stringify({ dependencies: { '@angular/core': '^20.0.0' } });
 const API_CSPROJ = '<Project Sdk="Microsoft.NET.Sdk.Web"></Project>';
 const HTTPS_REMOTE = 'https://acme@dev.azure.com/acme/Platform/_git/customer-portal';
@@ -672,6 +678,153 @@ describe('OpenPurpose with groups and organizations', () => {
         await api('DELETE', `/documents/${d.id}`);
   });
 
+  it('lets agents archive and move sections, as far as the edit modes allow', async () => {
+    const doc = async (title: string, mode: string, groupWide = false) =>
+      (
+        await api(
+          'POST',
+          '/documents',
+          groupWide
+            ? { organization_id: null, kind: 'reference', title, mode }
+            : { project_id: projectId, kind: 'reference', title, mode },
+        )
+      ).data;
+    const section = async (docId: string, heading: string, mode: string) =>
+      (await api('POST', `/documents/${docId}/sections`, { heading, body: `About ${heading}.`, mode }))
+        .data.section;
+    const notes = await doc('Portal notes', 'propose');
+    const handbook = await doc('Portal handbook', 'open');
+    const frozen = await doc('Portal policies', 'locked');
+    const elsewhere = await doc('Workspace notes', 'open', true);
+    const stale = await section(notes.id, 'Old deploy steps', 'propose');
+    const loose = await section(notes.id, 'Scratch', 'open');
+    const fixed = await section(notes.id, 'Retention', 'locked');
+    const howto = await section(notes.id, 'How to release', 'open');
+    const intro = await section(handbook.id, 'Intro', 'open');
+    const s8 = (x: { id: string }) => x.id.slice(0, 8);
+    const ctx = async () =>
+      (await call('get_context', { remote_url: HTTPS_REMOTE, path: 'src/app.ts' })).text;
+    const { client, call } = await mcp(t.jonas);
+
+    // A "propose" section becomes a proposal; nothing changes until a person approves it.
+    const r = await call('archive_section', {
+      section_id: s8(stale),
+      reason: 'We deploy with the pipeline now.',
+    });
+    expect(r.isError).toBeFalsy();
+    expect(r.text).toContain('Proposed archiving "Old deploy steps"');
+    expect(r.text).toContain('Tell the user in one line that you proposed it');
+    expect(await ctx()).toContain('Old deploy steps');
+    const again = await call('archive_section', { section_id: s8(stale), reason: 'Again.' });
+    expect(again.text).toContain('already has an open proposal to archive it');
+    const p = (await api('GET', '/proposals?status=pending')).data.find(
+      (x: any) => x.kind === 'archive_section' && x.section_id === stale.id,
+    );
+    expect(p).toMatchObject({ document_id: notes.id, heading: 'Old deploy steps' });
+    expect((await call('get_review', { proposal_id: p.id })).text).toContain(
+      '- Archives the section',
+    );
+    const revise = await call('revise_proposal', { proposal_id: p.id, body: 'x', note: 'x' });
+    expect(revise.text).toContain('has no text to revise');
+    expect((await api('POST', `/proposals/${p.id}/approve`, {})).status).toBe(200);
+
+    // Archived: agents no longer get it, people see it under the document and can restore it.
+    expect(await ctx()).not.toContain('Old deploy steps');
+    expect((await call('read_section', { section_id: s8(stale) })).text).toContain('is archived');
+    expect((await call('search', { query: 'deploy steps' })).text).not.toContain('Old deploy steps');
+    let page = (await api('GET', `/documents/${notes.id}`)).data;
+    expect(page.sections.map((x: any) => x.heading)).not.toContain('Old deploy steps');
+    expect(page.archived_sections).toMatchObject([
+      { id: stale.id, archived_by_name: 'Admin' },
+    ]);
+    expect((await api('PATCH', `/sections/${stale.id}`, { body: 'New.' })).status).toBe(409);
+    expect((await api('POST', `/sections/${stale.id}/restore`, {}, { token: t.anders })).status).toBe(
+      403,
+    );
+    expect((await api('POST', `/sections/${stale.id}/restore`, {})).data.archived_at).toBeNull();
+    expect(await ctx()).toContain('Old deploy steps');
+    // Only archived sections can be deleted for good.
+    expect((await api('DELETE', `/sections/${stale.id}`)).status).toBe(409);
+
+    // "open" sections are archived at once; "locked" ones are refused.
+    const now = await call('archive_section', { section_id: s8(loose), reason: 'Scratch notes.' });
+    expect(now.text).toContain('Archived "Scratch"');
+    expect((await call('archive_section', { section_id: s8(fixed), reason: 'x' })).text).toContain(
+      'is locked',
+    );
+
+    // Moves: open into open happens at once, and the section keeps its id.
+    const moved = await call('move_section', {
+      section_id: s8(howto),
+      document_id: `d:${handbook.id.slice(0, 8)}`,
+      position: 0,
+      reason: 'Belongs in the handbook.',
+    });
+    expect(moved.isError).toBeFalsy();
+    expect(moved.text).toContain(`Its id stays [s:${s8(howto)}]`);
+    page = (await api('GET', `/documents/${handbook.id}`)).data;
+    expect(page.sections.map((x: any) => [x.id, x.heading])).toEqual([
+      [howto.id, 'How to release'],
+      [intro.id, 'Intro'],
+    ]);
+    expect((await api('GET', `/sections/${howto.id}/versions`)).data).toHaveLength(1);
+
+    // A "propose" section is proposed; approving moves it to the end.
+    const proposed = await call('move_section', {
+      section_id: s8(stale),
+      document_id: handbook.id,
+      reason: 'Handbook material.',
+    });
+    expect(proposed.text).toContain('Proposed moving "Old deploy steps"');
+    const mp = (await api('GET', '/proposals?status=pending')).data.find(
+      (x: any) => x.kind === 'move_section' && x.section_id === stale.id,
+    );
+    expect(mp).toMatchObject({
+      document_id: notes.id,
+      target_document_id: handbook.id,
+      target_document_title: 'Portal handbook',
+      target_location: 'Customer Portal',
+    });
+    expect((await api('POST', `/proposals/${mp.id}/approve`, {})).status).toBe(200);
+    expect((await api('GET', `/proposals/${mp.id}`)).data.result_document_id).toBe(handbook.id);
+    page = (await api('GET', `/documents/${handbook.id}`)).data;
+    expect(page.sections.map((x: any) => x.heading)).toEqual([
+      'How to release',
+      'Intro',
+      'Old deploy steps',
+    ]);
+
+    // Locked targets, other organizations and locked sections are refused.
+    const into = await call('move_section', {
+      section_id: s8(intro),
+      document_id: frozen.id,
+      reason: 'x',
+    });
+    expect(into.text).toContain('is locked');
+    const away = await call('move_section', {
+      section_id: s8(intro),
+      document_id: elsewhere.id,
+      reason: 'x',
+    });
+    expect(away.text).toContain('within one organization');
+    expect(
+      (await call('move_section', { section_id: s8(fixed), document_id: handbook.id, reason: 'x' }))
+        .text,
+    ).toContain('is locked');
+    await client.close();
+
+    // People move with the REST API, to any other document of the same organization.
+    const targets = (await api('GET', `/documents/${notes.id}/move-targets`)).data;
+    expect(targets.map((x: any) => x.id)).toEqual(expect.arrayContaining([handbook.id, frozen.id]));
+    expect(targets.map((x: any) => x.id)).not.toContain(notes.id);
+    expect(targets.map((x: any) => x.id)).not.toContain(elsewhere.id);
+    expect(targets.find((x: any) => x.id === handbook.id).where).toBe('Customer Portal');
+    const back = await api('POST', `/sections/${howto.id}/move`, { document_id: notes.id });
+    expect(back.status).toBe(200);
+    expect(back.data.section.document_id).toBe(notes.id);
+    for (const d of [notes, handbook, frozen, elsewhere]) await api('DELETE', `/documents/${d.id}`);
+  });
+
   it('promotes a learning from one organization to the whole group', async () => {
     const lars = await mcp(t.lars);
     const r = await lars.call('propose_learning', {
@@ -987,8 +1140,8 @@ describe('OpenPurpose with groups and organizations', () => {
 
     await api('PATCH', `/organizations/${o.logistics}`, { context_max_tokens: null });
     await api('PUT', '/group', { context_max_tokens: before });
-    await api('DELETE', `/sections/${general.id}`);
-    await api('DELETE', `/sections/${specific.id}`);
+    await removeSection(general.id);
+    await removeSection(specific.id);
     await client.close();
   });
 
@@ -1050,7 +1203,7 @@ describe('OpenPurpose with groups and organizations', () => {
     expect((await api('GET', '/search?q=quokka&within=project')).status).toBe(400);
     expect((await api('GET', '/search?q=quokka&within=anywhere')).status).toBe(400);
 
-    for (const x of made) await api('DELETE', `/sections/${x.id}`);
+    for (const x of made) await removeSection(x.id);
     await api('DELETE', `/documents/${projDoc.id}`);
   });
 

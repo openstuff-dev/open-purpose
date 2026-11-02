@@ -908,6 +908,9 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       api.get('/documents/:id', async (req) =>
         pages.documentPage(req.db, req.access, (req.params as { id: string }).id),
       );
+      api.get('/documents/:id/move-targets', async (req) =>
+        pages.moveTargets(req.db, req.access, (req.params as { id: string }).id),
+      );
       api.patch('/documents/:id', async (req) => {
         const body = parse(
           z.object({
@@ -987,6 +990,37 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       api.delete('/sections/:id', async (req, reply) => {
         await content.deleteSection(req.db, req.access, (req.params as { id: string }).id);
         return reply.status(204).send();
+      });
+      api.post('/sections/:id/archive', async (req, reply) => {
+        const body = parse(z.object({ note: z.string().max(2000).optional() }), req.body ?? {});
+        const r = await proposals.archiveSection(
+          req.db,
+          req.access,
+          (req.params as { id: string }).id,
+          { rationale: body.note },
+        );
+        return reply.status(r.status === 'applied' ? 200 : 202).send(r);
+      });
+      api.post('/sections/:id/restore', async (req) =>
+        content.restoreSection(req.db, req.access, (req.params as { id: string }).id),
+      );
+      api.post('/sections/:id/move', async (req, reply) => {
+        const body = parse(
+          z.object({
+            document_id: id,
+            position: z.number().int().min(0).nullable().optional(),
+            note: z.string().max(2000).optional(),
+          }),
+          req.body,
+        );
+        const r = await proposals.moveSection(
+          req.db,
+          req.access,
+          (req.params as { id: string }).id,
+          body.document_id,
+          { position: body.position, rationale: body.note },
+        );
+        return reply.status(r.status === 'applied' ? 200 : 202).send(r);
       });
       api.get('/sections/:id/versions', async (req) =>
         content.listVersions(req.db, req.access, (req.params as { id: string }).id),
@@ -1300,7 +1334,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
         }>(
           `SELECT DISTINCT ON (lower(s.heading), d.organization_id) s.heading, d.organization_id
              FROM sections s JOIN documents d ON d.id = s.document_id
-            WHERE d.kind = 'glossary' AND s.heading ILIKE $1
+            WHERE d.kind = 'glossary' AND s.archived_at IS NULL AND s.heading ILIKE $1
               AND (d.organization_id IS NULL OR d.organization_id = ANY($2::uuid[]))
             ORDER BY lower(s.heading), d.organization_id LIMIT 10`,
           [like, a.readableOrgIds()],

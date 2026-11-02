@@ -158,6 +158,8 @@ const fileSchema = z.object({
           created_at: time,
           updated_at: time,
           updated_by: ref,
+          // Files from before sections could be archived don't have it.
+          archived_at: time.nullable().optional(),
           versions: z.array(
             z.object({
               version: z.number().int().min(1),
@@ -176,7 +178,15 @@ const fileSchema = z.object({
   proposals: z.array(
     z.object({
       key,
-      kind: z.enum(['edit_section', 'new_section', 'learning', 'new_scope', 'new_document']),
+      kind: z.enum([
+        'edit_section',
+        'new_section',
+        'learning',
+        'new_scope',
+        'new_document',
+        'archive_section',
+        'move_section',
+      ]),
       status: z.enum(['pending', 'changes_requested', 'approved', 'rejected']),
       organization: ref,
       project: ref,
@@ -203,6 +213,9 @@ const fileSchema = z.object({
         })
         .nullable()
         .optional(),
+      // Files from before section moves don't have these.
+      target_document: ref.optional(),
+      target_position: z.number().int().nullable().optional(),
       base_version: z.number().int().nullable(),
       heading: z.string(),
       body: z.string(),

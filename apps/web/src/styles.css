@@ -5068,3 +5068,24 @@ ul.stat-rest {
   flex: 1;
   min-width: 0;
 }
+
+.archived-sections {
+  margin-block: 1.25rem;
+}
+
+.archived-sections > summary {
+  cursor: pointer;
+  color: var(--ink-2);
+}
+
+.archived-sections .history li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+}
+
+.archived-sections .history details {
+  flex: 1 1 20rem;
+}

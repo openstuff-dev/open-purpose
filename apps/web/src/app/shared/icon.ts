@@ -7,6 +7,7 @@ import {
   input,
 } from '@angular/core';
 import {
+  Archive,
   ArrowRight,
   BookOpen,
   Bot,
@@ -68,6 +69,7 @@ import {
   ArrowLeftRight,
   ChartSpline,
   EyeOff,
+  FolderInput,
   Grid3x3,
   Hash,
   type IconNode,
@@ -138,6 +140,8 @@ const ICONS: Partial<Record<string, IconNode>> = {
   dots: Grid3x3,
   chart: ChartSpline,
   'eye-off': EyeOff,
+  archive: Archive,
+  'move-to': FolderInput,
 };
 
 function esc(v: unknown): string {

@@ -712,8 +712,9 @@ async function apply(run: Run): Promise<void> {
     history: boolean,
   ) => {
     const { rows } = await c.query<{ id: string }>(
-      `INSERT INTO sections (document_id, heading, body, mode, position, version, created_at, updated_at, updated_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      `INSERT INTO sections (document_id, heading, body, mode, position, version, created_at, updated_at, updated_by,
+                             archived_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
       [
         documentId,
         s.heading,
@@ -724,12 +725,14 @@ async function apply(run: Run): Promise<void> {
         s.created_at,
         s.updated_at,
         actor(s.updated_by),
+        s.archived_at ?? null,
       ],
     );
     const sectionId = rows[0].id;
     ids.sections.set(s.key, sectionId);
     counts.sections++;
-    await syncLinks(c, sectionId, s.body);
+    // Archived sections' links don't count until they're restored.
+    if (!s.archived_at) await syncLinks(c, sectionId, s.body);
     // Without history, the current text is the only version.
     const versions =
       history && s.versions.length
@@ -819,8 +822,9 @@ async function apply(run: Run): Promise<void> {
         mode: EditMode;
         version: number;
         position: number;
+        archived_at: string | null;
       }>(
-        'SELECT id, heading, body, mode, version, position FROM sections WHERE document_id = $1 ORDER BY position',
+        'SELECT id, heading, body, mode, version, position, archived_at FROM sections WHERE document_id = $1 ORDER BY position',
         [docId],
       )
     ).rows;
@@ -953,7 +957,7 @@ async function apply(run: Run): Promise<void> {
            SELECT id, version, heading, body, mode, $2, $3 FROM sections WHERE id = $1`,
           [t.id, run.actorId, run.label],
         );
-        await syncLinks(c, t.id, s.body);
+        if (!t.archived_at) await syncLinks(c, t.id, s.body);
         const { rows } = await c.query<{ n: number }>(
           'SELECT count(*)::int AS n FROM proposals WHERE section_id = $1 AND status IN (\'pending\', \'changes_requested\')',
           [t.id],
@@ -1046,8 +1050,10 @@ async function apply(run: Run): Promise<void> {
     const { rows } = await c.query<{ id: string }>(
       `INSERT INTO proposals (kind, status, organization_id, project_id, scope_id, document_id, section_id, result_section_id,
                               base_version, heading, body, rationale, context, revision, created_by, created_at, updated_at,
-                              reviewed_by, reviewed_at, review_note, result_scope_id, scope_spec, auto_approved, document_spec)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+                              reviewed_by, reviewed_at, review_note, result_scope_id, scope_spec, auto_approved, document_spec,
+                              target_document_id, target_position)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24,
+               $25, $26)
        RETURNING id`,
       [
         p.kind,
@@ -1074,6 +1080,8 @@ async function apply(run: Run): Promise<void> {
         p.scope_spec ? JSON.stringify(scopeSpecIn(p.scope_spec)) : null,
         p.auto_approved ?? false,
         p.document_spec ? JSON.stringify(p.document_spec) : null,
+        id(ids.docs, p.target_document ?? null),
+        p.target_position ?? null,
       ],
     );
     const proposalId = rows[0].id;

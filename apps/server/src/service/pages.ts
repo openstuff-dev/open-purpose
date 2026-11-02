@@ -86,7 +86,7 @@ export async function documentPage(db: Queryable, a: Access, ref: string) {
   const id = uuid(doc.id);
   const [sections, reads, docRead, projects, scopes] = (await db.query(`
     SELECT ${SECTION_COLS} FROM sections s LEFT JOIN actors a ON a.id = s.updated_by
-     WHERE s.document_id = ${id} ORDER BY s.position, s.created_at;
+     WHERE s.document_id = ${id} ORDER BY s.archived_at DESC NULLS FIRST, s.position, s.created_at;
     ${sectionActivitySql(`sections s WHERE s.document_id = ${id}`)};
     SELECT ${lastReadSql(id)} AS last_read_at, ${TRACKING_SINCE_SQL} AS tracking_since;
     SELECT ${PROJECT_COLS} FROM projects p WHERE p.id = ${uuid(doc.project_id)};
@@ -107,13 +107,42 @@ export async function documentPage(db: Queryable, a: Access, ref: string) {
     disabled_at,
     last_read_at,
     staleness,
-    sections: sections.rows.map((s) => ({
-      ...s,
-      activity: activity.get(s.id) ?? NO_SECTION_ACTIVITY,
-    })),
+    sections: sections.rows
+      .filter((s) => !s.archived_at)
+      .map((s) => ({ ...s, activity: activity.get(s.id) ?? NO_SECTION_ACTIVITY })),
+    /** People only: agents never get archived sections. Newest first. */
+    archived_sections: a.isAgent ? [] : sections.rows.filter((s) => s.archived_at),
     project: projects.rows.at(0) ?? null,
     scope: scopes.rows.at(0) ?? null,
     organization: orgOf(a, doc.organization_id),
     can_edit: a.canEdit(doc.organization_id),
   };
+}
+
+/** A document a section can move to: same organization, any level. */
+export interface MoveTarget {
+  id: string;
+  title: string;
+  kind: Document['kind'];
+  /** Where it hangs, e.g. "Customer Portal › Frontend". */
+  where: string;
+}
+
+/**
+ * The documents a section of this one can move to: the others of the same organization, those of
+ * its own project first.
+ */
+export async function moveTargets(db: Queryable, a: Access, ref: string): Promise<MoveTarget[]> {
+  const doc = await getDocument(db, a, ref);
+  const { rows } = await db.query<MoveTarget>(
+    `SELECT d.id, d.title, d.kind, concat_ws(' › ', COALESCE(p.name, o.name, $4), sc.name) AS "where"
+       FROM documents d
+       LEFT JOIN projects p ON p.id = d.project_id
+       LEFT JOIN scopes sc ON sc.id = d.scope_id
+       LEFT JOIN organizations o ON o.id = d.organization_id
+      WHERE d.organization_id IS NOT DISTINCT FROM $1 AND d.id <> $2 AND (p.id IS NULL OR p.archived_at IS NULL)
+      ORDER BY d.project_id IS NOT DISTINCT FROM $3 DESC, d.project_id IS NULL DESC, "where", d.position, d.title`,
+    [doc.organization_id, doc.id, doc.project_id, a.group.name],
+  );
+  return rows;
 }
