@@ -589,7 +589,12 @@ export class PeoplePage {
 
   private async load(): Promise<void> {
     try {
-      this.members.set(await this.api.members());
+      this.members.set(
+        await this.api.members((fresh) => {
+          this.members.set(fresh);
+          this.fixLevel();
+        }),
+      );
       this.fixLevel();
     } catch (e) {
       this.notices.error(e);

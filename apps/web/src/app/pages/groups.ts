@@ -123,7 +123,11 @@ export class GroupsPage {
 
   async load(): Promise<void> {
     try {
-      this.groups.set(await this.api.groups());
+      this.groups.set(
+        await this.api.groups((fresh) => {
+          this.groups.set(fresh);
+        }),
+      );
     } catch (e) {
       this.notices.error(e);
     }

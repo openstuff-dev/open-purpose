@@ -1,13 +1,13 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Api } from './api';
+import { MAX_AGE_MS } from './get-cache';
 import type { Counts } from './models';
-
-const MAX_AGE_MS = 30_000;
 
 /**
  * The counts on the Inbox and Findings links. They change when others act (an agent proposes a
- * learning or reports a finding), so they're refreshed while someone moves around, at most every
- * 30 seconds. Who-am-I (/me) only reloads when the person changes something.
+ * learning or reports a finding), so they're refreshed while someone moves around, at most once
+ * a minute (the same window as Api's store, so a refresh inside it costs no request).
+ * Who-am-I (/me) only reloads when the person changes something.
  */
 @Injectable({ providedIn: 'root' })
 export class Badges {
@@ -22,7 +22,9 @@ export class Badges {
     const mine = ++this.seq;
     this.loading = true;
     try {
-      const counts = await this.api.counts();
+      const counts = await this.api.counts((fresh) => {
+        if (mine === this.seq) this.counts.set(fresh);
+      });
       if (mine !== this.seq) return;
       this.counts.set(counts);
       this.loadedAt = Date.now();

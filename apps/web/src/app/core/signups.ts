@@ -14,12 +14,18 @@ export class Signups {
   readonly mode = signal<SignupMode>('off');
   readonly pending = signal<PendingSignup[]>([]);
 
-  /** Server admins only; anyone else keeps an empty list. */
+  /**
+   * Server admins only; anyone else keeps an empty list. Inside Api's one-minute window this is
+   * answered from memory, so opening Settings tabs one after another sends no requests.
+   */
   async load(): Promise<void> {
     if (!this.session.isSuperadmin) return;
-    const [config, pending] = await Promise.all([this.api.authConfig(), this.api.signups()]);
+    const show = (pending: PendingSignup[]) => {
+      this.pending.set(pending);
+    };
+    const [config, pending] = await Promise.all([this.api.authConfig(), this.api.signups(show)]);
     this.mode.set(config.signup);
-    this.pending.set(pending);
+    show(pending);
   }
 
   async approve(s: PendingSignup, workspace: string): Promise<void> {

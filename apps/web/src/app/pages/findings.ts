@@ -743,18 +743,28 @@ export class FindingsPage {
     }
   }
 
+  /** Only the newest load (and its later updates) may change what's shown. */
+  private asked = 0;
+
   private async load(): Promise<void> {
+    const ask = ++this.asked;
+    const showList = (list: Finding[]) => {
+      if (ask === this.asked) this.all.set(list);
+    };
+    const showCounts = (counts: FindingCounts) => {
+      if (ask === this.asked) this.counts.set(counts);
+    };
     try {
       const org = this.org() || undefined;
       const shown = this.shown();
       const [list, counts] = await Promise.all([
         shown.length
-          ? this.api.findings({ status: shown, organization_id: org })
+          ? this.api.findings({ status: shown, organization_id: org }, showList)
           : Promise.resolve([]),
-        this.api.findingCounts({ organization_id: org }),
+        this.api.findingCounts({ organization_id: org }, showCounts),
       ]);
-      this.all.set(list);
-      this.counts.set(counts);
+      showList(list);
+      showCounts(counts);
     } catch (e) {
       this.notices.error(e);
     }
