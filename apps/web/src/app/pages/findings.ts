@@ -435,6 +435,16 @@ function lines(f: Finding): string {
                   name="remind"
                   aria-describedby="remind-hint"
               /></label>
+              <label class="os-field remind solved-ref"
+                ><span class="os-label">Fixed in</span
+                ><input
+                  os-input
+                  [(ngModel)]="solvedRef"
+                  name="solved-ref"
+                  maxlength="500"
+                  placeholder="Commit or pull request"
+                  aria-describedby="remind-hint"
+              /></label>
             </div>
             <div class="form-actions">
               @for (s of nextStatuses(f); track s) {
@@ -449,7 +459,7 @@ function lines(f: Finding): string {
                 </button>
               }
               <span class="foot-hint quiet" id="remind-hint"
-                >The date only applies to Ask me later</span
+                >The date only applies to Ask me later, and Fixed in to Mark solved</span
               >
             </div>
           </footer>
@@ -492,6 +502,7 @@ export class FindingsPage {
   readonly dir = signal<1 | -1>(-1);
   note = '';
   remindAfter = '';
+  solvedRef = '';
   /** A finding opened by link that the current filters leave out. */
   private readonly extra = signal<Finding | null>(null);
 
@@ -564,6 +575,7 @@ export class FindingsPage {
         if (!id) return;
         this.note = '';
         this.remindAfter = this.current()?.remind_after ?? '';
+        this.solvedRef = this.current()?.solved_ref ?? '';
         queueMicrotask(() => {
           this.drawer()?.nativeElement.focus({ preventScroll: true });
         });
@@ -643,6 +655,7 @@ export class FindingsPage {
         status,
         note: this.note.trim() || undefined,
         remind_after: status === 'ask_later' ? this.remindAfter || null : null,
+        solved_ref: status === 'solved' ? this.solvedRef.trim() || null : null,
       });
       this.notices.ok(`"${updated.title}" is now ${STATUS[status].toLowerCase()}`);
       await this.badges.refresh();
