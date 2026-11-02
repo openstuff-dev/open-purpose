@@ -3,6 +3,38 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.4.1
+
+Adds migration `019_invites.sql`.
+
+**Upgrading (Supabase sign-in):** add `**` to the end of the redirect URL in Supabase, so
+`<OPENPURPOSE_PUBLIC_URL>/api/auth/callback**`. Without it, the links sent to people an admin
+adds by email are refused. Leave **Allow new users to sign up** on in Supabase, even with
+`OPENPURPOSE_SIGNUP=off`, so Supabase can send someone their first link.
+
+### People
+
+- Admins can add people by email under **Settings → People and agents**: pick **Person**, fill
+  in their email, and they get a role at once and a sign-in link by email. Someone who already
+  has an account just gets the new role.
+- A verified email now links a new sign-in to the person who already has it, so signing in with
+  the link, another link or GitHub lands in the same account instead of creating a second one.
+- The invite email can say who added someone, where and with which role: the server sets
+  `invited_by`, `invited_to` and `invited_role` on the new Supabase user for the **Confirm
+  signup** template. The README has an example, and the setup wizard's emails fit people an
+  admin added.
+
+### Web app
+
+- Pages you visited in the last minute open from memory without asking the server again.
+  After that, they show what was loaded before at once and reload it behind the scenes, and
+  coming back to the tab after a while does the same. Findings, the Inbox, the Overview's
+  activity, People, your tokens and the workspace list are now kept too. Any change you make
+  still reloads everything.
+- The Inbox and Findings badges refresh at most once a minute instead of every 30 seconds.
+- On the map, links between terms are faint and dashed with a smaller arrow, so a large
+  glossary no longer hides everything else. They still light up when you select a term.
+
 ## 0.4.0
 
 Adds migrations `017_document_proposals.sql` and `018_section_archive_move.sql`. Agents need to
