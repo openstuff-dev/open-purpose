@@ -20,6 +20,13 @@ export interface ExternalIdentity {
   method?: string | null;
 }
 
+/** Who added someone by email, where and as what, e.g. Turmz, OpenStuff, editor. */
+export interface Invitation {
+  invitedBy: string;
+  where: string;
+  role: string;
+}
+
 export interface AuthProvider {
   /** The OPENPURPOSE_AUTH_PROVIDER value, e.g. 'supabase'. */
   id: string;
@@ -29,13 +36,15 @@ export interface AuthProvider {
    * Begin signing in. OAuth returns a `redirect`; a magic link sends an email. Both end on
    * `callbackUrl`. A `verifier` (PKCE) is kept in a cookie and handed back to finish(). A
    * `notice` goes to the server log only, never to the visitor. `allowNewUser` sends a magic
-   * link even when sign-up is off, to someone an admin added by email.
+   * link even when sign-up is off, to someone an admin added by email; `invitation` says who
+   * added them and where, for the email's wording.
    */
   start(input: {
     method: AuthMethod;
     email?: string;
     callbackUrl: string;
     allowNewUser?: boolean;
+    invitation?: Invitation;
   }): Promise<{
     redirect?: string;
     emailSent?: boolean;

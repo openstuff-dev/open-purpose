@@ -465,7 +465,8 @@ pause
 # ── 6 ─────────────────────────────────────────────────────────────────────
 stage "Supabase: where sign-in links go"
 say "Site URL $APP_URL, and sign-ins return to $APP_URL/api/auth/callback."
-supabase_auth "$(jq -n --arg site "$APP_URL" --arg cb "$APP_URL/api/auth/callback" \
+# The ** lets through the links sent to people an admin adds by email (?invite=...).
+supabase_auth "$(jq -n --arg site "$APP_URL" --arg cb "$APP_URL/api/auth/callback**" \
   '{site_url: $site, uri_allow_list: $cb}')" "Site URL and redirect URL"
 pause
 
@@ -530,23 +531,33 @@ pause
 
 # ── 11 ────────────────────────────────────────────────────────────────────
 stage "Supabase: email wording"
-say "Matches the app: the link has to be opened in the browser that asked for it."
+say "Matches the app: a link someone asked for opens in the browser they asked in; a link"
+say "sent to someone an admin added opens anywhere."
+# Magic link: for people Supabase already knows, also when an admin adds them somewhere new.
 read -r -d '' MAGIC_LINK <<'HTML' || true
 <p>Here's your link to sign in to OpenPurpose:</p>
 <p><a href="{{ .ConfirmationURL }}">Sign in to OpenPurpose</a></p>
-<p>Open it in the same browser you asked for it in. It works once.</p>
-<p>If you didn't ask for it, ignore this email.</p>
+<p>It works once. If you asked for it on the sign-in page, open it in the same browser you asked in.</p>
+<p>If you didn't expect it, ignore this email.</p>
 HTML
+# Confirm signup: someone new. The server sets invited_by when an admin added them by email.
 read -r -d '' CONFIRM <<'HTML' || true
+{{ if .Data.invited_by }}
+<p>{{ .Data.invited_by }} added you to {{ .Data.invited_to }} on OpenPurpose. Your role: {{ .Data.invited_role }}.</p>
+<p><a href="{{ .ConfirmationURL }}">Sign in to OpenPurpose</a></p>
+<p>The link works once, in any browser. If it has expired, get a new one on the sign-in page with this email address.</p>
+<p>If you don't know {{ .Data.invited_by }}, ignore this email.</p>
+{{ else }}
 <p>Here's your link to finish signing up for OpenPurpose:</p>
 <p><a href="{{ .ConfirmationURL }}">Create your account</a></p>
 <p>Open it in the same browser you asked for it in. It works once. A server admin then approves your account.</p>
 <p>If you didn't ask for it, ignore this email.</p>
+{{ end }}
 HTML
 supabase_auth "$(jq -n --arg magic "$MAGIC_LINK" --arg confirm "$CONFIRM" '{
     mailer_subjects_magic_link: "Your OpenPurpose sign-in link",
     mailer_templates_magic_link_content: $magic,
-    mailer_subjects_confirmation: "Finish signing up for OpenPurpose",
+    mailer_subjects_confirmation: "{{ if .Data.invited_by }}{{ .Data.invited_by }} added you to OpenPurpose{{ else }}Finish signing up for OpenPurpose{{ end }}",
     mailer_templates_confirmation_content: $confirm
   }')" "the sign-in and sign-up emails"
 open_url "https://supabase.com/dashboard/account/tokens"

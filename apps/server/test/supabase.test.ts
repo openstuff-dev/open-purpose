@@ -97,8 +97,18 @@ describe('supabase provider', () => {
       email: 'invited@example.com',
       callbackUrl,
       allowNewUser: true,
+      invitation: { invitedBy: 'Turmz', where: 'OpenStuff', role: 'editor' },
     });
-    expect(request().body.create_user).toBe(true);
+    expect(request().body).toMatchObject({
+      create_user: true,
+      data: { invited_by: 'Turmz', invited_to: 'OpenStuff', invited_role: 'editor' },
+    });
+  });
+
+  it('sends no user data with an ordinary magic link', async () => {
+    answer(200, {});
+    await createSupabaseProvider(config).start({ method: magicLink, email: 'a@example.com', callbackUrl });
+    expect(request().body.data).toBeUndefined();
   });
 
   it('warns in the log when Supabase refuses sign-ups that OpenPurpose allows', async () => {

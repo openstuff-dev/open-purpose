@@ -1405,7 +1405,14 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
         const email = body.email.trim().toLowerCase();
         let emailSent = false;
         try {
-          const sent = await signin.sendInviteLink(pool, provider, email, callbackUrl);
+          const orgId = body.organization_id ?? null;
+          const sent = await signin.sendInviteLink(pool, provider, email, callbackUrl, {
+            invitedBy: req.actor.name,
+            where: orgId
+              ? (req.access.orgs.find((o) => o.id === orgId)?.name ?? req.access.group.name)
+              : req.access.group.name,
+            role: body.role ?? 'editor',
+          });
           if (sent.notice) req.log[sent.notice.level](sent.notice.message);
           emailSent = sent.sent;
         } catch (err) {

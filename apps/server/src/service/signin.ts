@@ -15,7 +15,12 @@ import type {
   SignupStatus,
 } from '@openpurpose/contracts';
 import { type Actor, generateToken, hashToken, requireSuperadmin, tokenPrefix } from '../auth.js';
-import { type AuthProvider, type ExternalIdentity, SignInError } from '../auth/providers/index.js';
+import {
+  type AuthProvider,
+  type ExternalIdentity,
+  type Invitation,
+  SignInError,
+} from '../auth/providers/index.js';
 import type { Pool, Queryable } from '../db.js';
 import { tx } from '../db.js';
 import { AppError, badRequest, notFound } from '../errors.js';
@@ -179,6 +184,7 @@ export async function sendInviteLink(
   provider: AuthProvider,
   email: string,
   callbackUrl: string,
+  invitation: Invitation,
 ): Promise<{ sent: boolean; notice?: { level: 'info' | 'warn'; message: string } }> {
   const id = crypto.randomBytes(24).toString('base64url');
   const started = await provider.start({
@@ -186,6 +192,7 @@ export async function sendInviteLink(
     email,
     callbackUrl: `${callbackUrl}?invite=${id}`,
     allowNewUser: true,
+    invitation,
   });
   if (started.verifier) {
     await pool.query(

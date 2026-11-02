@@ -324,7 +324,14 @@ Admins add people by email under **Settings → People and agents**: pick
 email. Whichever way they sign in with that address (the link, another link, or
 GitHub), they land in the same account. Someone who already has an account just
 gets the new role. Leave **Allow new users to sign up** on in Supabase, even with
-`OPENPURPOSE_SIGNUP=off`, so Supabase can send the first link. Supabase's own
+`OPENPURPOSE_SIGNUP=off`, so Supabase can send the first link.
+
+Someone new gets Supabase's **Confirm signup** email. It can say who added them:
+the server sets `invited_by`, `invited_to` and `invited_role` on the new Supabase
+user, so in **Authentication → Emails** you can write, for example,
+`{{ if .Data.invited_by }}{{ .Data.invited_by }} added you to {{ .Data.invited_to }}{{ else }}…{{ end }}`.
+People Supabase already knows get the **Magic link** email instead, so word that one
+for both cases. Supabase's own
 email service sends only a few emails an hour; set up custom SMTP in Supabase
 (**Authentication → Emails**) before adding many people.
 

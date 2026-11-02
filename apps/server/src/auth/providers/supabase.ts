@@ -56,7 +56,7 @@ export function createSupabaseProvider(config: AuthConfig): AuthProvider {
       { kind: 'oauth', provider: 'github', label: 'GitHub' },
     ],
 
-    async start({ method, email, callbackUrl, allowNewUser }) {
+    async start({ method, email, callbackUrl, allowNewUser, invitation }) {
       const verifier = randomBytes(32).toString('base64url');
       const pkce = {
         code_challenge: createHash('sha256').update(verifier).digest('base64url'),
@@ -76,6 +76,15 @@ export function createSupabaseProvider(config: AuthConfig): AuthProvider {
           // With sign-ups off, only people Supabase already knows get a link, and people an
           // admin added by email.
           create_user: allowNewUser === true || config.signup !== 'off',
+          // Kept on a new Supabase user, so the "Confirm signup" email can say who added them
+          // ({{ .Data.invited_by }}). An existing user's data stays as it was.
+          ...(invitation && {
+            data: {
+              invited_by: invitation.invitedBy,
+              invited_to: invitation.where,
+              invited_role: invitation.role,
+            },
+          }),
           ...pkce,
         });
       } catch (err) {

@@ -3187,12 +3187,17 @@ describe('sign-up and sign-in through a provider', () => {
   // A fake provider: the callback's ?code= names the identity, and it checks the PKCE verifier.
   const people = new Map<string, ExternalIdentity>();
   /** What start() was last asked for: invites read their link from it. */
-  const starts: { email?: string; callbackUrl: string; allowNewUser?: boolean }[] = [];
+  const starts: {
+    email?: string;
+    callbackUrl: string;
+    allowNewUser?: boolean;
+    invitation?: { invitedBy: string; where: string; role: string };
+  }[] = [];
   registerProvider('fake', () => ({
     id: 'fake',
     methods: () => [{ kind: 'magic_link' }, { kind: 'oauth', provider: 'github', label: 'GitHub' }],
-    start: async ({ method, email, callbackUrl, allowNewUser }) => {
-      starts.push({ email, callbackUrl, allowNewUser });
+    start: async ({ method, email, callbackUrl, allowNewUser, invitation }) => {
+      starts.push({ email, callbackUrl, allowNewUser, invitation });
       return {
         ...(method.kind === 'oauth'
           ? { redirect: `https://fake.example/authorize?redirect_to=${callbackUrl}` }
@@ -3433,7 +3438,12 @@ describe('sign-up and sign-in through a provider', () => {
       sign_in_url: 'https://purpose.example.com/sign-in',
     });
     const sent = starts.at(-1)!;
-    expect(sent).toMatchObject({ email: 'sofie@example.com', allowNewUser: true });
+    expect(sent).toMatchObject({
+      email: 'sofie@example.com',
+      allowNewUser: true,
+      invitation: { where: org.name, role: 'viewer' },
+    });
+    expect(sent.invitation?.invitedBy).toBeTruthy();
     expect(sent.callbackUrl).toMatch(
       /^https:\/\/purpose\.example\.com\/api\/auth\/callback\?invite=[\w-]+$/,
     );
