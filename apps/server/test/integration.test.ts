@@ -15,6 +15,7 @@ import {
 } from '../src/auth/providers/index.js';
 import { beginRequest, hashToken } from '../src/auth.js';
 import { buildGraph, relatedTo, type Related } from '../src/service/graph.js';
+import { sectionActivitySql } from '../src/service/activity.js';
 import { createServer } from 'node:http';
 import { BILLING_SWAGGER_YAML, ORDER_API } from '../src/demo-specs.js';
 
@@ -1549,6 +1550,74 @@ definitions:`,
       // Access; the whole overview; the commit.
       expect(sent).toHaveLength(3);
     }
+  });
+
+  it('counts section reads in one pass, the same as counting each number on its own', async () => {
+    // The query before it counted in one pass, kept here to compare against.
+    const separately = (from: string) => `SELECT s.id AS section_id,
+            (SELECT count(*)::int FROM section_reads r WHERE r.section_id = s.id) AS reads,
+            (SELECT max(created_at) FROM section_reads r WHERE r.section_id = s.id) AS last_read_at,
+            ARRAY(SELECT count(r.request_id)::int
+                    FROM generate_series(current_date - 27, current_date, interval '1 day') g
+                    LEFT JOIN section_reads r ON r.section_id = s.id AND r.created_at >= g AND r.created_at < g + interval '1 day'
+                   GROUP BY g ORDER BY g) AS daily,
+            (SELECT count(*)::int FROM section_reads r WHERE r.section_id = s.id AND r.created_at >= current_date - 6) AS week,
+            (SELECT count(*)::int FROM section_reads r WHERE r.section_id = s.id
+                AND r.created_at >= current_date - 13 AND r.created_at < current_date - 6) AS previous_week
+       FROM ${from}`;
+    const rollback = new Error('roll back');
+    await withScope(pool, { groupId: null, bypass: true }, async (c) => {
+      // Days are the database's dates, so try a time zone far from UTC too.
+      await c.query(`SET LOCAL timezone = 'Pacific/Auckland'`);
+      const sections = (
+        await c.query<{ id: string; group_id: string; document_id: string }>(
+          'SELECT id, group_id, document_id FROM sections ORDER BY created_at LIMIT 3',
+        )
+      ).rows;
+      const ids = sections.map((s) => s.id);
+      const from = 'unnest($1::uuid[]) AS s(id)';
+      const reads = async () => {
+        const { rows } = await c.query(sectionActivitySql(from), [ids]);
+        return ids.map((id) => rows.find((r: any) => r.section_id === id).reads as number);
+      };
+      const earlier = await reads();
+      const at = [
+        'now()',
+        `now() - interval '3 hours'`,
+        'current_date::timestamptz',
+        `current_date::timestamptz - interval '1 second'`,
+        '(current_date - 6)::timestamptz',
+        `(current_date - 6)::timestamptz - interval '1 second'`,
+        '(current_date - 13)::timestamptz',
+        `(current_date - 13)::timestamptz - interval '1 second'`,
+        '(current_date - 27)::timestamptz',
+        `(current_date - 27)::timestamptz - interval '1 second'`,
+        `now() - interval '40 days'`,
+        `now() + interval '1 day'`,
+      ];
+      // The first section gets every read, the second every other one, the third none.
+      for (const [i, when] of at.entries()) {
+        for (const s of sections.slice(0, i % 2 ? 1 : 2)) {
+          await c.query(
+            `WITH r AS (INSERT INTO agent_requests (group_id, tool, kind, created_at)
+                        VALUES ($1, 'read_section', 'read', ${when}) RETURNING id, created_at)
+             INSERT INTO section_reads (request_id, group_id, section_id, document_id, created_at)
+             SELECT id, $1, $2, $3, created_at FROM r`,
+            [s.group_id, s.id, s.document_id],
+          );
+        }
+      }
+      const byId = (rows: { section_id: string }[]) =>
+        [...rows].sort((a, b) => a.section_id.localeCompare(b.section_id));
+      const before = byId((await c.query(separately(from), [ids])).rows);
+      const after = byId((await c.query(sectionActivitySql(from), [ids])).rows);
+      expect(after).toEqual(before);
+      expect((await reads()).map((n, i) => n - earlier[i])).toEqual([12, 6, 0]);
+      expect(after.some((r: any) => r.week > 0 && r.previous_week > 0)).toBe(true);
+      throw rollback;
+    }).catch((e: unknown) => {
+      if (e !== rollback) throw e;
+    });
   });
 
   it('warns about documents agents stopped requesting, and hides disabled ones from agents', async () => {
