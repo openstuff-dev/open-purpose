@@ -58,6 +58,7 @@ import type {
   AuthStatus,
   ExportIncludes,
   ImportReport,
+  InviteMemberResult,
   PendingSignup,
   SignInErrorCode,
 } from '@openpurpose/contracts';
@@ -341,7 +342,13 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
             'too_many_requests',
             'Too many sign-in attempts. Try again in 15 minutes.',
           );
-        const started = await p.start({ method, email, callbackUrl });
+        // With sign-up off, someone an admin added by email still gets a link.
+        const allowNewUser =
+          method.kind === 'magic_link' &&
+          config.auth.signup === 'off' &&
+          !!email &&
+          (await signin.isInvited(pool, email));
+        const started = await p.start({ method, email, callbackUrl, allowNewUser });
         if (started.notice) req.log[started.notice.level](started.notice.message);
         if (started.verifier) {
           reply.setCookie(verifierCookie.name, started.verifier, {
@@ -354,7 +361,12 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       api.get('/auth/callback', open, async (req, reply) => {
         const back = (reason: SignInErrorCode) => reply.redirect(`/sign-in?error=${reason}`);
         if (!provider) return back('failed');
-        const verifier = req.cookies[verifierCookie.name];
+        // A link an admin's invite sent carries its own verifier: it opens in another browser.
+        const invite = (req.query as { invite?: unknown }).invite;
+        const verifier =
+          (typeof invite === 'string' && invite
+            ? await signin.takeInviteVerifier(pool, invite)
+            : undefined) ?? req.cookies[verifierCookie.name];
         reply.clearCookie(verifierCookie.name, verifierCookie.options);
         let code: string;
         try {
@@ -1373,6 +1385,39 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
           req.body,
         );
         return reply.status(201).send(await admin.createMember(req.db, req.access, body));
+      });
+      // Add a person by email: they get a role now and a sign-in link by email.
+      api.post('/members/invite', async (req, reply): Promise<InviteMemberResult> => {
+        const body = parse(
+          z.object({
+            email: z.email().max(320),
+            name: z.string().max(200).optional(),
+            organization_id: optId,
+            role: role.optional(),
+          }),
+          req.body,
+        );
+        if (!provider?.methods().some((m) => m.kind === 'magic_link'))
+          throw badRequest(
+            'This server has no sign-in by email, so people added by email could not sign in. Add them with a token instead.',
+          );
+        const { actor, existing } = await admin.inviteMember(req.db, req.access, body);
+        const email = body.email.trim().toLowerCase();
+        let emailSent = false;
+        try {
+          const sent = await signin.sendInviteLink(pool, provider, email, callbackUrl);
+          if (sent.notice) req.log[sent.notice.level](sent.notice.message);
+          emailSent = sent.sent;
+        } catch (err) {
+          // They have their role either way; they can ask for a link on the sign-in page.
+          req.log.warn(err, `No sign-in link sent to an added person`);
+        }
+        return reply.status(201).send({
+          actor: { ...actor, email },
+          existing,
+          email_sent: emailSent,
+          sign_in_url: `${config.publicUrl.replace(/\/+$/, '')}/sign-in`,
+        });
       });
       api.patch('/members/:id', async (req) => {
         const body = parse(

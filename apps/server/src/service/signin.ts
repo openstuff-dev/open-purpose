@@ -15,14 +15,22 @@ import type {
   SignupStatus,
 } from '@openpurpose/contracts';
 import { type Actor, generateToken, hashToken, requireSuperadmin, tokenPrefix } from '../auth.js';
-import { type ExternalIdentity, SignInError } from '../auth/providers/index.js';
+import { type AuthProvider, type ExternalIdentity, SignInError } from '../auth/providers/index.js';
 import type { Pool, Queryable } from '../db.js';
 import { tx } from '../db.js';
 import { AppError, badRequest, notFound } from '../errors.js';
-import { freeGroupSlug, provisionWorkspace } from './admin.js';
+import {
+  type ActorState,
+  freeGroupSlug,
+  lockEmail,
+  personByEmail,
+  provisionWorkspace,
+} from './admin.js';
 import type { Group, Organization } from './types.js';
 
 const CODE_SECONDS = 60;
+/** Supabase's magic links last an hour by default and 24 hours at most. */
+const INVITE_SECONDS = 24 * 3600;
 
 /** Issue a session token for an actor that expires after `days`. */
 export async function createSession(c: Queryable, actorId: string, days: number): Promise<string> {
@@ -74,24 +82,23 @@ export async function signOut(pool: Pool, token: string): Promise<void> {
 
 /**
  * Who a provider's identity signs in as. A known identity signs its actor in. An unknown one
- * depends on OPENPURPOSE_SIGNUP: off refuses it, approval adds a pending person, open adds a
- * person with their own workspace. A pending person signs in too, to see that they're waiting.
+ * with a verified email joins the person who already has that email: someone an admin added by
+ * email, or who signed in another way before. Otherwise it depends on OPENPURPOSE_SIGNUP: off
+ * refuses it, approval adds a pending person, open adds a person with their own workspace. A
+ * pending person signs in too, to see that they're waiting.
  */
 export async function actorForIdentity(
   pool: Pool,
   signup: SignupMode,
   identity: ExternalIdentity,
 ): Promise<string> {
+  const email = identity.emailVerified ? identity.email?.trim().toLowerCase() || null : null;
   const { actorId, created } = await tx(pool, async (c) => {
     // Two callbacks for the same new identity must not create two people.
     await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
       `identity:${identity.provider}:${identity.subject}`,
     ]);
-    const { rows } = await c.query<{
-      actor_id: string;
-      signup: SignupStatus | null;
-      disabled: boolean;
-    }>(
+    const { rows } = await c.query<ActorState & { actor_id: string }>(
       `UPDATE identities i SET last_sign_in_at = now(), email = COALESCE($3, i.email)
          FROM actors a
         WHERE a.id = i.actor_id AND i.provider = $1 AND i.subject = $2
@@ -100,26 +107,40 @@ export async function actorForIdentity(
     );
     const known = rows.at(0);
     if (known) {
-      if (known.disabled) throw new SignInError('disabled', 'This account is turned off');
-      if (known.signup === 'rejected')
-        throw new SignInError('rejected', 'This sign-up was turned down');
+      mayEnter(known);
       return { actorId: known.actor_id, created: false };
     }
-    if (signup === 'off')
-      throw new SignInError('no-account', 'Unknown identity and OPENPURPOSE_SIGNUP=off');
-    // Open sign-ups start as pending too, so a person whose workspace couldn't be made waits
-    // for an admin instead of being stuck.
-    const { rows: actor } = await c.query<{ id: string }>(
-      `INSERT INTO actors (name, kind, email, signup, signup_at)
-       VALUES ($1, 'human', $2, 'pending', now()) RETURNING id`,
-      [personName(identity), identity.email],
-    );
+    let actorId: string | null = null;
+    let created = false;
+    if (email) {
+      // Nor two new identities with the same email, or an invite at the same moment.
+      await lockEmail(c, email);
+      const same = await personByEmail(c, email);
+      if (same) {
+        mayEnter(same);
+        actorId = same.id;
+      }
+    }
+    if (!actorId) {
+      if (signup === 'off')
+        throw new SignInError('no-account', 'Unknown identity and OPENPURPOSE_SIGNUP=off');
+      // Open sign-ups start as pending too, so a person whose workspace couldn't be made waits
+      // for an admin instead of being stuck. Only a verified email is kept on the person, so an
+      // unverified one can never pull someone else's identity in later.
+      const { rows: actor } = await c.query<{ id: string }>(
+        `INSERT INTO actors (name, kind, email, signup, signup_at)
+         VALUES ($1, 'human', $2, 'pending', now()) RETURNING id`,
+        [personName(identity), email],
+      );
+      actorId = actor[0].id;
+      created = true;
+    }
     await c.query(
       `INSERT INTO identities (actor_id, provider, subject, email, method, last_sign_in_at)
        VALUES ($1, $2, $3, $4, $5, now())`,
-      [actor[0].id, identity.provider, identity.subject, identity.email, identity.method ?? null],
+      [actorId, identity.provider, identity.subject, identity.email, identity.method ?? null],
     );
-    return { actorId: actor[0].id, created: true };
+    return { actorId, created };
   });
   if (created && signup === 'open') {
     try {
@@ -129,6 +150,64 @@ export async function actorForIdentity(
     }
   }
   return actorId;
+}
+
+function mayEnter(actor: ActorState): void {
+  if (actor.disabled) throw new SignInError('disabled', 'This account is turned off');
+  if (actor.signup === 'rejected') throw new SignInError('rejected', 'This sign-up was turned down');
+}
+
+// ───────────────────────────── adding people by email ─────────────────────────────
+
+/** Whether an admin added a person with this email, so they may get a link with sign-up off. */
+export async function isInvited(pool: Pool, email: string): Promise<boolean> {
+  const { rows } = await pool.query(
+    `SELECT 1 FROM actors WHERE kind = 'human' AND lower(email) = $1
+        AND disabled_at IS NULL AND signup IS DISTINCT FROM 'rejected' LIMIT 1`,
+    [email.toLowerCase()],
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Ask the provider to email someone an admin added a magic link. They open it in their own
+ * browser, which has no verifier cookie, so the link carries an ?invite= id and the verifier
+ * waits here (see takeInviteVerifier). Returns whether an email went out.
+ */
+export async function sendInviteLink(
+  pool: Pool,
+  provider: AuthProvider,
+  email: string,
+  callbackUrl: string,
+): Promise<{ sent: boolean; notice?: { level: 'info' | 'warn'; message: string } }> {
+  const id = crypto.randomBytes(24).toString('base64url');
+  const started = await provider.start({
+    method: { kind: 'magic_link' },
+    email,
+    callbackUrl: `${callbackUrl}?invite=${id}`,
+    allowNewUser: true,
+  });
+  if (started.verifier) {
+    await pool.query(
+      `INSERT INTO invite_links (id_hash, verifier, expires_at)
+       VALUES ($1, $2, now() + make_interval(secs => $3))`,
+      [hashToken(id), started.verifier, INVITE_SECONDS],
+    );
+  }
+  // The provider answers "sent" even when it refused, so the sign-in form gives nothing away;
+  // its notice says why.
+  return { sent: !!started.emailSent && !started.notice, notice: started.notice };
+}
+
+/** The verifier for an invite link. Works once. */
+export async function takeInviteVerifier(pool: Pool, id: string): Promise<string | undefined> {
+  const { rows } = await pool.query<{ verifier: string; live: boolean }>(
+    'DELETE FROM invite_links WHERE id_hash = $1 RETURNING verifier, expires_at > now() AS live',
+    [hashToken(id)],
+  );
+  pool.query('DELETE FROM invite_links WHERE expires_at < now()').catch(() => undefined);
+  const row = rows.at(0);
+  return row?.live ? row.verifier : undefined;
 }
 
 function personName(identity: ExternalIdentity): string {

@@ -27,6 +27,15 @@ import { Session } from '../core/session';
 import { Notices } from '../shared/notice';
 import { Icon } from '../shared/icon';
 
+interface Invited {
+  name: string;
+  email: string;
+  existing: boolean;
+  emailSent: boolean;
+  signInUrl: string;
+  where: string;
+}
+
 interface NewToken {
   actor: string;
   kind: 'human' | 'agent';
@@ -106,22 +115,58 @@ const REVIEW_OPTIONS: { value: AgentReview; label: string; hint: string }[] = [
       </os-callout>
     }
 
+    @if (invited(); as i) {
+      <os-callout
+        [tone]="i.emailSent ? 'success' : 'warning'"
+        role="alert"
+        title="{{ i.existing ? 'Gave ' + i.name + ' a role' : 'Added ' + i.name }} in {{ i.where }}"
+        level="2"
+      >
+        @if (i.emailSent) {
+          <p>
+            We emailed {{ i.email }} a sign-in link. If it has expired by the time they open it,
+            they can get a new one at <a [href]="i.signInUrl">{{ i.signInUrl }}</a
+            >.
+          </p>
+        } @else {
+          <p>
+            We couldn't email {{ i.email }}. Ask them to sign in at
+            <a [href]="i.signInUrl">{{ i.signInUrl }}</a> with that address.
+          </p>
+        }
+        <div class="form-actions">
+          <button os-button type="button" (click)="invited.set(null)">Done</button>
+        </div>
+      </os-callout>
+    }
+
     <section>
       <form class="inline-form os-panel os-panel-body" (ngSubmit)="create()">
-        <os-field label="Name" class="grow"
-          ><input
-            os-input
-            name="name"
-            [(ngModel)]="name"
-            required
-            [placeholder]="kind === 'agent' ? 'Claude Code, Jonas' : 'Jonas Hansen'"
-        /></os-field>
         <os-field label="Kind"
           ><select os-select name="kind" [(ngModel)]="kind" (ngModelChange)="fixLevel()">
             <option value="human">Person</option>
             <option value="agent">Agent</option>
           </select></os-field
         >
+        @if (byEmail()) {
+          <os-field label="Email" class="grow"
+            ><input
+              os-input
+              type="email"
+              name="email"
+              autocomplete="off"
+              [(ngModel)]="email"
+              placeholder="jonas@example.com"
+          /></os-field>
+        }
+        <os-field [label]="byEmail() && email.trim() ? 'Name (optional)' : 'Name'" class="grow"
+          ><input
+            os-input
+            name="name"
+            [(ngModel)]="name"
+            [required]="!(byEmail() && email.trim())"
+            [placeholder]="kind === 'agent' ? 'Claude Code, Jonas' : 'Jonas Hansen'"
+        /></os-field>
         <label class="os-field"
           ><span class="os-label">{{ kind === 'agent' ? 'Works in' : 'Role in' }}</span
           ><select os-select name="level" [(ngModel)]="level">
@@ -150,12 +195,22 @@ const REVIEW_OPTIONS: { value: AgentReview; label: string; hint: string }[] = [
             Editors change rules and review the inbox; viewers read; admins also manage people. A
             role in the workspace reaches every organization: admins administer all of them, editors
             and viewers read all of them and edit workspace-wide rules.
+            @if (byEmail()) {
+              With an email, they get a sign-in link by email; without one, you get a token to pass
+              on.
+            }
           }
         </p>
         <div class="form-actions full">
-          <button os-button variant="primary" type="submit" [disabled]="!name.trim() || !level">
-            <app-icon name="plus" />Add and create token
-          </button>
+          @if (inviting()) {
+            <button os-button variant="primary" type="submit" [disabled]="!level">
+              <app-icon name="plus" />Add and email a sign-in link
+            </button>
+          } @else {
+            <button os-button variant="primary" type="submit" [disabled]="!name.trim() || !level">
+              <app-icon name="plus" />Add and create token
+            </button>
+          }
         </div>
       </form>
     </section>
@@ -188,6 +243,9 @@ const REVIEW_OPTIONS: { value: AgentReview; label: string; hint: string }[] = [
             ><app-icon [name]="m.kind === 'agent' ? 'bot' : 'user'" [size]="15"
           /></span>
           <strong>{{ m.name }}</strong>
+          @if (m.email) {
+            <span class="quiet">{{ m.email }}</span>
+          }
           @if (m.is_superadmin) {
             <span os-chip>Server admin</span>
           }
@@ -462,6 +520,8 @@ export class PeoplePage {
   readonly people = computed(() => this.members().filter((m) => m.kind === 'human'));
   readonly agents = computed(() => this.members().filter((m) => m.kind === 'agent'));
   readonly fresh = signal<NewToken | null>(null);
+  readonly invited = signal<Invited | null>(null);
+  private readonly magicLink = signal(false);
   /** Whose new token is being labelled. */
   readonly issuing = signal<Member | null>(null);
   tokenLabel = 'laptop';
@@ -482,15 +542,29 @@ export class PeoplePage {
   });
 
   name = '';
+  email = '';
   kind: 'human' | 'agent' = 'agent';
   role: Role = 'editor';
   level = '';
   addLevel = '';
   addRole: Role = 'viewer';
 
+  /** People sign in with a link by email here, so they can be added by email. */
+  byEmail(): boolean {
+    return this.magicLink() && this.kind === 'human';
+  }
+
+  inviting(): boolean {
+    return this.byEmail() && !!this.email.trim();
+  }
+
   constructor() {
     void this.load();
     this.fixLevel();
+    this.api.authConfig().then(
+      (c) => { this.magicLink.set(c.methods.some((m) => m.kind === 'magic_link')); },
+      () => undefined,
+    );
   }
 
   fixLevel(): void {
@@ -547,6 +621,7 @@ export class PeoplePage {
   }
 
   async create(): Promise<void> {
+    if (this.inviting()) return this.invite();
     try {
       const orgId = this.orgOf(this.level);
       const r = await this.api.createMember({
@@ -562,6 +637,32 @@ export class PeoplePage {
         where: this.session.orgName(orgId),
       });
       this.name = '';
+      await this.load();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  private async invite(): Promise<void> {
+    try {
+      const orgId = this.orgOf(this.level);
+      const r = await this.api.inviteMember({
+        email: this.email.trim(),
+        name: this.name.trim() || undefined,
+        organization_id: orgId,
+        role: this.role as 'admin' | 'editor' | 'viewer',
+      });
+      this.fresh.set(null);
+      this.invited.set({
+        name: r.actor.name,
+        email: r.actor.email,
+        existing: r.existing,
+        emailSent: r.email_sent,
+        signInUrl: r.sign_in_url,
+        where: this.session.orgName(orgId),
+      });
+      this.name = '';
+      this.email = '';
       await this.load();
     } catch (e) {
       this.notices.error(e);

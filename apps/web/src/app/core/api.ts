@@ -59,6 +59,8 @@ import type {
   AuthStartResult,
   AuthStatus,
   PendingSignup,
+  InviteMemberRequest,
+  InviteMemberResult,
 } from './models';
 
 /** An export to import: parsed JSON, or a zip as base64. */
@@ -495,6 +497,10 @@ export class Api {
     organization_id: string | null;
     role?: Role;
   }) => this.send<{ actor: Member; token: string }>('POST', '/members', body);
+
+  /** Add a person by email; the server emails them a sign-in link. */
+  inviteMember = (body: InviteMemberRequest) =>
+    this.send<InviteMemberResult>('POST', '/members/invite', body);
 
   updateMember = (
     id: string,

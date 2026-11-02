@@ -118,6 +118,28 @@ export interface PendingSignup {
 }
 
 /**
+ * POST /api/members/invite: add a person by email. They get the role at once and a sign-in link
+ * by email; signing in with that verified email joins this account.
+ */
+export interface InviteMemberRequest {
+  email: string;
+  /** Only for someone new; defaults to the part of the email before the @. */
+  name?: string;
+  /** null = a role in the workspace itself, which reaches every organization. */
+  organization_id: string | null;
+  role?: 'admin' | 'editor' | 'viewer';
+}
+
+export interface InviteMemberResult {
+  actor: { id: string; name: string; kind: 'human'; email: string };
+  /** They already had an account with this email, and only got the new role. */
+  existing: boolean;
+  /** false when the provider couldn't send the link: then pass on sign_in_url yourself. */
+  email_sent: boolean;
+  sign_in_url: string;
+}
+
+/**
  * How much review an agent's writes get. edit_modes: follow each section's edit mode.
  * always_propose: propose even in open sections. auto_approve: approve its proposals in its
  * own organization as soon as they arrive.

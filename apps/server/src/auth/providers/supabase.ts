@@ -12,6 +12,8 @@ import { type AuthProvider, type ExternalIdentity, SignInError } from './provide
 interface SupabaseUser {
   id: string;
   email?: string | null;
+  /** Set once Supabase knows they own the email: they opened a link, or GitHub verified it. */
+  email_confirmed_at?: string | null;
   /** `provider` is how they signed in: 'github', 'email', ... */
   app_metadata?: Record<string, unknown>;
   user_metadata?: Record<string, unknown>;
@@ -54,7 +56,7 @@ export function createSupabaseProvider(config: AuthConfig): AuthProvider {
       { kind: 'oauth', provider: 'github', label: 'GitHub' },
     ],
 
-    async start({ method, email, callbackUrl }) {
+    async start({ method, email, callbackUrl, allowNewUser }) {
       const verifier = randomBytes(32).toString('base64url');
       const pkce = {
         code_challenge: createHash('sha256').update(verifier).digest('base64url'),
@@ -71,8 +73,9 @@ export function createSupabaseProvider(config: AuthConfig): AuthProvider {
       try {
         await call(`/otp?${new URLSearchParams({ redirect_to: callbackUrl })}`, {
           email,
-          // With sign-ups off, only people Supabase already knows get a link.
-          create_user: config.signup !== 'off',
+          // With sign-ups off, only people Supabase already knows get a link, and people an
+          // admin added by email.
+          create_user: allowNewUser === true || config.signup !== 'off',
           ...pkce,
         });
       } catch (err) {
@@ -134,10 +137,12 @@ export function createSupabaseProvider(config: AuthConfig): AuthProvider {
 export function identityOf(user: SupabaseUser): ExternalIdentity {
   const meta = user.user_metadata ?? {};
   const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  const email = text(user.email)?.toLowerCase() ?? null;
   return {
     provider: 'supabase',
     subject: user.id,
-    email: text(user.email)?.toLowerCase() ?? null,
+    email,
+    emailVerified: !!email && !!text(user.email_confirmed_at),
     // GitHub fills full_name or name; user_name is the GitHub login.
     name: text(meta.full_name) ?? text(meta.name) ?? text(meta.user_name),
     method: text(user.app_metadata?.provider),

@@ -16,7 +16,12 @@ import { slugify } from '../domain/remote.js';
 import { claimSlug } from './aliases.js';
 import { insertDocument, insertSection } from './content.js';
 import type { Group, Organization, Website } from './types.js';
-import type { AgentPermissions, AgentReview, SlugAlias } from '@openpurpose/contracts';
+import type {
+  AgentPermissions,
+  AgentReview,
+  SignupStatus,
+  SlugAlias,
+} from '@openpurpose/contracts';
 
 export const AGENT_REVIEWS: AgentReview[] = ['edit_modes', 'always_propose', 'auto_approve'];
 
@@ -433,6 +438,8 @@ export async function setReadGrant(
 export interface MemberRow {
   id: string;
   name: string;
+  /** People added by email or who signed in through a provider; null for agents. */
+  email: string | null;
   kind: ActorKind;
   is_superadmin: boolean;
   disabled_at: string | null;
@@ -460,7 +467,7 @@ export async function listMembers(db: Queryable, pool: Pool, a: Access): Promise
   if (!a.canAdmin(null) && adminOrgs.length === 0)
     throw forbidden('Only admins can manage people and agents');
   const { rows } = await db.query<Omit<MemberRow, 'manageable'>>(
-    `SELECT a.id, a.name, a.kind, a.is_superadmin, a.disabled_at, a.created_at,
+    `SELECT a.id, a.name, a.kind, a.email, a.is_superadmin, a.disabled_at, a.created_at,
             json_agg(json_build_object('id', m.id, 'organization_id', m.organization_id, 'role', m.role)
                      ORDER BY m.organization_id NULLS FIRST) AS memberships,
             COALESCE((SELECT json_agg(json_build_object('id', t.id, 'prefix', t.prefix, 'label', t.label,
@@ -555,6 +562,85 @@ export async function createMember(
     ]);
     const token = await insertToken(c, rows[0].id, input.token_label ?? 'default');
     return { actor: rows[0], token };
+  });
+}
+
+/** Whether a person may sign in: not turned off, and their sign-up wasn't turned down. */
+export interface ActorState {
+  signup: SignupStatus | null;
+  disabled: boolean;
+}
+
+/** Hold the email until the transaction ends, so two requests can't both create its person. */
+export async function lockEmail(c: Queryable, email: string): Promise<void> {
+  await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`email:${email.toLowerCase()}`]);
+}
+
+/**
+ * The person with this email. Older databases can hold an address twice: then the one an admin
+ * added or approved wins over a pending sign-up, and the oldest over newer ones.
+ */
+export async function personByEmail(
+  c: Queryable,
+  email: string,
+): Promise<(ActorState & { id: string; name: string }) | undefined> {
+  const { rows } = await c.query<ActorState & { id: string; name: string }>(
+    `SELECT id, name, signup, disabled_at IS NOT NULL AS disabled FROM actors
+      WHERE kind = 'human' AND lower(email) = $1
+      ORDER BY (signup IS NULL OR signup = 'approved') DESC, created_at
+      LIMIT 1`,
+    [email.toLowerCase()],
+  );
+  return rows.at(0);
+}
+
+/**
+ * Add a person by email at one level. Someone who already has an account with that email gets
+ * the role; anyone else gets an account that their first sign-in with that verified email
+ * joins. Sending them the sign-in link is up to the caller (see signin.sendInviteLink).
+ */
+export async function inviteMember(
+  db: Db,
+  a: Access,
+  input: { email: string; name?: string; organization_id?: string | null; role?: Role },
+): Promise<{ actor: { id: string; name: string; kind: 'human' }; existing: boolean }> {
+  const orgId = input.organization_id ?? null;
+  a.requireAdmin(orgId);
+  const email = input.email.trim().toLowerCase();
+  if (!email.includes('@')) throw badRequest('Enter an email address, like jonas@example.com');
+  const role = validRole('human', input.role, orgId);
+  return tx(db, async (c) => {
+    await lockEmail(c, email);
+    const found = await personByEmail(c, email);
+    if (found?.signup === 'rejected')
+      throw badRequest(
+        `A server admin turned down ${email}'s sign-up, so they can't sign in. Ask a server admin.`,
+      );
+    let actor: { id: string; name: string; kind: 'human' };
+    if (found) {
+      actor = { id: found.id, name: found.name, kind: 'human' };
+    } else {
+      const { rows } = await c.query<{ id: string; name: string; kind: 'human' }>(
+        `INSERT INTO actors (name, kind, email) VALUES ($1, 'human', $2) RETURNING id, name, kind`,
+        [input.name?.trim() || email.split('@')[0], email],
+      );
+      actor = rows[0];
+    }
+    try {
+      await c.query(
+        'INSERT INTO memberships (actor_id, organization_id, role) VALUES ($1, $2, $3)',
+        [actor.id, orgId, role],
+      );
+    } catch (err) {
+      const e = mapPgError(err);
+      if (e instanceof AppError && e.code === 'conflict')
+        throw new AppError('conflict', `${actor.name} (${email}) already has a role there`);
+      throw e;
+    }
+    // Someone waiting for their sign-up to be approved now has a workspace to work in.
+    if (found?.signup === 'pending')
+      await c.query(`UPDATE actors SET signup = 'approved' WHERE id = $1`, [actor.id]);
+    return { actor, existing: !!found };
   });
 }
 

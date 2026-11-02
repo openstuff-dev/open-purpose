@@ -152,7 +152,8 @@ docker compose logs openpurpose | grep "Admin token"
 ```
 
 Open http://localhost:8080 and sign in with the admin token. Then go to
-**Settings → People and agents** and create a token for each person and each agent.
+**Settings → People and agents** and create a token for each person and each agent
+(or, with [sign-in by email](#sign-up-and-sign-in), add people by their email).
 
 To try it with example data (a workspace with two organizations, nine linked
 services, learnings and pending proposals). This wipes the database:
@@ -294,8 +295,9 @@ in with an email link or GitHub, and sign up on their own, connect a
    default. To offer GitHub, turn it on there and paste the client ID and secret of a
    GitHub OAuth app whose callback URL is `https://<project>.supabase.co/auth/v1/callback`.
 2. Under **Authentication → URL Configuration**, add
-   `<OPENPURPOSE_PUBLIC_URL>/api/auth/callback` to the redirect URLs, e.g.
-   `https://purpose.example.com/api/auth/callback`.
+   `<OPENPURPOSE_PUBLIC_URL>/api/auth/callback**` to the redirect URLs, e.g.
+   `https://purpose.example.com/api/auth/callback**`. The `**` lets through the
+   links sent to people an admin adds by email, which end in `?invite=…`.
 3. Copy the project URL and the publishable key from **Project Settings → API Keys**, and set:
 
 ```bash
@@ -310,14 +312,24 @@ OPENPURPOSE_SIGNUP=approval
 
 | Value | |
 |---|---|
-| `off` (default) | they can't get in. Only people who signed in this way before can |
+| `off` (default) | they can't get in. Only people who signed in this way before, or whom an admin added by email, can |
 | `approval` | they wait until a server admin approves them under **Settings → Server**; approving gives them their own workspace |
 | `open` | they get their own workspace right away |
 
 To go from approval to open, change `OPENPURPOSE_SIGNUP` to `open` and restart.
 People who are already waiting stay on the list until you approve them.
 
-Sign-in links work only in the browser that asked for them. Access tokens keep
+Admins add people by email under **Settings → People and agents**: pick
+**Person**, fill in their email, and they get a role at once and a sign-in link by
+email. Whichever way they sign in with that address (the link, another link, or
+GitHub), they land in the same account. Someone who already has an account just
+gets the new role. Leave **Allow new users to sign up** on in Supabase, even with
+`OPENPURPOSE_SIGNUP=off`, so Supabase can send the first link. Supabase's own
+email service sends only a few emails an hour; set up custom SMTP in Supabase
+(**Authentication → Emails**) before adding many people.
+
+Sign-in links work only in the browser that asked for them, except links sent to
+people an admin added. Access tokens keep
 working next to a provider, for people and for agents. Behind a reverse proxy, set
 [`OPENPURPOSE_TRUST_PROXY`](#without-docker) too, so the limit on sign-in emails
 counts each visitor on their own.

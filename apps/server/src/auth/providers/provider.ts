@@ -10,6 +10,11 @@ export interface ExternalIdentity {
   provider: string;
   subject: string;
   email: string | null;
+  /**
+   * Whether the provider checked that this person owns `email` (they opened a link sent to it,
+   * or GitHub verified it). Only a verified email links a new identity to an existing person.
+   */
+  emailVerified: boolean;
   name: string | null;
   /** How they proved it, e.g. 'github' or 'email'; shown to the admin who approves them. */
   method?: string | null;
@@ -23,12 +28,14 @@ export interface AuthProvider {
   /**
    * Begin signing in. OAuth returns a `redirect`; a magic link sends an email. Both end on
    * `callbackUrl`. A `verifier` (PKCE) is kept in a cookie and handed back to finish(). A
-   * `notice` goes to the server log only, never to the visitor.
+   * `notice` goes to the server log only, never to the visitor. `allowNewUser` sends a magic
+   * link even when sign-up is off, to someone an admin added by email.
    */
   start(input: {
     method: AuthMethod;
     email?: string;
     callbackUrl: string;
+    allowNewUser?: boolean;
   }): Promise<{
     redirect?: string;
     emailSent?: boolean;
