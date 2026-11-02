@@ -218,8 +218,9 @@ const link = (
 
 function fakeDb(links: LinkFixture[], data = { projects, terms }): Queryable {
   const query = async (sql: string, params: unknown[] = []) => {
-    if (sql.includes('FROM section_links')) {
-      // Mirrors the WHERE clause: group-wide content, or content in a readable organization.
+    if (sql.includes('section_links')) {
+      // Mirrors the readable check. relatedTo's query narrows further in SQL; all links are a
+      // superset of that, and resolving decides the rest (integration tests check the SQL).
       const readable = params[0] as string[];
       return {
         rows: links.filter(
