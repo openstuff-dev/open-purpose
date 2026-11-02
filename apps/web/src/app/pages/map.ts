@@ -41,6 +41,16 @@ interface SimLink extends SimulationLinkDatum<SimNode> {
   edge: GraphEdge;
 }
 
+/** A [[link]] from one term to another. */
+const termLink = (d: SimLink) =>
+  d.edge.kind === 'link' &&
+  (d.source as SimNode).type === 'term' &&
+  (d.target as SimNode).type === 'term';
+
+/** The arrowhead an edge has when nothing is selected. */
+const restMarker = (d: SimLink) =>
+  d.edge.kind !== 'link' ? null : termLink(d) ? 'url(#arrow-term)' : 'url(#arrow)';
+
 const RADIUS: Record<GraphNode['type'], number> = {
   group: 18,
   organization: 14,
@@ -407,15 +417,17 @@ export class MapPage implements AfterViewInit, OnDestroy {
     svg.selectAll('*').remove();
     svg.attr('viewBox', `0 0 ${width} ${height}`);
     const defs = svg.append('defs');
-    for (const id of ['arrow', 'arrow-hot', 'arrow-dim']) {
+    // Links between two terms get a smaller, fainter arrow: a big glossary has many of them.
+    for (const id of ['arrow', 'arrow-hot', 'arrow-dim', 'arrow-term']) {
+      const size = id === 'arrow-term' ? 4 : 7;
       defs
         .append('marker')
         .attr('id', id)
         .attr('viewBox', '0 -4 8 8')
         .attr('refX', 8)
         .attr('refY', 0)
-        .attr('markerWidth', 7)
-        .attr('markerHeight', 7)
+        .attr('markerWidth', size)
+        .attr('markerHeight', size)
         .attr('orient', 'auto')
         .append('path')
         .attr('d', 'M0,-4L8,0L0,4')
@@ -438,11 +450,11 @@ export class MapPage implements AfterViewInit, OnDestroy {
       .selectAll<SVGLineElement, SimLink>('line')
       .data(links)
       .join('line')
-      .attr('class', (d) => `edge ${d.edge.kind}`)
+      .attr('class', (d) => `edge ${d.edge.kind}${termLink(d) ? ' term-link' : ''}`)
       .attr('stroke-width', (d) =>
-        d.edge.kind === 'defines' ? 1 : Math.min(1.2 + d.edge.count * 0.6, 4),
+        d.edge.kind === 'defines' || termLink(d) ? 1 : Math.min(1.2 + d.edge.count * 0.6, 4),
       )
-      .attr('marker-end', (d) => (d.edge.kind === 'link' ? 'url(#arrow)' : null));
+      .attr('marker-end', (d) => restMarker(d));
 
     const node = root
       .append('g')
@@ -635,7 +647,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
       this.linkSel
         .classed('dim', false)
         .classed('hot', false)
-        .attr('marker-end', (d) => (d.edge.kind === 'link' ? 'url(#arrow)' : null));
+        .attr('marker-end', (d) => restMarker(d));
       return;
     }
     const near = new Set([id]);
@@ -651,7 +663,13 @@ export class MapPage implements AfterViewInit, OnDestroy {
       .classed('dim', (d) => !hot(d))
       .classed('hot', hot)
       .attr('marker-end', (d) =>
-        d.edge.kind === 'link' ? (hot(d) ? 'url(#arrow-hot)' : 'url(#arrow-dim)') : null,
+        d.edge.kind !== 'link'
+          ? null
+          : hot(d)
+            ? 'url(#arrow-hot)'
+            : termLink(d)
+              ? 'url(#arrow-term)'
+              : 'url(#arrow-dim)',
       );
   }
 }

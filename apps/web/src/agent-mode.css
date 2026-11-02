@@ -388,7 +388,12 @@ html.agent-mode .map-svg .edge.hot {
   stroke-dasharray: none;
 }
 
-html.agent-mode .map-svg marker .arrow {
+html.agent-mode .map-svg .edge.term-link:not(.hot) {
+  stroke-dasharray: 2 4;
+}
+
+html.agent-mode .map-svg marker .arrow,
+html.agent-mode .map-svg marker .arrow-term {
   fill: var(--line-strong);
 }
 

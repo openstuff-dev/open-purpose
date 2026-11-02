@@ -2437,6 +2437,11 @@ mark {
   stroke-opacity: 0.7;
 }
 
+.map-svg .edge.term-link {
+  stroke-dasharray: 4 4;
+  stroke-opacity: 0.35;
+}
+
 .map-svg .edge.hot {
   stroke: var(--accent);
   stroke-opacity: 1;
@@ -2452,6 +2457,11 @@ mark {
 
 .map-svg marker .arrow-hot {
   fill: var(--accent);
+}
+
+.map-svg marker .arrow-term {
+  fill: var(--edge);
+  fill-opacity: 0.4;
 }
 
 .map-svg marker .arrow-dim {
