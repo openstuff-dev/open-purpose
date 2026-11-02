@@ -380,7 +380,7 @@ export async function updateFinding(
     if (!OPEN_FINDING_STATUSES.includes(current.status)) {
       throw new AppError(
         'conflict',
-        `This finding is ${current.status === 'ask_later' ? 'waiting' : current.status}; it can't be changed any more.`,
+        `This finding is ${current.status}; it can't be changed any more.`,
       );
     }
 
@@ -455,7 +455,7 @@ export async function findingsNear(
     `SELECT ${FINDING_COLS}, count(*) OVER ()::int AS total FROM ${FINDING_FROM}
       WHERE f.project_id = $1 AND f.organization_id = ANY($2::uuid[])
         AND (f.status = 'todo' OR (f.status = 'ask_later' AND (f.remind_after IS NULL OR f.remind_after <= current_date)))
-        AND ($3 = '' OR starts_with(f.file, $3 || '/'))
+        AND ($3 = '' OR f.file = $3 OR starts_with(f.file, $3 || '/'))
         AND ($4::text IS NULL OR f.remote IS NULL OR f.remote = $4)
       ORDER BY f.status = 'ask_later' DESC, f.updated_at DESC
       LIMIT $5`,
