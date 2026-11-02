@@ -185,17 +185,25 @@ async function approve(
     [actorId],
   );
   if (!rowCount) throw await notPending(pool, actorId);
-  try {
-    return await provisionWorkspace(pool, actorId, {
-      name: workspace,
-      slug: await freeGroupSlug(pool, workspace),
-      created_by: approvedBy ?? actorId,
-    });
-  } catch (err) {
-    await pool.query(`UPDATE actors SET signup = 'pending' WHERE id = $1`, [actorId]);
-    throw err;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await provisionWorkspace(pool, actorId, {
+        name: workspace,
+        slug: await freeGroupSlug(pool, workspace),
+        created_by: approvedBy ?? actorId,
+      });
+    } catch (err) {
+      // Someone with the same name signed up at the same moment and took the free slug: pick
+      // the next one.
+      if (attempt < 5 && isSlugTaken(err)) continue;
+      await pool.query(`UPDATE actors SET signup = 'pending' WHERE id = $1`, [actorId]);
+      throw err;
+    }
   }
 }
+
+const isSlugTaken = (err: unknown) =>
+  err instanceof AppError && err.code === 'conflict' && err.message.includes('groups_slug_key');
 
 /** Turn a pending sign-up down. They can't sign in again, and their sessions end now. */
 export async function rejectSignup(pool: Pool, actor: Actor, actorId: string): Promise<void> {

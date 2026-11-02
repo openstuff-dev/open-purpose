@@ -2989,6 +2989,18 @@ describe('sign-up and sign-in through a provider', () => {
     expect(second.data.group.slug).toBe(`${me.data.group.slug}-2`);
   });
 
+  it('gives people with the same name who sign up at once a workspace each', async () => {
+    config.auth.signup = 'open';
+    const signups = await Promise.all(
+      [1, 2, 3, 4].map((i) => signIn(person(`kari${i}`, 'Kari'))),
+    );
+    const groups = await Promise.all(
+      signups.map(async ({ token }) => (await call('GET', '/me', undefined, token)).data.group),
+    );
+    expect(groups.every((g) => g?.role === 'admin')).toBe(true);
+    expect(groups.map((g) => g.slug).sort()).toEqual(['kari', 'kari-2', 'kari-3', 'kari-4']);
+  });
+
   it('leaves agent and API tokens alone', async () => {
     const org = (await call('GET', '/me', undefined, ADMIN)).data.organizations[0].id;
     const agent = await call(
