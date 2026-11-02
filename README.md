@@ -238,6 +238,7 @@ connection is IPv6 only unless you buy the IPv4 add-on.
 | `OPENPURPOSE_PUBLIC_URL` | `http://localhost:PORT` | shown in MCP setup snippets |
 | `OPENPURPOSE_BOOTSTRAP_TOKEN` | random | first admin's token; otherwise printed once in the log |
 | `OPENPURPOSE_API_FETCH` | `on` | `off` stops the server from fetching API spec URLs (uploads still work) |
+| `OPENPURPOSE_API_FETCH_ALLOW` | empty | private network hosts the server may still fetch API specs from: names, addresses or ranges (`specs.internal,192.168.1.20,10.0.0.0/8`). See below |
 | `OPENPURPOSE_API_REFRESH_MINUTES` | `60` | re-fetch linked API specs older than this when agents read them; `0` = only on demand |
 | `OPENPURPOSE_API_MAX_MB` | `20` | largest API spec accepted |
 | `OPENPURPOSE_IMPORT_MAX_MB` | `100` | largest export file accepted by an import |
@@ -258,9 +259,22 @@ Leave it off when people reach the server directly: then anyone could fake the
 header.
 
 Linked API specs are fetched by the server, so it must be able to reach those URLs.
-Only editors can add a link, and only http(s) URLs without credentials are accepted;
-if the server sits next to things editors shouldn't be able to probe, set
-`OPENPURPOSE_API_FETCH=off` and upload spec files instead.
+Only editors can add a link, and only http(s) URLs without credentials are accepted.
+
+**The server doesn't fetch specs from private network addresses**, so a spec link can't be
+used to look around the network the server runs in. That covers `localhost`, `127.0.0.1`,
+`10.x`, `172.16–31.x`, `192.168.x`, link-local addresses such as the cloud metadata
+service `169.254.169.254`, IPv6 private and link-local addresses, and any host name that
+resolves to one of them (Docker service names like `http://billing-api:8080` usually do).
+Each redirect is checked again. Adding or refreshing such a link fails with "… is a
+private network address".
+
+If your specs live on your own network, list those hosts in
+`OPENPURPOSE_API_FETCH_ALLOW`, comma separated: host names (`billing-api`), addresses
+(`192.168.1.20`) or ranges (`10.0.0.0/8`). Allow as little as you can: anyone who can
+edit a project can make the server fetch from what you list. Public URLs need no
+setting. To stop fetching URLs altogether, set `OPENPURPOSE_API_FETCH=off` and upload
+spec files instead.
 
 ### Sign-up and sign-in
 

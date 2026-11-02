@@ -21,6 +21,9 @@ services:
       OPENPURPOSE_SESSION_DAYS: ${OPENPURPOSE_SESSION_DAYS:-30}
       # Only cloudflared may set X-Forwarded-For, so rate limits see each visitor's own address.
       OPENPURPOSE_TRUST_PROXY: ${OPENPURPOSE_NETWORK:-172.30.47}.2
+      # API spec URLs on your own network the server may still fetch (names, addresses or ranges).
+      # Private addresses are refused otherwise. See "API specs" in the main README.
+      OPENPURPOSE_API_FETCH_ALLOW: ${OPENPURPOSE_API_FETCH_ALLOW:-}
     networks:
       - openpurpose
     # No ports: visitors come in through the tunnel only.
