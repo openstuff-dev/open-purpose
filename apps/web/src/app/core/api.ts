@@ -387,7 +387,12 @@ export class Api {
 
   setFindingStatus = (
     id: string,
-    body: { status: FindingStatus; note?: string; remind_after?: string | null },
+    body: {
+      status: FindingStatus;
+      note?: string;
+      remind_after?: string | null;
+      solved_ref?: string | null;
+    },
   ) => this.send<Finding>('PUT', `/findings/${id}/status`, body);
 
   proposals = (status: ProposalStatus | 'all' = 'pending', level?: string) =>

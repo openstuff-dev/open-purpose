@@ -5059,3 +5059,12 @@ ul.stat-rest {
   width: auto;
   margin: 0;
 }
+
+.drawer-foot .solved-ref {
+  flex: 1 1 16rem;
+}
+
+.drawer-foot .solved-ref input {
+  flex: 1;
+  min-width: 0;
+}
