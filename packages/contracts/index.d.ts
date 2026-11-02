@@ -15,7 +15,8 @@
 export type EditMode = 'locked' | 'propose' | 'open';
 export type DocKind =
   'purpose' | 'business_logic' | 'glossary' | 'guidelines' | 'reference' | 'learnings';
-export type ProposalKind = 'edit_section' | 'new_section' | 'learning' | 'new_scope';
+export type ProposalKind =
+  'edit_section' | 'new_section' | 'learning' | 'new_scope' | 'new_document';
 
 /** What a new_scope proposal creates, besides its name (heading) and description (body). */
 export interface ScopeSpec {
@@ -24,6 +25,14 @@ export interface ScopeSpec {
   stacks: string[];
   /** Repositories of the project the scope is bound to. */
   repository_ids: string[];
+}
+/**
+ * What a new_document proposal creates, besides its title (heading) and sections (body, one
+ * "## Heading" line per section).
+ */
+export interface DocumentSpec {
+  kind: Exclude<DocKind, 'learnings'>;
+  slug: string;
 }
 export type ProposalStatus = 'pending' | 'changes_requested' | 'approved' | 'rejected';
 export type ActorKind = 'human' | 'agent';
@@ -612,6 +621,8 @@ export interface ExportProposal {
   result_scope?: string | null;
   /** new_scope proposals: the paths, stacks and repositories it asks for. */
   scope_spec?: ScopeSpec | null;
+  /** new_document proposals: the kind and slug of the document it asks for. */
+  document_spec?: DocumentSpec | null;
   base_version: number | null;
   heading: string;
   body: string;

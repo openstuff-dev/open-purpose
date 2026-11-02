@@ -29,6 +29,7 @@ import { DialogTitle, Drawer, SegmentedControl } from '@openstuff-dev/ui-angular
 import { Badges } from '../core/badges';
 import { Api } from '../core/api';
 import {
+  KIND_LABEL,
   MODE_LABEL,
   type EditMode,
   type Proposal,
@@ -78,6 +79,7 @@ const KIND: Record<Proposal['kind'], { label: string; icon: string }> = {
   edit_section: { label: 'Change', icon: 'pencil' },
   new_section: { label: 'New section', icon: 'plus' },
   new_scope: { label: 'New scope', icon: 'layers' },
+  new_document: { label: 'New document', icon: 'file' },
 };
 
 const STATUS_TONE: Record<ProposalStatus, Tone> = {
@@ -197,6 +199,7 @@ function ago(iso: string): string {
           <option value="edit_section">Changes</option>
           <option value="new_section">New sections</option>
           <option value="new_scope">New scopes</option>
+          <option value="new_document">New documents</option>
         </select>
         <select os-select aria-label="Where" [ngModel]="level()" (ngModelChange)="setLevel($event)">
           <option value="all">Everywhere I can see</option>
@@ -514,6 +517,16 @@ function ago(iso: string): string {
                 }
               </dd>
             }
+            @if (p.document_spec; as spec) {
+              <dt>Kind</dt>
+              <dd>{{ docKindLabel[spec.kind] }}</dd>
+              <dt>Slug</dt>
+              <dd>
+                <code>{{ spec.slug }}</code>
+              </dd>
+              <dt>Sections</dt>
+              <dd>{{ sectionCount(p.body) }}</dd>
+            }
             @if (p.scope_spec; as spec) {
               <dt>Slug</dt>
               <dd>
@@ -596,7 +609,9 @@ function ago(iso: string): string {
                       ? 'The learning'
                       : p.kind === 'new_scope'
                         ? 'The new scope'
-                        : 'The new section'
+                        : p.kind === 'new_document'
+                          ? 'The new document'
+                          : 'The new section'
                 }}
                 @if (p.revision > 1) {
                   <span os-chip>Revision {{ p.revision }}</span>
@@ -611,16 +626,35 @@ function ago(iso: string): string {
             </div>
             @if (r.editing) {
               <div class="section-edit">
-                <os-field [label]="p.kind === 'new_scope' ? 'Name' : 'Heading'"
+                <os-field
+                  [label]="
+                    p.kind === 'new_scope'
+                      ? 'Name'
+                      : p.kind === 'new_document'
+                        ? 'Title'
+                        : 'Heading'
+                  "
                   ><input os-input [(ngModel)]="r.heading" name="heading"
                 /></os-field>
                 <app-md-editor
                   [(value)]="r.body"
                   [rows]="12"
-                  [label]="p.kind === 'new_scope' ? 'Description' : 'Text'"
+                  [label]="
+                    p.kind === 'new_scope'
+                      ? 'Description'
+                      : p.kind === 'new_document'
+                        ? 'Sections'
+                        : 'Text'
+                  "
                   [fromProject]="p.project_id"
                   [fromOrganization]="p.organization_id"
                 />
+                @if (p.kind === 'new_document') {
+                  <p class="quiet">
+                    Each line that starts with <code>## </code> starts a section. Use
+                    <code>###</code> for headings inside a section.
+                  </p>
+                }
                 @if (rv?.threads?.length) {
                   <p class="quiet">
                     Comments stay attached to their lines as long as those lines still exist.
@@ -847,13 +881,17 @@ function ago(iso: string): string {
                 }
               }
               <div class="foot-row">
-                @if (p.kind === 'new_section' || p.kind === 'learning') {
+                @if (takesMode(p)) {
                   <div class="doc-mode">
                     <span>Agents may</span>
                     <app-mode-picker
                       [mode]="r.mode"
                       (changed)="r.mode = $event; touch()"
-                      label="What agents may do with the approved section"
+                      [label]="
+                        p.kind === 'new_document'
+                          ? 'What agents may do with the approved document and its sections'
+                          : 'What agents may do with the approved section'
+                      "
                     />
                   </div>
                 }
@@ -892,7 +930,7 @@ function ago(iso: string): string {
                   </button>
                 }
                 <button os-button variant="danger" type="button" (click)="reject(p)">Reject</button>
-                @if (p.kind === 'new_section' || p.kind === 'learning') {
+                @if (takesMode(p)) {
                   <span class="quiet foot-hint">{{ modeLabel[r.mode] }} after approval</span>
                 } @else if (p.kind === 'new_scope') {
                   <span class="quiet foot-hint">Approving creates the scope</span>
@@ -964,6 +1002,24 @@ export class InboxPage {
   readonly statusLabel = STATUS;
   readonly statusTone = STATUS_TONE;
   readonly modeLabel = MODE_LABEL;
+  readonly docKindLabel = KIND_LABEL;
+
+  /** Approving these makes sections, so the reviewer picks what agents may do with them. */
+  takesMode(p: Proposal): boolean {
+    return p.kind === 'new_section' || p.kind === 'learning' || p.kind === 'new_document';
+  }
+
+  /** How many sections a new_document proposal's text holds: one per "## " line. */
+  sectionCount(body: string): number {
+    let fenced = false;
+    let n = 0;
+    for (const line of body.split('\n')) {
+      if (/^\s{0,3}(```|~~~)/.test(line)) fenced = !fenced;
+      else if (!fenced && /^##\s+\S/.test(line)) n++;
+    }
+    return n;
+  }
+
   readonly ago = ago;
   readonly tabs: { value: StatusTab; label: string }[] = [
     { value: 'pending', label: 'Needs review' },
@@ -1526,7 +1582,7 @@ export class InboxPage {
         heading: r.heading !== (p.heading || p.current_heading) ? r.heading : undefined,
         body: r.body !== p.body ? r.body : undefined,
         note: r.note || undefined,
-        mode: p.kind === 'new_section' || p.kind === 'learning' ? r.mode : undefined,
+        mode: this.takesMode(p) ? r.mode : undefined,
         target:
           p.kind === 'learning' && t
             ? { organization_id: t.organization_id, project_id: t.project_id, scope_id: t.scope_id }
@@ -1537,7 +1593,9 @@ export class InboxPage {
           ? `Approved. Agents in ${t?.label ?? 'that scope'} get it from now on.`
           : p.kind === 'new_scope'
             ? `Created the scope ${p.heading}`
-            : 'Approved',
+            : p.kind === 'new_document'
+              ? `Created the document ${r.heading || p.heading}`
+              : 'Approved',
       );
       await this.afterDecision(p);
     } catch (e) {

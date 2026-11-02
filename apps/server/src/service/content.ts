@@ -305,6 +305,21 @@ export async function loadDocument(db: Queryable, id: string): Promise<Document>
   return rows[0];
 }
 
+/** A full document UUID, or an unambiguous prefix of at least 8 hex characters ("d:" optional). */
+export async function resolveDocumentRef(db: Queryable, ref: string): Promise<string> {
+  const r = ref.trim().toLowerCase().replace(/^d:/, '');
+  if (isUuid(r)) return r;
+  if (!/^[0-9a-f-]{8,36}$/.test(r)) throw badRequest(`Invalid document id "${ref}"`);
+  const { rows } = await db.query<{ id: string }>(
+    "SELECT id FROM documents WHERE id::text LIKE $1 || '%' LIMIT 2",
+    [r],
+  );
+  if (rows.length === 0) throw notFound('Document');
+  if (rows.length > 1)
+    throw badRequest(`Document id prefix "${ref}" is ambiguous; use more characters`);
+  return rows[0].id;
+}
+
 export async function getDocument(db: Queryable, a: Access, id: string): Promise<Document> {
   const doc = await loadDocument(db, id);
   a.requireRead(doc.organization_id);

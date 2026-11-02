@@ -13,6 +13,7 @@ import type {
   GroupRef,
   ProposalKind,
   ScopeSpec,
+  DocumentSpec,
   ProposalStatus,
   Repository,
   Role,
@@ -325,6 +326,8 @@ export interface Proposal {
   scope_spec: ScopeSpec | null;
   /** new_scope only: the scope created on approval. */
   result_scope_id: string | null;
+  /** new_document only: the kind and slug of the document to create. */
+  document_spec: DocumentSpec | null;
   /** Approved without review: an admin lets the agent who made it skip review. */
   auto_approved: boolean;
   project_slug: string | null;

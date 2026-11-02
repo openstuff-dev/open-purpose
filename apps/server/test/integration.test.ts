@@ -533,6 +533,145 @@ describe('OpenPurpose with groups and organizations', () => {
       if (s.slug === 'lint-package' || s.slug === 'scripts') await api('DELETE', `/scopes/${s.id}`);
   });
 
+  it('lets agents propose a document with its first sections, which a person creates by approving', async () => {
+    const { client, call } = await mcp(t.jonas);
+    const r = await call('propose_document', {
+      title: 'Portal glossary',
+      kind: 'glossary',
+      sections: [
+        { heading: 'Order', body: 'What a customer buys.\n\n### Not a quote\n\nQuotes are separate.' },
+        { heading: 'Quote', body: 'A price offer.' },
+      ],
+      reason: 'New project: the terms are only in the README.',
+      remote_url: HTTPS_REMOTE,
+    });
+    expect(r.isError).toBeFalsy();
+    expect(r.text).toContain(
+      'Document "Portal glossary" proposed for **Customer Portal** with 2 sections',
+    );
+    expect(r.text).toContain('Tell the user in one line that you proposed it');
+    const p = (await api('GET', '/proposals?status=pending')).data.find(
+      (x: any) => x.kind === 'new_document' && x.heading === 'Portal glossary',
+    );
+    expect(p).toMatchObject({
+      project_id: projectId,
+      document_id: null,
+      document_spec: { kind: 'glossary', slug: 'portal-glossary' },
+      body: '## Order\n\nWhat a customer buys.\n\n### Not a quote\n\nQuotes are separate.\n\n## Quote\n\nA price offer.',
+    });
+    expect((await call('get_review', { proposal_id: p.id })).text).toContain(
+      '- Document kind: glossary',
+    );
+
+    // One proposal per document: the second one is refused, and so are learnings documents.
+    const twice = await call('propose_document', {
+      title: 'Portal glossary',
+      kind: 'glossary',
+      reason: 'Again.',
+      remote_url: HTTPS_REMOTE,
+    });
+    expect(twice.isError).toBe(true);
+    expect(twice.text).toContain('already proposed here');
+    const learnings = await call('propose_document', {
+      title: 'Learnings',
+      kind: 'learnings',
+      reason: 'No.',
+      remote_url: HTTPS_REMOTE,
+    });
+    expect(learnings.isError).toBe(true);
+    const nested = await call('propose_document', {
+      title: 'Runbook',
+      kind: 'reference',
+      sections: [{ heading: 'Deploy', body: '## Steps' }],
+      reason: 'Ops.',
+      remote_url: HTTPS_REMOTE,
+    });
+    expect(nested.isError).toBe(true);
+    expect(nested.text).toContain('Use "###" for headings inside a section');
+
+    // Revisions must still split into sections.
+    const bad = await call('revise_proposal', {
+      proposal_id: p.id,
+      body: 'Terms we use.\n\n## Order\n\nWhat a customer buys.',
+      note: 'Intro.',
+    });
+    expect(bad.isError).toBe(true);
+    expect(bad.text).toContain('Start the text with a "## Heading" line');
+    const revised = await call('revise_proposal', {
+      proposal_id: p.id,
+      body: `${p.body}\n\n## Invoice\n\nWhat we send after delivery.`,
+      note: 'Added Invoice.',
+    });
+    expect(revised.isError).toBeFalsy();
+
+    // Nothing exists until a person approves it.
+    const before = await call('get_context', { remote_url: HTTPS_REMOTE, path: 'src/app.ts' });
+    expect(before.text).not.toContain('Portal glossary');
+
+    const ok = await api('POST', `/proposals/${p.id}/approve`, { mode: 'open' });
+    expect(ok.status).toBe(200);
+    const done = (await api('GET', `/proposals/${p.id}`)).data;
+    expect(done.status).toBe('approved');
+    expect(done.result_document_id).toBe(done.document_id);
+    const doc = (await api('GET', `/documents/${done.document_id}`)).data;
+    expect(doc).toMatchObject({ title: 'Portal glossary', kind: 'glossary', mode: 'open' });
+    expect(doc.sections.map((s: any) => [s.heading, s.mode])).toEqual([
+      ['Order', 'open'],
+      ['Quote', 'open'],
+      ['Invoice', 'open'],
+    ]);
+    expect(doc.sections[0].body).toBe('What a customer buys.\n\n### Not a quote\n\nQuotes are separate.');
+
+    // The context shows the document's id, and add_section takes it.
+    const d8 = done.document_id.slice(0, 8);
+    const after = await call('get_context', { remote_url: HTTPS_REMOTE, path: 'src/app.ts' });
+    expect(after.text).toContain(`### Portal glossary  \`[d:${d8} · open]\``);
+    const added = await call('add_section', {
+      document_id: `d:${d8}`,
+      heading: 'Customer',
+      body: 'Who places orders.',
+      reason: 'Missing term.',
+    });
+    expect(added.text).toContain('Added section');
+    const exists = await call('propose_document', {
+      title: 'Portal glossary',
+      kind: 'glossary',
+      reason: 'Again.',
+      remote_url: HTTPS_REMOTE,
+    });
+    expect(exists.isError).toBe(true);
+    expect(exists.text).toContain(`add_section(document_id="${d8}")`);
+
+    // An empty document is listed with its id, so an agent can add the first section.
+    const runbook = await api('POST', '/documents', {
+      project_id: projectId,
+      kind: 'reference',
+      title: 'Runbook',
+    });
+    expect(runbook.status).toBe(201);
+    const empty = await call('get_context', { remote_url: HTTPS_REMOTE, path: 'src/app.ts' });
+    expect(empty.text).toContain('## Empty documents');
+    expect(empty.text).toContain(`Runbook \`[d:${runbook.data.id.slice(0, 8)} · propose]\``);
+    await client.close();
+
+    // An editor's token creates it right away.
+    const admin = await mcp(ADMIN);
+    const direct = await admin.call('propose_document', {
+      title: 'Business logic',
+      slug: 'portal-rules',
+      kind: 'business_logic',
+      sections: [{ heading: 'Orders', body: 'Paid before they ship.' }],
+      reason: 'Rules.',
+      remote_url: HTTPS_REMOTE,
+    });
+    expect(direct.text).toContain('Created document "Business logic"');
+    expect(direct.text).toContain('with 1 section.');
+    await admin.client.close();
+    for (const d of (await api('GET', `/documents?project_id=${projectId}`)).data)
+      if (['portal-glossary', 'runbook', 'portal-rules'].includes(d.slug))
+        await api('DELETE', `/documents/${d.id}`);
+  });
+
   it('promotes a learning from one organization to the whole group', async () => {
     const lars = await mcp(t.lars);
     const r = await lars.call('propose_learning', {

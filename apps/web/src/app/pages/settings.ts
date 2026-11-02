@@ -51,6 +51,10 @@ organization, the project and the part of the code you are in (a repository or a
    to \`backend/\`), call \`get_context\` again with the new path and manifest.
 3. If no project is found, ask me which project this repo belongs to, then call
    \`register_repository\` (or \`create_project\`) and create \`.openpurpose.json\`.
+   \`get_context\` shows each document's id as \`[d:…]\`: add sections with
+   \`add_section\`. When a document is missing (a new project often has no
+   glossary or business logic yet), call \`propose_document\` with its first
+   sections and tell me in one line that you proposed it.
 4. When I correct you and the correction should apply next time, call
    \`propose_learning\` with the same remote/path/manifests. Say in one line that
    you did. Do not propose one-off preferences or task-specific details.

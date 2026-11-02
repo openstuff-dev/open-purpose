@@ -4,7 +4,7 @@
  */
 import { z } from 'zod';
 import { AppError } from '../../errors.js';
-import { DOC_KINDS, EDIT_MODES } from '../types.js';
+import { DOC_KINDS, EDIT_MODES, PROPOSABLE_DOC_KINDS, type DocumentSpec } from '../types.js';
 import { websites } from '../../domain/websites.js';
 import type { ExportDocument, ExportFile } from '@openpurpose/contracts';
 
@@ -176,7 +176,7 @@ const fileSchema = z.object({
   proposals: z.array(
     z.object({
       key,
-      kind: z.enum(['edit_section', 'new_section', 'learning', 'new_scope']),
+      kind: z.enum(['edit_section', 'new_section', 'learning', 'new_scope', 'new_document']),
       status: z.enum(['pending', 'changes_requested', 'approved', 'rejected']),
       organization: ref,
       project: ref,
@@ -192,6 +192,14 @@ const fileSchema = z.object({
           path_globs: z.array(z.string()),
           stacks: z.array(z.string()),
           repository_ids: z.array(z.string()),
+        })
+        .nullable()
+        .optional(),
+      // Files from before document proposals don't have it.
+      document_spec: z
+        .object({
+          kind: z.enum(PROPOSABLE_DOC_KINDS as [DocumentSpec['kind'], ...DocumentSpec['kind'][]]),
+          slug,
         })
         .nullable()
         .optional(),
