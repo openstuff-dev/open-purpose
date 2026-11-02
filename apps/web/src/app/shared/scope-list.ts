@@ -148,6 +148,8 @@ export const repoName = (key: string) => key.slice(key.lastIndexOf('/') + 1) || 
   `,
 })
 export class ScopeList {
+  /** Counts loads, so an answer for an earlier one is ignored. */
+  private asked = 0;
   /** null = group-wide. */
   readonly organizationId = input<string | null>(null);
   readonly projectId = input<string | null>(null);
@@ -195,10 +197,12 @@ export class ScopeList {
   }
 
   private async load(organizationId: string | null, projectId: string | null): Promise<void> {
+    const ask = ++this.asked;
+    const show = (scopes: Scope[]) => {
+      if (ask === this.asked) this.scopes.set(scopes);
+    };
     try {
-      this.scopes.set(
-        await this.api.scopes({ organization_id: organizationId, project_id: projectId }),
-      );
+      show(await this.api.scopes({ organization_id: organizationId, project_id: projectId }, show));
     } catch (e) {
       this.notices.error(e);
     }

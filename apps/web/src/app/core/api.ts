@@ -1,5 +1,9 @@
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, untracked } from '@angular/core';
+import { GetCache, type OnFresh } from './get-cache';
+import { Session } from './session';
+
+export type { OnFresh } from './get-cache';
 import { firstValueFrom, type Observable } from 'rxjs';
 import type {
   ActivityPeriod,
@@ -61,28 +65,66 @@ export type ImportUpload = { file: unknown } | { zip: string };
 
 const lv = (id: string | null | undefined) => id ?? 'group';
 
-/** Thin typed wrapper over the REST API. Every method returns a Promise. */
+type Params = Record<string, string | number | undefined | null>;
+
+/**
+ * Thin typed wrapper over the REST API. Every method returns a Promise.
+ *
+ * GETs for the same path and parameters at the same time share one request. The pages people go
+ * back and forth between (projects, a project, its documents and scopes, the graph) are also kept
+ * in memory: a second visit gets the stored answer at once while it is fetched again behind the
+ * scenes, and `onFresh` gets the new one if it changed. Any change sent to the server clears the
+ * store, and so does signing in or out, switching workspace or organization and agent mode,
+ * because those are part of every key.
+ */
 @Injectable({ providedIn: 'root' })
 export class Api {
   private http = inject(HttpClient);
+  private session = inject(Session);
+  private cache = new GetCache();
+  /** Who is asking: requests for anyone else never share an answer. */
+  private asked = '';
 
-  private get<T>(
-    path: string,
-    params?: Record<string, string | number | undefined | null>,
-  ): Promise<T> {
+  /** Drops every stored answer, and lets the next GET start a new request. */
+  forget(): void {
+    this.cache.forget();
+  }
+
+  private get<T>(path: string, params?: Params, store?: { onFresh?: OnFresh<T> }): Promise<T> {
     let p = new HttpParams();
     for (const [k, v] of Object.entries(params ?? {}))
       if (v !== undefined && v !== null && v !== '') p = p.set(k, String(v));
-    return firstValueFrom(this.http.get<T>(`/api${path}`, { params: p }));
+    const s = this.session;
+    // untracked: a page effect that loads something shouldn't rerun when these change.
+    const who = untracked(() =>
+      JSON.stringify([s.token(), s.groupChoice(), s.orgChoice(), s.agentMode()]),
+    );
+    if (who !== this.asked) {
+      this.asked = who;
+      this.forget();
+    }
+    const key = `${path}?${p.keys().sort().map((k) => `${k}=${p.get(k)}`).join('&')}`;
+    return this.cache.get(
+      key,
+      () => firstValueFrom(this.http.get<T>(`/api${path}`, { params: p })),
+      store,
+    );
   }
 
+  /** `keep` for POSTs that only read, such as running a read-only agent tool. */
   private send<T>(
     method: 'POST' | 'PATCH' | 'PUT' | 'DELETE',
     path: string,
     body?: unknown,
+    keep?: 'keep',
   ): Promise<T> {
     const obs: Observable<T> = this.http.request<T>(method, `/api${path}`, { body });
-    return firstValueFrom(obs);
+    if (keep) return firstValueFrom(obs);
+    this.forget();
+    // Also after it lands: a GET started meanwhile may have read the old state.
+    return firstValueFrom(obs).finally(() => {
+      this.forget();
+    });
   }
 
   // signing in: config, start and exchange need no token
@@ -111,7 +153,7 @@ export class Api {
   counts = () => this.get<Counts>('/me/counts');
   /** Agent mode: run one read-only MCP tool as the agent and get its text exactly. */
   agentTool = (name: string, args: Record<string, unknown>) =>
-    this.send<{ text: string; is_error: boolean }>('POST', '/agent/tool', { name, args });
+    this.send<{ text: string; is_error: boolean }>('POST', '/agent/tool', { name, args }, 'keep');
 
   renameMe = (name: string) => this.send('PATCH', '/me', { name });
   myTokens = () => this.get<TokenRow[]>('/me/tokens');
@@ -149,13 +191,13 @@ export class Api {
   };
 
   previewImport = (upload: ImportUpload, opts: ImportOptions) =>
-    this.send<ImportReport>('POST', '/import/preview', { ...upload, ...opts });
+    this.send<ImportReport>('POST', '/import/preview', { ...upload, ...opts }, 'keep');
 
   runImport = (upload: ImportUpload, opts: ImportOptions) =>
     this.send<ImportReport>('POST', '/import', { ...upload, ...opts });
 
   previewGroupImport = (upload: ImportUpload, opts: { name?: string; slug?: string }) =>
-    this.send<ImportReport>('POST', '/groups/import/preview', { ...upload, ...opts });
+    this.send<ImportReport>('POST', '/groups/import/preview', { ...upload, ...opts }, 'keep');
 
   runGroupImport = (upload: ImportUpload, opts: { name?: string; slug?: string }) =>
     this.send<ImportReport>('POST', '/groups/import', { ...upload, ...opts });
@@ -188,15 +230,22 @@ export class Api {
   setReader = (targetId: string, readerId: string, allowed: boolean) =>
     this.send('PUT', `/organizations/${targetId}/readers/${readerId}`, { allowed });
 
-  projects = (opts: { q?: string; archived?: boolean; organizationId?: string | null } = {}) =>
-    this.get<Project[]>('/projects', {
-      q: opts.q,
-      archived: opts.archived ? '1' : undefined,
-      organization_id: opts.organizationId ?? undefined,
-    });
+  projects = (
+    opts: { q?: string; archived?: boolean; organizationId?: string | null } = {},
+    onFresh?: OnFresh<Project[]>,
+  ) =>
+    this.get<Project[]>(
+      '/projects',
+      {
+        q: opts.q,
+        archived: opts.archived ? '1' : undefined,
+        organization_id: opts.organizationId ?? undefined,
+      },
+      { onFresh },
+    );
 
-  project = (idOrSlug: string) =>
-    this.get<ProjectDetail>(`/projects/${encodeURIComponent(idOrSlug)}`);
+  project = (idOrSlug: string, onFresh?: OnFresh<ProjectDetail>) =>
+    this.get<ProjectDetail>(`/projects/${encodeURIComponent(idOrSlug)}`, {}, { onFresh });
 
   createProject = (body: {
     organization_id: string | null;
@@ -247,11 +296,15 @@ export class Api {
   refreshApi = (id: string) => this.send<ApiSpec>('POST', `/apis/${id}/refresh`);
   deleteApi = (id: string) => this.send<undefined>('DELETE', `/apis/${id}`);
 
-  scopes = (level: { organization_id: string | null; project_id?: string | null }) =>
-    this.get<Scope[]>('/scopes', {
-      organization_id: lv(level.organization_id),
-      project_id: level.project_id ?? undefined,
-    });
+  scopes = (
+    level: { organization_id: string | null; project_id?: string | null },
+    onFresh?: OnFresh<Scope[]>,
+  ) =>
+    this.get<Scope[]>(
+      '/scopes',
+      { organization_id: lv(level.organization_id), project_id: level.project_id ?? undefined },
+      { onFresh },
+    );
 
   scope = (id: string) => this.get<ScopeDetail>(`/scopes/${id}`);
   createScope = (body: Partial<Scope> & { name: string; take_alias?: boolean }) =>
@@ -276,12 +329,16 @@ export class Api {
 
   deleteAlias = (id: string) => this.send<undefined>('DELETE', `/aliases/${id}`);
 
-  documents = (level: Level) =>
-    this.get<Doc[]>('/documents', {
-      organization_id: lv(level.organization_id),
-      project_id: level.project_id ?? undefined,
-      scope_id: level.scope_id ?? undefined,
-    });
+  documents = (level: Level, onFresh?: OnFresh<Doc[]>) =>
+    this.get<Doc[]>(
+      '/documents',
+      {
+        organization_id: lv(level.organization_id),
+        project_id: level.project_id ?? undefined,
+        scope_id: level.scope_id ?? undefined,
+      },
+      { onFresh },
+    );
 
   document = (id: string) => this.get<DocDetail>(`/documents/${id}`);
   createDocument = (body: Level & { kind: DocKind; title: string; mode?: EditMode }) =>
@@ -381,7 +438,7 @@ export class Api {
     stacks?: string[];
     scopes?: string[];
     manifests?: { path: string; content: string }[];
-  }) => this.send<ContextResult>('POST', '/context', body);
+  }) => this.send<ContextResult>('POST', '/context', body, 'keep');
 
   /** near_*: where the searcher is, ranked first; within narrows to that place. */
   search = (
@@ -393,12 +450,15 @@ export class Api {
     } = {},
   ) => this.get<SearchHit[]>('/search', { q, ...near });
 
-  graph = (opts: { focus?: string; depth?: number; missing?: boolean } = {}) =>
-    this.get<Graph>('/graph', {
-      focus: opts.focus,
-      depth: opts.depth,
-      missing: opts.missing ? '1' : undefined,
-    });
+  graph = (
+    opts: { focus?: string; depth?: number; missing?: boolean } = {},
+    onFresh?: OnFresh<Graph>,
+  ) =>
+    this.get<Graph>(
+      '/graph',
+      { focus: opts.focus, depth: opts.depth, missing: opts.missing ? '1' : undefined },
+      { onFresh },
+    );
 
   backlinks = (opts: { node?: string; project?: string }) =>
     this.get<{ source: GraphNode; refs: LinkRef[] }[]>('/backlinks', opts);

@@ -205,6 +205,8 @@ const RADIUS: Record<GraphNode['type'], number> = {
   `,
 })
 export class MapPage implements AfterViewInit, OnDestroy {
+  /** Counts loads, so an answer for an earlier one is ignored. */
+  private asked = 0;
   private api = inject(Api);
   private notices = inject(Notices);
   private route = inject(ActivatedRoute);
@@ -297,14 +299,19 @@ export class MapPage implements AfterViewInit, OnDestroy {
   }
 
   async reload(): Promise<void> {
+    const ask = ++this.asked;
     try {
-      this.graph.set(
-        await this.api.graph({
-          focus: this.focus() || undefined,
-          depth: this.depth(),
-          missing: this.showMissing(),
-        }),
+      const graph = await this.api.graph(
+        { focus: this.focus() || undefined, depth: this.depth(), missing: this.showMissing() },
+        // A stored map draws at once; a newer one is drawn over it.
+        (fresh) => {
+          if (ask !== this.asked) return;
+          this.graph.set(fresh);
+          this.draw();
+        },
       );
+      if (ask !== this.asked) return;
+      this.graph.set(graph);
       if (this.focus()) {
         const node = this.graph().nodes.find(
           (n) => n.type === 'project' && (n.project_id === this.focus() || n.slug === this.focus()),

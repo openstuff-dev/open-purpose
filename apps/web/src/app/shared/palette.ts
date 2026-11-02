@@ -363,20 +363,17 @@ export class Palette {
   }
 
   constructor() {
-    void this.api
-      .projects({})
-      .then((p) => {
-        this.projects.set(p);
-      })
-      .catch(() => undefined);
+    // Both come from Api's store when ⌘K was open before, and update if the server's differ.
+    const setProjects = (p: Project[]) => {
+      this.projects.set(p);
+    };
+    void this.api.projects({}, setProjects).then(setProjects).catch(() => undefined);
     const project = untracked(this.here).project;
+    const setLocal = (p: ProjectDetail) => {
+      this.local.set(p);
+    };
     if (project)
-      void this.api
-        .project(project.id)
-        .then((p) => {
-          this.local.set(p);
-        })
-        .catch(() => undefined);
+      void this.api.project(project.id, setLocal).then(setLocal).catch(() => undefined);
     effect(() => {
       queueMicrotask(() => {
         this.input().nativeElement.focus();
