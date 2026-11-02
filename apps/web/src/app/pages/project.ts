@@ -199,6 +199,7 @@ const TABS: Tab[] = [
               [organizationId]="p.organization_id"
               [projectId]="p.id"
               [canEdit]="p.can_edit"
+              [items]="p.documents"
             />
           }
           @case ('scopes') {
@@ -215,6 +216,7 @@ const TABS: Tab[] = [
               [projectId]="p.id"
               [canEdit]="p.can_edit"
               [repositories]="p.repositories"
+              [items]="p.scopes"
               (repositoryAdded)="reload()"
               emptyText="Add one per part with its own conventions, such as Frontend (the Angular repository, or frontend/** in a monorepo) and API (src/Api/**)."
             />
@@ -259,52 +261,56 @@ const TABS: Tab[] = [
                 ><app-icon name="map" [size]="14" />Open on the map</a
               >
             </div>
-            <div class="two-col">
-              <div class="conn-card">
-                <h3>
-                  Uses or refers to <span class="tab-count">{{ uses().length }}</span>
-                </h3>
-                @for (c of uses(); track c.node.id) {
-                  <p class="conn">
-                    @if (c.node.restricted) {
-                      <span>{{ c.node.label }}</span>
-                    } @else {
+            @if (graphOf() !== p.id) {
+              <p class="quiet" role="status">Loading connections…</p>
+            } @else {
+              <div class="two-col">
+                <div class="conn-card">
+                  <h3>
+                    Uses or refers to <span class="tab-count">{{ uses().length }}</span>
+                  </h3>
+                  @for (c of uses(); track c.node.id) {
+                    <p class="conn">
+                      @if (c.node.restricted) {
+                        <span>{{ c.node.label }}</span>
+                      } @else {
+                        <a [routerLink]="linkFor(c.node)">{{ c.node.label }}</a>
+                      }
+                      @if (c.node.type === 'term') {
+                        <span os-chip>Term</span>
+                      }
+                      @if (c.node.organization_id && c.node.organization_id !== p.organization_id) {
+                        <span os-chip>{{ session.orgName(c.node.organization_id) }}</span>
+                      }
+                      @if (c.node.restricted) {
+                        <span os-badge>No access</span>
+                      }
+                      <span class="quiet">in {{ refsText(c.refs) }}</span>
+                    </p>
+                  } @empty {
+                    <p class="quiet">
+                      Nothing yet. Link another project with [[its-slug]] in a document here.
+                    </p>
+                  }
+                </div>
+                <div class="conn-card">
+                  <h3>
+                    Referenced by <span class="tab-count">{{ usedBy().length }}</span>
+                  </h3>
+                  @for (c of usedBy(); track c.node.id) {
+                    <p class="conn">
                       <a [routerLink]="linkFor(c.node)">{{ c.node.label }}</a>
-                    }
-                    @if (c.node.type === 'term') {
-                      <span os-chip>Term</span>
-                    }
-                    @if (c.node.organization_id && c.node.organization_id !== p.organization_id) {
-                      <span os-chip>{{ session.orgName(c.node.organization_id) }}</span>
-                    }
-                    @if (c.node.restricted) {
-                      <span os-badge>No access</span>
-                    }
-                    <span class="quiet">in {{ refsText(c.refs) }}</span>
-                  </p>
-                } @empty {
-                  <p class="quiet">
-                    Nothing yet. Link another project with [[its-slug]] in a document here.
-                  </p>
-                }
+                      @if (c.node.organization_id && c.node.organization_id !== p.organization_id) {
+                        <span os-chip>{{ session.orgName(c.node.organization_id) }}</span>
+                      }
+                      <span class="quiet">in {{ refsText(c.refs) }}</span>
+                    </p>
+                  } @empty {
+                    <p class="quiet">No other project links here yet.</p>
+                  }
+                </div>
               </div>
-              <div class="conn-card">
-                <h3>
-                  Referenced by <span class="tab-count">{{ usedBy().length }}</span>
-                </h3>
-                @for (c of usedBy(); track c.node.id) {
-                  <p class="conn">
-                    <a [routerLink]="linkFor(c.node)">{{ c.node.label }}</a>
-                    @if (c.node.organization_id && c.node.organization_id !== p.organization_id) {
-                      <span os-chip>{{ session.orgName(c.node.organization_id) }}</span>
-                    }
-                    <span class="quiet">in {{ refsText(c.refs) }}</span>
-                  </p>
-                } @empty {
-                  <p class="quiet">No other project links here yet.</p>
-                }
-              </div>
-            </div>
+            }
           }
           @case ('repositories') {
             <div class="panel-head">
@@ -452,6 +458,10 @@ export class ProjectPage {
   readonly project = signal<ProjectDetail | null>(null);
   readonly missing = signal(false);
   readonly graph = signal<Graph>({ nodes: [], edges: [], organizations: [] });
+  /** The project the graph is loaded for; it's only fetched once Connections is open. */
+  readonly graphOf = signal<string | null>(null);
+  /** The project the graph was last asked for. */
+  private graphFor: string | null = null;
   draft = { name: '', summary: '', organization_id: '' };
   remote = '';
 
@@ -505,7 +515,7 @@ export class ProjectPage {
         key: 'connections',
         label: 'Connections',
         icon: 'network',
-        count: this.uses().length + this.usedBy().length,
+        count: this.graphOf() === p.id ? this.uses().length + this.usedBy().length : null,
       },
       { key: 'repositories', label: 'Repositories', icon: 'branch', count: p.repositories.length },
     ];
@@ -522,6 +532,13 @@ export class ProjectPage {
 
   constructor() {
     effect(() => void this.load(this.id()));
+    // GET /graph reads the whole workspace, so wait until someone opens Connections.
+    effect(() => {
+      const p = this.project();
+      if (p && this.current() === 'connections' && this.graphFor !== p.id) {
+        void this.loadGraph(p.id);
+      }
+    });
     provideHere(() => {
       const p = this.project();
       return p ? { project: { id: p.id, name: p.name }, organization: p.organization } : null;
@@ -542,13 +559,28 @@ export class ProjectPage {
   private async load(id: string): Promise<void> {
     try {
       const p = await this.api.project(id);
+      // Fetched again when Connections is (or next gets) open: a change may have moved links.
+      this.graphFor = null;
+      this.graphOf.set(null);
       this.project.set(p);
       this.resetDraft();
       this.missing.set(false);
-      this.graph.set(await this.api.graph({ focus: p.id, depth: 1 }));
     } catch {
       this.project.set(null);
       this.missing.set(true);
+    }
+  }
+
+  private async loadGraph(id: string): Promise<void> {
+    this.graphFor = id;
+    try {
+      const graph = await this.api.graph({ focus: id, depth: 1 });
+      if (this.graphFor !== id) return;
+      this.graph.set(graph);
+      this.graphOf.set(id);
+    } catch (e) {
+      if (this.graphFor === id) this.graphFor = null;
+      this.notices.error(e);
     }
   }
 

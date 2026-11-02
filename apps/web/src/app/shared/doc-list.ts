@@ -118,6 +118,8 @@ export class DocList {
   readonly emptyTitle = input('No documents yet');
   /** A sentence under the title, such as what to add first. */
   readonly emptyText = input('');
+  /** The documents, when the page already has them (GET /projects/:id); then none are fetched. */
+  readonly items = input<Doc[] | null>(null);
   readonly session = inject(Session);
   private api = inject(Api);
   private router = inject(Router);
@@ -134,6 +136,12 @@ export class DocList {
 
   constructor() {
     effect(() => {
+      const items = this.items();
+      if (items) {
+        this.docs.set(items);
+        this.loaded.set(true);
+        return;
+      }
       void this.load({
         organization_id: this.organizationId(),
         project_id: this.projectId(),

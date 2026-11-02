@@ -158,6 +158,8 @@ export class ScopeList {
   /** The project's repositories (project scopes only). */
   readonly repositories = input<Repository[]>([]);
   readonly repositoryAdded = output<Repository>();
+  /** The scopes, when the page already has them (GET /projects/:id); then none are fetched. */
+  readonly items = input<Scope[] | null>(null);
   readonly session = inject(Session);
   private readonly confirmDialog = inject(ConfirmDialog);
   private api = inject(Api);
@@ -172,7 +174,13 @@ export class ScopeList {
   readonly repositoryIds = signal<string[]>([]);
 
   constructor() {
-    effect(() => void this.load(this.organizationId(), this.projectId()));
+    effect(() => {
+      const items = this.items();
+      if (items) {
+        this.scopes.set(items);
+        this.loaded.set(true);
+      } else void this.load(this.organizationId(), this.projectId());
+    });
     effect(() => {
       this.repos.set(this.repositories());
     });
