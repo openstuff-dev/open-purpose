@@ -88,7 +88,12 @@ async function resetSchema() {
 
 beforeAll(async () => {
   await resetSchema();
-  const config = { ...loadConfig({}), databaseUrl: DATABASE_URL, webDir: '/nonexistent' };
+  // The spec-URL tests serve from 127.0.0.1, which is refused unless allowed.
+  const config = {
+    ...loadConfig({ OPENPURPOSE_API_FETCH_ALLOW: '127.0.0.1' }),
+    databaseUrl: DATABASE_URL,
+    webDir: '/nonexistent',
+  };
   await migrate(DATABASE_URL, config.migrationsDir);
   pool = createPool(DATABASE_URL);
   await bootstrap(pool, { groupName: 'Acme Group', orgName: 'Acme Logistics', token: ADMIN });

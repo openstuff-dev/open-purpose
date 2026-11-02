@@ -1,4 +1,8 @@
 import crypto from 'node:crypto';
+import dns from 'node:dns';
+import http from 'node:http';
+import https from 'node:https';
+import net from 'node:net';
 import type { Access } from '../auth.js';
 import type { ApiSpecConfig } from '../config.js';
 import type { Pool, Queryable } from '../db.js';
@@ -45,59 +49,191 @@ const isUuid = (s: string) =>
 
 // ───────────────────────────── fetching and parsing ─────────────────────────────
 
-/** Download a spec. Only http(s), with a timeout and a size cap. */
+// Loopback, private, link-local, shared, multicast and reserved ranges: a spec link must not
+// reach the server's own network (or a cloud metadata service) unless
+// OPENPURPOSE_API_FETCH_ALLOW says so.
+// BlockList also matches IPv4-mapped IPv6 addresses (::ffff:127.0.0.1) against the IPv4 ranges.
+const PRIVATE = new net.BlockList();
+for (const [ip, bits] of [
+  ['0.0.0.0', 8],
+  ['10.0.0.0', 8],
+  ['100.64.0.0', 10],
+  ['127.0.0.0', 8],
+  ['169.254.0.0', 16],
+  ['172.16.0.0', 12],
+  ['192.0.0.0', 24],
+  ['192.168.0.0', 16],
+  ['198.18.0.0', 15],
+  ['224.0.0.0', 4],
+  ['240.0.0.0', 4],
+] as const)
+  PRIVATE.addSubnet(ip, bits, 'ipv4');
+for (const [ip, bits] of [
+  ['::', 128],
+  ['::1', 128],
+  ['fc00::', 7],
+  ['fe80::', 10],
+  ['ff00::', 8],
+] as const)
+  PRIVATE.addSubnet(ip, bits, 'ipv6');
+
+const family = (ip: string) => (net.isIP(ip) === 6 ? 'ipv6' : 'ipv4');
+
+/** Whether an IP address is on a loopback, private, link-local or reserved network. */
+export function isPrivateAddress(ip: string): boolean {
+  return net.isIP(ip) !== 0 && PRIVATE.check(ip, family(ip));
+}
+
+/** Host names, addresses and CIDR ranges from OPENPURPOSE_API_FETCH_ALLOW. */
+function allowList(entries: string[]) {
+  const names = new Set<string>();
+  const nets = new net.BlockList();
+  for (const e of entries) {
+    const [ip, bits] = e.split('/');
+    if (net.isIP(ip) && e.includes('/')) nets.addSubnet(ip, Number(bits), family(ip));
+    else if (net.isIP(ip)) nets.addAddress(ip, family(ip));
+    else names.add(e.replace(/\.$/, ''));
+  }
+  return {
+    name: (host: string) => names.has(host),
+    address: (ip: string) => !isPrivateAddress(ip) || nets.check(ip, family(ip)),
+  };
+}
+
+class PrivateAddress extends Error {
+  constructor(
+    readonly host: string,
+    readonly address: string,
+  ) {
+    super(`${host} is ${address}`);
+  }
+}
+
+const refusePrivate = (e: PrivateAddress) => {
+  const what = e.host === e.address ? e.host : `${e.host} points to ${e.address}, which`;
+  return badRequest(
+    `${what} is a private network address, so the server won't fetch it. Upload the file instead, or ask whoever runs this server to add it to OPENPURPOSE_API_FETCH_ALLOW.`,
+  );
+};
+
+const MAX_REDIRECTS = 5;
+
+/**
+ * Download a spec. Only http(s), with a timeout and a size cap, and never from a private network
+ * address unless it's allowed: every address is checked when the connection opens, on each
+ * redirect too, so a name that resolves differently the second time can't get through.
+ */
 export async function downloadSpec(url: string, cfg: ApiSpecConfig): Promise<string> {
   if (!cfg.fetch)
     throw badRequest(
       'Fetching URLs is turned off on this server (OPENPURPOSE_API_FETCH=off). Upload the file instead.',
     );
-  let parsed: URL;
+  let target: URL;
   try {
-    parsed = new URL(url);
+    target = new URL(url);
   } catch {
     throw badRequest('That is not a valid URL');
   }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
-    throw badRequest('Only http and https URLs can be fetched');
-  if (parsed.username || parsed.password)
-    throw badRequest(
-      'URLs with a user name or password are not supported. Upload the file instead.',
-    );
-  let res: Response;
-  try {
-    res = await fetch(parsed, {
-      headers: {
-        accept: 'application/json, application/yaml;q=0.9, text/yaml;q=0.9, */*;q=0.5',
-        'user-agent': 'OpenPurpose (API spec fetch)',
-      },
-      redirect: 'follow',
-      signal: AbortSignal.timeout(cfg.timeoutMs),
-    });
-  } catch (e) {
-    const cause = (e as { cause?: { code?: string; message?: string } }).cause;
-    const why =
-      (e as Error).name === 'TimeoutError'
-        ? `no answer within ${cfg.timeoutMs / 1000} s`
-        : (cause?.code ?? cause?.message ?? (e as Error).message);
-    throw badRequest(`Couldn't reach ${parsed.host}: ${why}`);
-  }
-  if (!res.ok) throw badRequest(`${parsed.host} answered ${res.status} ${res.statusText}`.trim());
-  const declared = Number(res.headers.get('content-length') ?? 0);
-  if (declared > cfg.maxBytes)
-    throw badRequest(`The spec is larger than ${Math.round(cfg.maxBytes / 1048576)} MB`);
-  const reader = res.body?.getReader();
-  if (!reader) return '';
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > cfg.maxBytes) {
-      await reader.cancel();
-      throw badRequest(`The spec is larger than ${Math.round(cfg.maxBytes / 1048576)} MB`);
+  const allow = allowList(cfg.allow);
+  const signal = AbortSignal.timeout(cfg.timeoutMs);
+  for (let hop = 0; ; hop++) {
+    if (target.protocol !== 'http:' && target.protocol !== 'https:')
+      throw badRequest('Only http and https URLs can be fetched');
+    if (target.username || target.password)
+      throw badRequest(
+        'URLs with a user name or password are not supported. Upload the file instead.',
+      );
+    const res = await open(target, allow, signal, cfg.timeoutMs);
+    const location = res.headers.location;
+    if ([301, 302, 303, 307, 308].includes(res.statusCode ?? 0) && location) {
+      res.resume();
+      if (hop >= MAX_REDIRECTS)
+        throw badRequest(`${target.host} redirected more than ${MAX_REDIRECTS} times`);
+      try {
+        target = new URL(location, target);
+      } catch {
+        throw badRequest(`${target.host} redirected to an invalid URL`);
+      }
+      continue;
     }
-    chunks.push(value);
+    return readBody(res, target, cfg);
+  }
+}
+
+/** One GET, refused if the host is or resolves to a private address that isn't allowed. */
+function open(
+  target: URL,
+  allow: ReturnType<typeof allowList>,
+  signal: AbortSignal,
+  timeoutMs: number,
+): Promise<http.IncomingMessage> {
+  const host = target.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  const named = allow.name(host);
+  if (!named && net.isIP(host) && !allow.address(host))
+    return Promise.reject(refusePrivate(new PrivateAddress(host, host)));
+  const lookup: net.LookupFunction = (hostname, options, done) => {
+    dns.lookup(hostname, { ...options, all: true }, (err, addresses) => {
+      const bad = named ? undefined : addresses.find((x) => !allow.address(x.address));
+      if (err) done(err, '', 4);
+      else if (bad) done(new PrivateAddress(host, bad.address), '', 4);
+      else if (options.all) (done as (e: null, a: dns.LookupAddress[]) => void)(null, addresses);
+      else done(null, addresses[0].address, addresses[0].family);
+    });
+  };
+  return new Promise((resolve, reject) => {
+    const req = (target.protocol === 'https:' ? https : http).get(
+      target,
+      {
+        headers: {
+          accept: 'application/json, application/yaml;q=0.9, text/yaml;q=0.9, */*;q=0.5',
+          'user-agent': 'OpenPurpose (API spec fetch)',
+        },
+        lookup,
+        signal,
+      },
+      resolve,
+    );
+    req.on('error', (e: Error & { code?: string }) => {
+      const why = signal.aborted ? `no answer within ${timeoutMs / 1000} s` : (e.code ?? e.message);
+      reject(
+        e instanceof PrivateAddress
+          ? refusePrivate(e)
+          : badRequest(`Couldn't reach ${target.host}: ${why}`),
+      );
+    });
+  });
+}
+
+async function readBody(
+  res: http.IncomingMessage,
+  target: URL,
+  cfg: ApiSpecConfig,
+): Promise<string> {
+  const status = res.statusCode ?? 0;
+  if (status < 200 || status >= 300) {
+    res.resume();
+    throw badRequest(`${target.host} answered ${status} ${res.statusMessage ?? ''}`.trim());
+  }
+  const tooLarge = () =>
+    badRequest(`The spec is larger than ${Math.round(cfg.maxBytes / 1048576)} MB`);
+  if (Number(res.headers['content-length'] ?? 0) > cfg.maxBytes) {
+    res.destroy();
+    throw tooLarge();
+  }
+  const chunks: Buffer[] = [];
+  let size = 0;
+  try {
+    for await (const chunk of res as AsyncIterable<Buffer>) {
+      size += chunk.byteLength;
+      if (size > cfg.maxBytes) {
+        res.destroy();
+        throw tooLarge();
+      }
+      chunks.push(chunk);
+    }
+  } catch (e) {
+    if (e instanceof AppError) throw e;
+    throw badRequest(`Couldn't read the spec from ${target.host}: ${(e as Error).message}`);
   }
   return Buffer.concat(chunks).toString('utf8');
 }

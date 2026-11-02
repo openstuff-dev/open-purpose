@@ -55,6 +55,12 @@ export interface ApiSpecConfig {
    */
   fetch: boolean;
   /**
+   * Private network addresses the server may still fetch specs from
+   * (OPENPURPOSE_API_FETCH_ALLOW): host names, IP addresses or CIDR ranges. Everything else on
+   * loopback, private, link-local or reserved addresses is refused.
+   */
+  allow: string[];
+  /**
    * Re-fetch a URL spec in the background when an agent reads it and it's older than this. 0 = only
    * on demand.
    */
@@ -80,6 +86,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     publicUrl: env.OPENPURPOSE_PUBLIC_URL ?? `http://localhost:${port}`,
     apiSpecs: {
       fetch: (env.OPENPURPOSE_API_FETCH ?? 'on').toLowerCase() !== 'off',
+      allow: (env.OPENPURPOSE_API_FETCH_ALLOW ?? '')
+        .split(',')
+        .map((x) => x.trim().toLowerCase())
+        .filter(Boolean),
       refreshMinutes: Number(env.OPENPURPOSE_API_REFRESH_MINUTES ?? 60),
       maxBytes: Number(env.OPENPURPOSE_API_MAX_MB ?? 20) * 1024 * 1024,
       timeoutMs: 15_000,
