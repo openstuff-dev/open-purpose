@@ -1,6 +1,9 @@
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import fastifyCookie from '@fastify/cookie';
+import fastifyCompress from '@fastify/compress';
+import fastifyEtag from '@fastify/etag';
 import fastifyStatic from '@fastify/static';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type pg from 'pg';
@@ -124,6 +127,18 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
   const provider = createProvider(config.auth);
   // Only the PKCE verifier between /api/auth/start and /api/auth/callback is a cookie.
   await app.register(fastifyCookie);
+  // A weak ETag on every answer that isn't streamed, so a GET asked again for the same bytes
+  // gets a 304. Registered before compression, which turns the payload into a stream.
+  await app.register(fastifyEtag, { weak: true });
+  // Compress what's over 1 KB (the graph, documents, specs, the app's bundles) for anyone not
+  // behind a proxy that does it. MCP writes to the socket itself and is never compressed.
+  await app.register(fastifyCompress, {
+    encodings: ['br', 'gzip'],
+    threshold: 1024,
+    // Brotli's default quality is too slow for answers built on every request.
+    brotliOptions: { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 } },
+    globalDecompression: false,
+  });
 
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof AppError) {
