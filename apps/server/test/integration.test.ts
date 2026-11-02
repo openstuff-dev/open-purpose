@@ -13,7 +13,8 @@ import {
   registerProvider,
   SignInError,
 } from '../src/auth/providers/index.js';
-import { hashToken } from '../src/auth.js';
+import { beginRequest, hashToken } from '../src/auth.js';
+import { buildGraph, relatedTo, type Related } from '../src/service/graph.js';
 import { createServer } from 'node:http';
 import { BILLING_SWAGGER_YAML, ORDER_API } from '../src/demo-specs.js';
 
@@ -622,6 +623,67 @@ describe('OpenPurpose with groups and organizations', () => {
     expect((await call('get_context', { project: 'payments/payment-gateway' })).isError).toBe(true);
     await lars.client.close();
     await client.close();
+  });
+
+  it('finds related projects without the full graph, with the same answer', async () => {
+    // Links that name a project in different ways: by name, by a form that only slugify turns into
+    // its slug, with an organization, in upper case, and ones that name nothing.
+    const portal = await api('GET', '/projects/customer-portal');
+    const doc = portal.data.documents[0].id;
+    expect(
+      (
+        await api('POST', `/documents/${doc}/sections`, {
+          heading: 'Neighbours',
+          body: [
+            '[[Payment Gateway]], [[payment_gateway]], [[payments/Payment Gateway]],',
+            '[[LOGISTICS/customer-portal]], [[Kundeportål]], [[!!!]] and [[term:Order]].',
+          ].join(' '),
+        })
+      ).status,
+    ).toBe(201);
+    const gateway = await api('GET', `/projects/${encodeURIComponent('payments/payment-gateway')}`);
+    expect(
+      (
+        await api('POST', `/documents/${gateway.data.documents[0].id}/sections`, {
+          heading: 'Callers',
+          body: 'Called by [[Customer Portal]] and [[logistics/customer_portal]].',
+        })
+      ).status,
+    ).toBe(201);
+
+    const sorted = (rs: Related[]) =>
+      rs
+        .map((r) => ({
+          ...r,
+          refs: [...r.refs].sort((x, y) => x.section_id.localeCompare(y.section_id)),
+        }))
+        .sort((x, y) => `${x.direction}${x.node.id}`.localeCompare(`${y.direction}${y.node.id}`));
+    for (const token of [ADMIN, t.anders, t.jonas, t.lars]) {
+      const { db, access } = await beginRequest(pool, token, null, null, true);
+      try {
+        const graph = await buildGraph(db, access);
+        const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+        const projects = graph.nodes.filter((n) => n.type === 'project');
+        expect(projects.length).toBeGreaterThan(1);
+        let linked = 0;
+        for (const p of projects) {
+          // What relatedTo returned when it built the whole graph.
+          const expected: Related[] = graph.edges.flatMap((e) => {
+            if (e.kind !== 'link' || (e.source !== p.id && e.target !== p.id)) return [];
+            const other = byId.get(e.source === p.id ? e.target : e.source);
+            if (!other || other.type === 'group' || other.type === 'organization') return [];
+            return [{ node: other, direction: e.source === p.id ? 'uses' : 'used_by', refs: e.refs }];
+          });
+          const got = await relatedTo(db, access, p.project_id ?? '');
+          expect(sorted(got)).toEqual(sorted(expected));
+          linked += got.length;
+        }
+        expect(linked).toBeGreaterThan(0);
+      } finally {
+        await db.query('ROLLBACK');
+        db.release();
+      }
+    }
   });
 
   it('shows people exactly what an agent reads in agent mode, read-only', async () => {

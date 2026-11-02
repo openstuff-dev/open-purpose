@@ -199,20 +199,14 @@ export async function linkResolver(db: Queryable, a: Access): Promise<LinkIndex[
   return index.resolve.bind(index);
 }
 
-export async function buildGraph(
-  db: Queryable,
-  a: Access,
-  opts: { includeMissing?: boolean; includeArchived?: boolean } = {},
-): Promise<Graph> {
-  const index = await loadIndex(db, a, opts.includeArchived ?? false);
-  const { rows: links } = await db.query<LinkRow>(
-    `SELECT l.section_id, s.heading, l.target_kind, l.target, d.title AS document_title, d.kind AS doc_kind,
-            d.organization_id, d.project_id
-       FROM section_links l JOIN sections s ON s.id = l.section_id JOIN documents d ON d.id = s.document_id
-      WHERE d.organization_id IS NULL OR d.organization_id = ANY($1::uuid[])`,
-    [a.readableOrgIds()],
-  );
+const LINK_COLS = `l.section_id, s.heading, l.target_kind, l.target, d.title AS document_title,
+  d.kind AS doc_kind, d.organization_id, d.project_id`;
+const LINK_FROM = `section_links l JOIN sections s ON s.id = l.section_id
+  JOIN documents d ON d.id = s.document_id`;
+const READABLE = '(d.organization_id IS NULL OR d.organization_id = ANY($1::uuid[]))';
 
+/** Every node: the group, its organizations, and the projects and terms in the index. */
+function graphNodes(a: Access, index: LinkIndex): Map<string, GraphNode> {
   const nodes = new Map<string, GraphNode>();
   const orgSlug = (id: string | null) => a.org(id)?.slug ?? null;
   nodes.set(GROUP_NODE, {
@@ -267,12 +261,17 @@ export async function buildGraph(
       restricted,
     });
   }
+  return nodes;
+}
 
-  const edges = new Map<string, GraphEdge>();
-  const addEdge = (source: string, target: string, kind: GraphEdge['kind'], ref?: LinkRef) => {
-    if (source === target || !nodes.has(source) || !nodes.has(target)) return;
+class Edges {
+  readonly all = new Map<string, GraphEdge>();
+  constructor(private nodes: Map<string, GraphNode>) {}
+
+  add(source: string, target: string, kind: GraphEdge['kind'], ref?: LinkRef): void {
+    if (source === target || !this.nodes.has(source) || !this.nodes.has(target)) return;
     const id = `${kind}|${source}|${target}`;
-    const e = edges.get(id) ?? { id, source, target, kind, count: 0, refs: [] };
+    const e = this.all.get(id) ?? { id, source, target, kind, count: 0, refs: [] };
     if (ref) {
       if (!e.refs.some((r) => r.section_id === ref.section_id)) {
         e.refs.push(ref);
@@ -281,21 +280,19 @@ export async function buildGraph(
     } else {
       e.count = Math.max(e.count, 1);
     }
-    edges.set(id, e);
-  };
-
-  // Who defines each term. Terms in unreadable organizations only appear when something readable
-  // links to them.
-  for (const t of index.terms) {
-    if (!a.canRead(t.organization_id)) continue;
-    const owner = t.project_id
-      ? projectNode(t.project_id)
-      : t.organization_id
-        ? orgNode(t.organization_id)
-        : GROUP_NODE;
-    addEdge(owner, termNode(t.id), 'defines');
+    this.all.set(id, e);
   }
+}
 
+/** Resolve each link and add it as an edge; `includeMissing` adds a node for each dead link. */
+function addLinks(
+  a: Access,
+  index: LinkIndex,
+  nodes: Map<string, GraphNode>,
+  edges: Edges,
+  links: LinkRow[],
+  includeMissing: boolean,
+): void {
   for (const l of links) {
     const source =
       l.doc_kind === 'glossary'
@@ -329,7 +326,7 @@ export async function buildGraph(
         : termNode(hit.row.id)
       : null;
     if (!target) {
-      if (!opts.includeMissing) continue;
+      if (!includeMissing) continue;
       target = `missing:${l.target_kind}:${l.target}`;
       if (!nodes.has(target)) {
         nodes.set(target, {
@@ -345,13 +342,40 @@ export async function buildGraph(
         });
       }
     }
-    addEdge(source, target, 'link', ref);
+    edges.add(source, target, 'link', ref);
   }
+}
+
+export async function buildGraph(
+  db: Queryable,
+  a: Access,
+  opts: { includeMissing?: boolean; includeArchived?: boolean } = {},
+): Promise<Graph> {
+  const index = await loadIndex(db, a, opts.includeArchived ?? false);
+  const { rows: links } = await db.query<LinkRow>(
+    `SELECT ${LINK_COLS} FROM ${LINK_FROM} WHERE ${READABLE}`,
+    [a.readableOrgIds()],
+  );
+  const nodes = graphNodes(a, index);
+  const edges = new Edges(nodes);
+
+  // Who defines each term. Terms in unreadable organizations only appear when something readable
+  // links to them.
+  for (const t of index.terms) {
+    if (!a.canRead(t.organization_id)) continue;
+    const owner = t.project_id
+      ? projectNode(t.project_id)
+      : t.organization_id
+        ? orgNode(t.organization_id)
+        : GROUP_NODE;
+    edges.add(owner, termNode(t.id), 'defines');
+  }
+  addLinks(a, index, nodes, edges, links, opts.includeMissing ?? false);
 
   // Drop nodes nobody can see a reason for: restricted things nothing readable links to, and empty
   // org/group nodes.
   const used = new Set<string>();
-  for (const e of edges.values()) {
+  for (const e of edges.all.values()) {
     used.add(e.source);
     used.add(e.target);
   }
@@ -362,7 +386,7 @@ export async function buildGraph(
   });
   return {
     nodes: keep,
-    edges: [...edges.values()],
+    edges: [...edges.all.values()],
     organizations: a.orgs.map((o) => ({
       id: o.id,
       slug: o.slug,
@@ -415,16 +439,46 @@ export interface Related {
   refs: LinkRef[];
 }
 
-/** Projects and terms connected to a project by links, in both directions. */
+/**
+ * Letters and digits only, lower case: what a [[link]] and a project key have in common however
+ * `slugify` or `normalizeTarget` changed them. Only for ASCII; other text always passes.
+ */
+const LOOSE = (sql: string) => `regexp_replace(lower(${sql}), '[^a-z0-9]', '', 'g')`;
+
+/**
+ * The links that can touch one project: those written in it, and those whose target could name
+ * it. A target names a project when it (or the part after `org/`) is one of its keys (slug, name,
+ * old slugs) or slugifies to one. Both leave the key's letters and digits at the start of the
+ * target's, so this is a cheap superset; `index.resolve` decides exactly, as for the full graph.
+ */
+const LINKS_NEAR = `SELECT ${LINK_COLS} FROM ${LINK_FROM}
+  WHERE ${READABLE}
+    AND ((d.project_id = $2 AND d.kind <> 'glossary')
+      OR (l.target_kind <> 'term' AND EXISTS (
+        SELECT 1
+          FROM (VALUES (l.target), (substring(l.target FROM position('/' IN l.target) + 1))) t(v),
+               (SELECT p.slug AS k FROM projects p WHERE p.id = $2
+                UNION ALL SELECT p.name FROM projects p WHERE p.id = $2
+                UNION ALL SELECT x.old_slug FROM slug_aliases x WHERE x.project_id = $2) keys
+         WHERE t.v ~ '[^\\x01-\\x7f]' OR ${LOOSE('t.v')} = ''
+            OR starts_with(${LOOSE('t.v')}, ${LOOSE('keys.k')}))))`;
+
+/**
+ * Projects and terms connected to a project by links, in both directions. The same answer as
+ * the project's edges in `buildGraph`, without reading every link in the workspace: get_context
+ * calls this on every request.
+ */
 export async function relatedTo(db: Queryable, a: Access, projectId: string): Promise<Related[]> {
-  const graph = await buildGraph(db, a);
+  const index = await loadIndex(db, a, false);
+  const { rows: links } = await db.query<LinkRow>(LINKS_NEAR, [a.readableOrgIds(), projectId]);
+  const nodes = graphNodes(a, index);
+  const edges = new Edges(nodes);
+  addLinks(a, index, nodes, edges, links, false);
   const self = projectNode(projectId);
-  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
   const out: Related[] = [];
-  for (const e of graph.edges) {
-    if (e.kind !== 'link') continue;
+  for (const e of edges.all.values()) {
     const other =
-      e.source === self ? byId.get(e.target) : e.target === self ? byId.get(e.source) : undefined;
+      e.source === self ? nodes.get(e.target) : e.target === self ? nodes.get(e.source) : undefined;
     if (!other || other.type === 'group' || other.type === 'organization') continue;
     out.push({ node: other, direction: e.source === self ? 'uses' : 'used_by', refs: e.refs });
   }
