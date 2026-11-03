@@ -2501,7 +2501,7 @@ mark {
 
 /* An organization is a ring in its colour, so it never looks like one of its projects. */
 .map-svg .node.organization circle {
-  fill: color-mix(in srgb, var(--c, var(--ink-2)) 18%, var(--ground));
+  fill: var(--ground);
   stroke: var(--c, var(--ink-2));
   stroke-width: 3.5;
 }
