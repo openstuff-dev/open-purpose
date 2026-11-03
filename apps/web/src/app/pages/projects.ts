@@ -170,6 +170,11 @@ import { ListSkeleton } from '../shared/list-skeleton';
                 <span title="Repositories"
                   ><app-icon name="branch" [size]="12" /> {{ p.repository_count }}</span
                 >
+                @if (p.section_count !== undefined) {
+                  <span title="Sections in its documents and scopes"
+                    ><app-icon name="file" [size]="12" /> {{ p.section_count }}</span
+                  >
+                }
               </span>
             </a>
           </li>

@@ -48,7 +48,15 @@ export const repoName = (key: string) => key.slice(key.lastIndexOf('/') + 1) || 
       <ul class="scope-list">
         @for (s of scopes(); track s.id) {
           <li>
-            <a [routerLink]="['/scopes', s.id]" class="scope-name">{{ s.name }}</a>
+            <a [routerLink]="['/scopes', s.id]" class="scope-name"
+              >{{ s.name }}
+              @if (s.section_count !== undefined) {
+                <span class="entry-count" [title]="sections(s.section_count)"
+                  ><span class="sr-only">, {{ sections(s.section_count) }}</span
+                  ><span aria-hidden="true">{{ s.section_count }}</span></span
+                >
+              }
+            </a>
             <span class="scope-match">
               @for (id of s.repository_ids; track id) {
                 <span os-chip tone="brand" class="mono" [title]="repoKey(id)"
@@ -160,6 +168,11 @@ export class ScopeList {
   /** The project's repositories (project scopes only). */
   readonly repositories = input<Repository[]>([]);
   readonly repositoryAdded = output<Repository>();
+
+  sections(n: number): string {
+    return `${n} ${n === 1 ? 'section' : 'sections'}`;
+  }
+
   /** The scopes, when the page already has them (GET /projects/:id); then none are fetched. */
   readonly items = input<Scope[] | null>(null);
   readonly session = inject(Session);

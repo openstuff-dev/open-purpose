@@ -5,9 +5,9 @@ import { normalizeTarget } from '../domain/links.js';
 import type { Graph, GraphEdge, GraphNode, LinkRef, LinkResolution } from '@openpurpose/contracts';
 
 /**
- * The link graph behind the map. Nodes: the group, its organizations, projects
- * and glossary terms. Edges: [[wikilinks]] between them, resolved at read time
- * so a link written before its target existed starts working once it does.
+ * The link graph behind the map. Nodes: the group, its organizations, projects,
+ * scopes (on the map only) and glossary terms. Edges: [[wikilinks]] between them, resolved at
+ * read time so a link written before its target existed starts working once it does.
  *
  * Privacy: links are only taken from content the viewer can read. A link that
  * points into an organization the viewer can't read shows the target's name
@@ -26,6 +26,7 @@ export const GROUP_NODE = 'group';
 export const orgNode = (id: string) => `org:${id}`;
 export const projectNode = (id: string) => `project:${id}`;
 export const termNode = (sectionId: string) => `term:${sectionId}`;
+export const scopeNode = (id: string) => `scope:${id}`;
 
 interface ProjectRow {
   id: string;
@@ -43,6 +44,14 @@ interface TermRow {
   organization_id: string | null;
   project_id: string | null;
   document_id: string;
+}
+interface ScopeRow {
+  id: string;
+  organization_id: string | null;
+  project_id: string | null;
+  slug: string;
+  name: string;
+  description: string;
 }
 interface LinkRow {
   section_id: string;
@@ -348,6 +357,42 @@ function addLinks(
   }
 }
 
+/**
+ * Each readable scope as a node, joined to the project, organization or workspace it belongs to.
+ * Links written in a scope's documents still start at its project, so focusing on a project and
+ * `relatedTo` see the same links as before scopes were drawn.
+ */
+function addScopes(
+  a: Access,
+  nodes: Map<string, GraphNode>,
+  edges: Edges,
+  scopes: ScopeRow[],
+): void {
+  for (const s of scopes) {
+    if (s.organization_id && !a.canRead(s.organization_id)) continue;
+    const owner = s.project_id
+      ? projectNode(s.project_id)
+      : s.organization_id
+        ? orgNode(s.organization_id)
+        : GROUP_NODE;
+    // A scope of an archived (and so left out) project stays out too.
+    if (!nodes.has(owner)) continue;
+    const id = scopeNode(s.id);
+    nodes.set(id, {
+      id,
+      type: 'scope',
+      label: s.name,
+      slug: s.slug,
+      summary: firstLine(s.description),
+      organization_id: s.organization_id,
+      organization_slug: a.org(s.organization_id)?.slug ?? null,
+      project_id: s.project_id,
+      restricted: false,
+    });
+    edges.add(owner, id, 'contains');
+  }
+}
+
 export async function buildGraph(
   db: Queryable,
   a: Access,
@@ -356,6 +401,12 @@ export async function buildGraph(
   const index = await loadIndex(db, a, opts.includeArchived ?? false);
   const { rows: links } = await db.query<LinkRow>(
     `SELECT ${LINK_COLS} FROM ${LINK_FROM} WHERE ${READABLE}`,
+    [a.readableOrgIds()],
+  );
+  const { rows: scopes } = await db.query<ScopeRow>(
+    `SELECT id, organization_id, project_id, slug, name, description FROM scopes
+      WHERE organization_id IS NULL OR organization_id = ANY($1::uuid[])
+      ORDER BY position, name`,
     [a.readableOrgIds()],
   );
   const nodes = graphNodes(a, index);
@@ -373,6 +424,7 @@ export async function buildGraph(
     edges.add(owner, termNode(t.id), 'defines');
   }
   addLinks(a, index, nodes, edges, links, opts.includeMissing ?? false);
+  addScopes(a, nodes, edges, scopes);
 
   // Drop nodes nobody can see a reason for: restricted things nothing readable links to, and empty
   // org/group nodes.

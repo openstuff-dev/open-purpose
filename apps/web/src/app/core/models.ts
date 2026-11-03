@@ -187,6 +187,8 @@ export interface Project {
   archived_at: string | null;
   repository_count?: number;
   pending_proposals?: number;
+  /** Project lists only: sections in its documents and its scopes' documents. */
+  section_count?: number;
 }
 
 export interface Doc {
@@ -205,6 +207,8 @@ export interface Doc {
   disabled_at: string | null;
   /** Set on document lists; missing on a document just created. */
   staleness?: DocumentActivity['staleness'];
+  /** Set on document lists: how many sections it has. */
+  section_count?: number;
 }
 
 export interface Section {

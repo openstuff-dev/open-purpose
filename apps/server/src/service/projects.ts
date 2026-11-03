@@ -15,6 +15,8 @@ export interface ProjectListItem extends Project {
   organization_name: string;
   repository_count: number;
   pending_proposals: number;
+  /** Sections in its documents and its scopes' documents, archived ones left out. */
+  section_count: number;
 }
 
 /** Projects in the organizations the actor can read; optionally one organization only. */
@@ -27,8 +29,15 @@ export async function listProjects(
   const { rows } = await db.query<ProjectListItem>(
     `SELECT ${PROJECT_COLS}, o.slug AS organization_slug, o.name AS organization_name,
             (SELECT count(*)::int FROM repositories r WHERE r.project_id = p.id) AS repository_count,
-            (SELECT count(*)::int FROM proposals x WHERE x.project_id = p.id AND x.status = 'pending') AS pending_proposals
+            (SELECT count(*)::int FROM proposals x WHERE x.project_id = p.id AND x.status = 'pending') AS pending_proposals,
+            COALESCE(sc.n, 0) AS section_count
        FROM projects p JOIN organizations o ON o.id = p.organization_id
+       -- One pass over the sections for every project, instead of one count per project.
+       LEFT JOIN (SELECT d.project_id, count(*)::int AS n
+                    FROM sections s JOIN documents d ON d.id = s.document_id
+                   WHERE s.archived_at IS NULL AND d.project_id IS NOT NULL
+                     AND d.organization_id = ANY($3::uuid[])
+                   GROUP BY d.project_id) sc ON sc.project_id = p.id
       WHERE p.organization_id = ANY($3::uuid[])
         AND ($4::uuid IS NULL OR p.organization_id = $4)
         AND ($1::text IS NULL OR p.slug ILIKE '%' || $1 || '%' OR p.name ILIKE '%' || $1 || '%'
