@@ -3,6 +3,17 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.4.2
+
+No migrations.
+
+### Web app
+
+- On the map, every link to or from a term is now faint and dashed with a smaller arrow, not
+  only links between two terms. Solid lines are left for links between projects.
+- Organizations on the map are rings in their colour, so they no longer look like their
+  projects. The legend shows which is which.
+
 ## 0.4.1
 
 Adds migration `019_invites.sql`.
