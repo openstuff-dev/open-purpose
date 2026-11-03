@@ -198,6 +198,8 @@ function samplePath(glob: string): string {
 export class AgentView {
   readonly project = input.required<string>();
   readonly scopes = input<Scope[]>([]);
+  /** The part of the code to pick first: a scope id, or 'root' for the whole project. */
+  readonly initial = input<string>('root');
   private api = inject(Api);
   private notices = inject(Notices);
   readonly session = inject(Session);
@@ -226,7 +228,11 @@ export class AgentView {
   constructor() {
     effect(() => {
       this.project();
-      untracked(() => void this.run());
+      const first = this.initial();
+      untracked(() => {
+        this.choice.set(first);
+        void this.run();
+      });
     });
   }
 
