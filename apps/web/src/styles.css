@@ -893,16 +893,6 @@ kbd {
   margin: 0;
 }
 
-/* A scope's matching: the facts and one sentence on what they mean, in a panel. */
-.applies > .facts {
-  margin-top: 0;
-}
-
-.applies > p.quiet {
-  margin: 0;
-  font-size: var(--fs-sm);
-}
-
 .facts dd > a + .quiet,
 .facts dd > .os-chip + .quiet {
   margin-left: 0.4rem;
@@ -4037,6 +4027,39 @@ mark {
   margin: 0.6rem 0 0;
   font-size: var(--fs-sm);
   max-width: 80ch;
+}
+
+/* A scope's matching under its layer path: repositories, paths and stacks side by side. */
+.scope-applies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2rem;
+  margin: 1rem 0 0;
+  padding: 0.75rem 1rem;
+  border: 1px var(--os-border-style) var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+
+.scope-applies dt {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.scope-applies dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0;
+  font-size: var(--fs-sm);
 }
 
 .page-tabs {
