@@ -416,6 +416,7 @@ html.agent-mode .map-svg .node.group rect.box {
 }
 
 html.agent-mode .map-svg .node.organization rect.box {
+  fill: var(--ground);
   stroke-width: 3;
   paint-order: stroke;
 }

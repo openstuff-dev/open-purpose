@@ -2395,6 +2395,16 @@ mark {
   height: 7px;
 }
 
+.dot.project {
+  background: var(--ink-2);
+}
+
+/* Organizations are rings on the map, so the legend shows a ring too. */
+.dot.org {
+  background: transparent;
+  border: 2.5px solid var(--ink-2);
+}
+
 .dot.missing,
 .dot.restricted {
   border: 1.5px dashed var(--muted);
@@ -2482,15 +2492,18 @@ mark {
 }
 
 .map-svg .node.project circle {
-  fill: var(--accent);
+  fill: var(--c, var(--accent));
 }
 
 .map-svg .node.group circle {
   fill: var(--ink);
 }
 
+/* An organization is a ring in its colour, so it never looks like one of its projects. */
 .map-svg .node.organization circle {
-  fill: var(--ink-2);
+  fill: var(--ground);
+  stroke: var(--c, var(--ink-2));
+  stroke-width: 3.5;
 }
 
 .map-svg .node.term rect {
