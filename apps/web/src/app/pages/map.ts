@@ -54,6 +54,7 @@ const RADIUS: Record<GraphNode['type'], number> = {
   group: 18,
   organization: 14,
   project: 9,
+  scope: 6,
   term: 5,
   missing: 5,
 };
@@ -100,6 +101,15 @@ const RADIUS: Record<GraphNode['type'], number> = {
         ><input
           os-checkbox
           type="checkbox"
+          [ngModel]="showScopes()"
+          (ngModelChange)="showScopes.set($event); draw()"
+        />
+        Scopes</label
+      >
+      <label os-check
+        ><input
+          os-checkbox
+          type="checkbox"
           [ngModel]="showMissing()"
           (ngModelChange)="showMissing.set($event); reload()"
         />
@@ -110,6 +120,7 @@ const RADIUS: Record<GraphNode['type'], number> = {
           <span><i class="dot" [style.background]="o.color"></i>{{ o.name }}</span>
         }
         <span><i class="dot project"></i>Project</span>
+        <span><i class="dot scope"></i>Scope</span>
         <span><i class="dot org"></i>Organization</span>
         <span><i class="dot term"></i>Term</span>
         <span><i class="dot restricted"></i>No access</span>
@@ -157,6 +168,8 @@ const RADIUS: Record<GraphNode['type'], number> = {
                   Focus here
                 </button>
               }
+            } @else if (n.type === 'scope') {
+              <a os-button [routerLink]="['/scopes', scopeId(n)]">Open scope</a>
             } @else if (n.type === 'term' && !n.restricted) {
               <a
                 os-button
@@ -244,6 +257,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
   readonly focus = signal('');
   readonly depth = signal(1);
   readonly showTerms = signal(true);
+  readonly showScopes = signal(true);
   readonly showMissing = signal(false);
   readonly selectedId = signal<string | null>(null);
   readonly empty = computed(() => this.graph().edges.filter((e) => e.kind === 'link').length === 0);
@@ -354,6 +368,11 @@ export class MapPage implements AfterViewInit, OnDestroy {
     this.highlight();
   }
 
+  /** A scope node's id is `scope:<scope id>`. */
+  scopeId(n: GraphNode): string {
+    return n.id.slice('scope:'.length);
+  }
+
   typeLabel(n: GraphNode): string {
     const where = n.organization_id
       ? this.session.orgName(n.organization_id)
@@ -362,9 +381,21 @@ export class MapPage implements AfterViewInit, OnDestroy {
       group: 'Workspace',
       organization: 'Organization',
       project: `Project in ${where}`,
+      scope: `Scope in ${this.ownerName(n)}`,
       term: `Term in ${where}`,
       missing: 'Linked, not created yet',
     }[n.type];
+  }
+
+  /** The project a scope belongs to, else its organization or the workspace. */
+  private ownerName(n: GraphNode): string {
+    const project = n.project_id
+      ? this.graph().nodes.find((p) => p.type === 'project' && p.project_id === n.project_id)
+      : undefined;
+    if (project) return project.label;
+    return n.organization_id
+      ? this.session.orgName(n.organization_id)
+      : (this.session.group()?.name ?? 'the workspace');
   }
 
   refText(refs: LinkRef[]): string {
@@ -384,7 +415,8 @@ export class MapPage implements AfterViewInit, OnDestroy {
     this.sim?.stop();
 
     const g = this.graph();
-    const keep = (n: GraphNode) => this.showTerms() || n.type !== 'term';
+    const keep = (n: GraphNode) =>
+      (this.showTerms() || n.type !== 'term') && (this.showScopes() || n.type !== 'scope');
     const nodes: SimNode[] = g.nodes.filter(keep).map((n) => ({ ...n, degree: 0 }));
     const byId = new Map(nodes.map((n) => [n.id, n]));
     const links: SimLink[] = g.edges.flatMap((e) => {
@@ -453,7 +485,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
       .join('line')
       .attr('class', (d) => `edge ${d.edge.kind}${touchesTerm(d) ? ' term-link' : ''}`)
       .attr('stroke-width', (d) =>
-        d.edge.kind === 'defines' || touchesTerm(d) ? 1 : Math.min(1.2 + d.edge.count * 0.6, 4),
+        d.edge.kind !== 'link' || touchesTerm(d) ? 1 : Math.min(1.2 + d.edge.count * 0.6, 4),
       )
       .attr('marker-end', (d) => restMarker(d));
 
@@ -480,6 +512,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
       .on('dblclick', (_ev, d) => {
         if (d.type === 'project' && !d.restricted)
           void this.router.navigate(['/projects', d.project_id]);
+        else if (d.type === 'scope') void this.router.navigate(['/scopes', this.scopeId(d)]);
       });
 
     node
@@ -530,8 +563,8 @@ export class MapPage implements AfterViewInit, OnDestroy {
         'link',
         forceLink<SimNode, SimLink>(links)
           .id((d) => d.id)
-          .distance((l) => (l.edge.kind === 'defines' ? 46 : 170))
-          .strength((l) => (l.edge.kind === 'defines' ? 0.8 : 0.25)),
+          .distance((l) => (l.edge.kind !== 'link' ? 46 : 170))
+          .strength((l) => (l.edge.kind !== 'link' ? 0.8 : 0.25)),
       )
       .force(
         'charge',

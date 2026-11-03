@@ -19,6 +19,7 @@ import {
   documentsWithActivitySql,
   getDocument,
   SCOPE_COLS,
+  SCOPE_SECTIONS_SQL,
   SECTION_COLS,
 } from './content.js';
 import { getProject, PROJECT_COLS } from './projects.js';
@@ -55,7 +56,7 @@ export async function projectPage(db: Queryable, a: Access, ref: string) {
   const [repositories, scopes, documents, apis, aliases] = (await db.query(`
     SELECT id, project_id, remote_key, remote_url, created_at FROM repositories
      WHERE project_id = ${id} ORDER BY remote_key;
-    SELECT ${SCOPE_COLS} FROM scopes
+    SELECT ${SCOPE_COLS}, ${SCOPE_SECTIONS_SQL} FROM scopes
      WHERE organization_id IS NOT DISTINCT FROM ${org} AND project_id = ${id}
      ORDER BY position, name;
     ${documentsWithActivitySql([org, id, 'NULL'], String(a.isAgent))};

@@ -56,7 +56,15 @@ const KIND_HINT: Record<DocKind, string> = {
                 ><app-icon [name]="glyph[d.kind]"
               /></span>
               <span class="doc-name">
-                <span class="doc-title">{{ d.title }}</span>
+                <span class="doc-title"
+                  ><span class="doc-title-text">{{ d.title }}</span>
+                  @if (d.section_count !== undefined) {
+                    <span class="entry-count" [title]="sections(d.section_count)"
+                      ><span class="sr-only">, {{ sections(d.section_count) }}</span
+                      ><span aria-hidden="true">{{ d.section_count }}</span></span
+                    >
+                  }
+                </span>
                 <span class="doc-kind">{{ kindLabel[d.kind] }}</span>
               </span>
               @if (d.disabled_at) {
@@ -135,6 +143,10 @@ export class DocList {
   readonly glyph = GLYPH;
   kind: DocKind = 'guidelines';
   title = '';
+
+  sections(n: number): string {
+    return `${n} ${n === 1 ? 'section' : 'sections'}`;
+  }
 
   constructor() {
     effect(() => {

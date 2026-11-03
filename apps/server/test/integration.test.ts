@@ -678,6 +678,50 @@ describe('OpenPurpose with groups and organizations', () => {
         await api('DELETE', `/documents/${d.id}`);
   });
 
+  it('counts sections on document, scope and project lists, leaving archived ones out', async () => {
+    const projectCount = async () =>
+      (await api('GET', '/projects')).data.find((p: any) => p.id === projectId).section_count;
+    const before = await projectCount();
+    const add = async (docId: string, heading: string) =>
+      (await api('POST', `/documents/${docId}/sections`, { heading, body: `About ${heading}.` }))
+        .data.section;
+    const doc = (
+      await api('POST', '/documents', { project_id: projectId, kind: 'reference', title: 'Counted' })
+    ).data;
+    await add(doc.id, 'One');
+    const two = await add(doc.id, 'Two');
+    await api('POST', `/sections/${two.id}/archive`, {});
+    const scope = (await api('POST', '/scopes', { project_id: projectId, name: 'Counted part' }))
+      .data;
+    const scopeDoc = (
+      await api('POST', '/documents', { scope_id: scope.id, kind: 'reference', title: 'Part' })
+    ).data;
+    await add(scopeDoc.id, 'Three');
+
+    const page = (await api('GET', `/projects/${projectId}`)).data;
+    expect(page.documents.find((d: any) => d.id === doc.id).section_count).toBe(1);
+    expect(page.scopes.find((x: any) => x.id === scope.id).section_count).toBe(1);
+    const listed = (await api('GET', `/documents?project_id=${projectId}`)).data;
+    expect(listed.find((d: any) => d.id === doc.id).section_count).toBe(1);
+    const scopes = (await api('GET', `/scopes?project_id=${projectId}`)).data;
+    expect(scopes.find((x: any) => x.id === scope.id).section_count).toBe(1);
+    expect((await api('GET', `/scopes/${scope.id}`)).data.documents[0].section_count).toBe(1);
+    // The project counts its own documents and its scopes' documents.
+    expect(await projectCount()).toBe(before + 2);
+
+    const graph = (await api('GET', '/graph')).data;
+    expect(graph.edges).toContainEqual(
+      expect.objectContaining({
+        source: `project:${projectId}`,
+        target: `scope:${scope.id}`,
+        kind: 'contains',
+      }),
+    );
+
+    expect((await api('DELETE', `/scopes/${scope.id}`)).status).toBe(204);
+    expect((await api('DELETE', `/documents/${doc.id}`)).status).toBe(204);
+  });
+
   it('lets agents archive and move sections, as far as the edit modes allow', async () => {
     const doc = async (title: string, mode: string, groupWide = false) =>
       (

@@ -272,6 +272,11 @@ function readPeriod(): ActivityPeriod {
                         <span class="pending">{{ p.pending_proposals }} to review</span>
                       }
                       <span><app-icon name="branch" [size]="12" /> {{ p.repository_count }}</span>
+                      @if (p.section_count !== undefined) {
+                        <span title="Sections in its documents and scopes"
+                          ><app-icon name="file" [size]="12" /> {{ p.section_count }}</span
+                        >
+                      }
                     </span>
                   </a>
                 </li>

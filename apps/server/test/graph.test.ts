@@ -10,6 +10,7 @@ import {
   projectNode,
   relatedTo,
   resolveLink,
+  scopeNode,
   termNode,
   trimRefs,
   type Graph,
@@ -24,7 +25,7 @@ import {
 //   platform  – the viewer is an editor here
 //   payments  – readable through a read grant from platform
 //   secret    – not readable at all
-// Unit tests run without Postgres: a fake Queryable answers the three queries graph.ts makes.
+// Unit tests run without Postgres: a fake Queryable answers the four queries graph.ts makes.
 
 const ORG_A = 'org-platform';
 const ORG_B = 'org-payments';
@@ -216,8 +217,40 @@ const link = (
   project_id: from.project ?? null,
 });
 
-function fakeDb(links: LinkFixture[], data = { projects, terms }): Queryable {
+interface ScopeFixture {
+  id: string;
+  organization_id: string | null;
+  project_id: string | null;
+  slug: string;
+  name: string;
+  description: string;
+}
+
+const scope = (id: string, organization_id: string | null, project_id: string | null) => ({
+  id,
+  organization_id,
+  project_id,
+  slug: id,
+  name: `Scope ${id}`,
+  description: `About ${id}.\nMore.`,
+});
+
+function fakeDb(
+  links: LinkFixture[],
+  data: { projects: ProjectFixture[]; terms: TermFixture[]; scopes?: ScopeFixture[] } = {
+    projects,
+    terms,
+  },
+): Queryable {
   const query = async (sql: string, params: unknown[] = []) => {
+    if (sql.includes('FROM scopes')) {
+      const readable = params[0] as string[];
+      return {
+        rows: (data.scopes ?? []).filter(
+          (s) => s.organization_id === null || readable.includes(s.organization_id),
+        ),
+      };
+    }
     if (sql.includes('section_links')) {
       // Mirrors the readable check. relatedTo's query narrows further in SQL; all links are a
       // superset of that, and resolving decides the rest (integration tests check the SQL).
@@ -734,5 +767,47 @@ describe('resolveLink', () => {
       type: 'missing',
       target: 'no such thing',
     });
+  });
+});
+
+describe('buildGraph: scopes', () => {
+  const scopes = [
+    scope('sc-web', ORG_A, 'p-portal'),
+    scope('sc-dotnet', ORG_A, null),
+    scope('sc-all', null, null),
+    scope('sc-secret', ORG_C, 'p-ledger'),
+    scope('sc-old', ORG_A, 'p-old'),
+  ];
+  const db = (links: LinkFixture[] = []) => fakeDb(links, { projects, terms, scopes });
+
+  it('hangs each scope off its project, organization or the workspace', async () => {
+    const g = await buildGraph(db(), access);
+    expect(edge(g, projectNode('p-portal'), scopeNode('sc-web'), 'contains')).toBeDefined();
+    expect(edge(g, orgNode(ORG_A), scopeNode('sc-dotnet'), 'contains')).toBeDefined();
+    expect(edge(g, GROUP_NODE, scopeNode('sc-all'), 'contains')).toBeDefined();
+    expect(g.nodes.find((n) => n.id === scopeNode('sc-web'))).toMatchObject({
+      type: 'scope',
+      label: 'Scope sc-web',
+      summary: 'About sc-web.',
+      project_id: 'p-portal',
+      restricted: false,
+    });
+  });
+
+  it('leaves out scopes of unreadable organizations and of archived projects', async () => {
+    const g = await buildGraph(db(), access);
+    const ids = g.nodes.map((n) => n.id);
+    expect(ids).not.toContain(scopeNode('sc-secret'));
+    expect(ids).not.toContain(scopeNode('sc-old'));
+    const archived = await buildGraph(db(), access, { includeArchived: true });
+    expect(archived.nodes.map((n) => n.id)).toContain(scopeNode('sc-old'));
+  });
+
+  it('keeps links written in scope documents on the project, so relatedTo is unchanged', async () => {
+    const links = [link('s1', 'payment-gateway', { org: ORG_A, project: 'p-portal' })];
+    const g = await buildGraph(db(links), access);
+    expect(edge(g, projectNode('p-portal'), projectNode('p-gateway'))).toBeDefined();
+    const related = await relatedTo(db(links), access, 'p-portal');
+    expect(related.map((r) => r.node.type)).not.toContain('scope');
   });
 });

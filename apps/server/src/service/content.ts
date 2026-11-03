@@ -141,6 +141,10 @@ async function bindRepositories(
   return { ...scope, repository_ids: unique };
 }
 
+/** For scope lists: the sections in a scope's documents, archived ones left out. */
+export const SCOPE_SECTIONS_SQL = `(SELECT count(*)::int FROM documents d JOIN sections s ON s.document_id = d.id
+     WHERE d.scope_id = scopes.id AND s.archived_at IS NULL) AS section_count`;
+
 /** Scopes defined at exactly this level (group, organization or project). */
 export async function listScopes(
   db: Queryable,
@@ -150,7 +154,7 @@ export async function listScopes(
   const lv = await resolveLevel(db, level);
   a.requireRead(lv.organization_id);
   const { rows } = await db.query<Scope>(
-    `SELECT ${SCOPE_COLS} FROM scopes
+    `SELECT ${SCOPE_COLS}, ${SCOPE_SECTIONS_SQL} FROM scopes
       WHERE organization_id IS NOT DISTINCT FROM $1 AND project_id IS NOT DISTINCT FROM $2
       ORDER BY position, name`,
     [lv.organization_id, lv.project_id],
@@ -272,7 +276,9 @@ export const documentsWithActivitySql = (
   level: [string, string, string],
   forAgents: string,
 ) => `SELECT ${DOC_COLS}, ${lastReadSql('documents.id')} AS last_read_at,
-         ${TRACKING_SINCE_SQL} AS tracking_since
+         ${TRACKING_SINCE_SQL} AS tracking_since,
+         (SELECT count(*)::int FROM sections s
+           WHERE s.document_id = documents.id AND s.archived_at IS NULL) AS section_count
     FROM documents
    WHERE organization_id IS NOT DISTINCT FROM ${level[0]}::uuid
      AND project_id IS NOT DISTINCT FROM ${level[1]}::uuid

@@ -421,6 +421,11 @@ html.agent-mode .map-svg .node.organization rect.box {
   paint-order: stroke;
 }
 
+html.agent-mode .map-svg .node.scope rect.box {
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+
 html.agent-mode .map-svg .node.restricted rect.box,
 html.agent-mode .map-svg .node.missing rect.box {
   --c: var(--muted);

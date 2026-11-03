@@ -192,6 +192,8 @@ export interface Scope {
    */
   repository_ids: string[];
   position: number;
+  /** Scope lists only: sections in the scope's documents, archived ones left out. */
+  section_count?: number;
 }
 
 // ───────────────────────────── proposals and reviews ─────────────────────────────
@@ -309,7 +311,7 @@ export type FindingCounts = Record<FindingStatus, number>;
 
 // ───────────────────────────── the link graph (map) ─────────────────────────────
 
-export type NodeType = 'group' | 'organization' | 'project' | 'term' | 'missing';
+export type NodeType = 'group' | 'organization' | 'project' | 'scope' | 'term' | 'missing';
 
 export interface GraphNode {
   id: string;
@@ -337,7 +339,8 @@ export interface GraphEdge {
   id: string;
   source: string;
   target: string;
-  kind: 'link' | 'defines';
+  /** link: a [[link]]; defines: who defines a term; contains: the project or organization a scope is in. */
+  kind: 'link' | 'defines' | 'contains';
   count: number;
   refs: LinkRef[];
 }
@@ -459,6 +462,8 @@ export interface DocumentActivity {
   disabled_at: string | null;
   staleness: Staleness | null;
   last_read_at: string | null;
+  /** Document lists only: how many sections it has, archived ones left out. */
+  section_count?: number;
 }
 
 // ───────────────────────────── export and import ─────────────────────────────
