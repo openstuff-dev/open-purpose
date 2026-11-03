@@ -21,13 +21,18 @@ organization, the project and the part of the code you are in (a repository or a
    outdated or repeats another, call `archive_section`; when it belongs in
    another document, call `move_section`. Give the reason and tell me in one
    line what you archived or moved.
+   Check `list_scopes` for the project: if a distinct area (e.g. `apps/server/**`,
+   `apps/web/**`, `packages/<name>/**`, `site/**`) or stack lacks a scope,
+   suggest it with `create_scope`.
 4. When I correct you and the correction should apply next time, call
    `propose_learning` with the same remote/path/manifests. Say in one line that
    you did. Do not propose one-off preferences or task-specific details.
 5. Never try to change a section marked `locked`.
 6. `[[name]]` in OpenPurpose text links to another project or a glossary term, and
-   `[[org/name]]` to a project in another organization. Use `get_related` when
-   your task touches a linked service.
+   `[[org/name]]` to a project in another organization. Always link domain terms
+   and projects with `[[...]]` whenever you write, propose or edit sections,
+   documents or learnings. Use `get_related` when your task touches a linked
+   service.
 7. If `get_context` lists "Review feedback waiting on you", read it with
    `get_review` before other work. Answer each thread with `reply_to_review`,
    accept suggestions you agree with via `apply_suggestion`, and push other
