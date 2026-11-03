@@ -3,6 +3,18 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.4.3
+
+No migrations.
+
+### Web app
+
+- The scope page looks like the project page it opens from: a layer path with the scope
+  highlighted, its repositories, paths and stacks in one strip, and **Documents**, **What agents
+  see** and **Settings** tabs. **What agents see** opens on the scope, so you see what an agent
+  gets in that part of the code. Editing, renaming the slug and deleting moved to **Settings**.
+- An unknown scope shows "Scope not found" instead of a blank page.
+
 ## 0.4.2
 
 No migrations.

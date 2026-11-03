@@ -1,6 +1,6 @@
 {
   "name": "openpurpose",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "private": true,
   "packageManager": "npm@10.9.4",
   "engines": {
