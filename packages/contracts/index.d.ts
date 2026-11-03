@@ -339,7 +339,10 @@ export interface GraphEdge {
   id: string;
   source: string;
   target: string;
-  /** link: a [[link]]; defines: who defines a term; contains: the project or organization a scope is in. */
+  /**
+   * link: a [[link]]; defines: who defines a term;
+   * contains: the project or organization a scope is in.
+   */
   kind: 'link' | 'defines' | 'contains';
   count: number;
   refs: LinkRef[];
