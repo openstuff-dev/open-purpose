@@ -41,15 +41,14 @@ interface SimLink extends SimulationLinkDatum<SimNode> {
   edge: GraphEdge;
 }
 
-/** A [[link]] from one term to another. */
-const termLink = (d: SimLink) =>
+/** A [[link]] to or from a term. Drawn thin and dashed, so links between projects stand out. */
+const touchesTerm = (d: SimLink) =>
   d.edge.kind === 'link' &&
-  (d.source as SimNode).type === 'term' &&
-  (d.target as SimNode).type === 'term';
+  ((d.source as SimNode).type === 'term' || (d.target as SimNode).type === 'term');
 
 /** The arrowhead an edge has when nothing is selected. */
 const restMarker = (d: SimLink) =>
-  d.edge.kind !== 'link' ? null : termLink(d) ? 'url(#arrow-term)' : 'url(#arrow)';
+  d.edge.kind !== 'link' ? null : touchesTerm(d) ? 'url(#arrow-term)' : 'url(#arrow)';
 
 const RADIUS: Record<GraphNode['type'], number> = {
   group: 18,
@@ -110,6 +109,8 @@ const RADIUS: Record<GraphNode['type'], number> = {
         @for (o of legendOrgs(); track o.id) {
           <span><i class="dot" [style.background]="o.color"></i>{{ o.name }}</span>
         }
+        <span><i class="dot project"></i>Project</span>
+        <span><i class="dot org"></i>Organization</span>
         <span><i class="dot term"></i>Term</span>
         <span><i class="dot restricted"></i>No access</span>
       </span>
@@ -417,7 +418,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
     svg.selectAll('*').remove();
     svg.attr('viewBox', `0 0 ${width} ${height}`);
     const defs = svg.append('defs');
-    // Links between two terms get a smaller, fainter arrow: a big glossary has many of them.
+    // Links to or from a term get a smaller, fainter arrow: a big glossary has many of them.
     for (const id of ['arrow', 'arrow-hot', 'arrow-dim', 'arrow-term']) {
       const size = id === 'arrow-term' ? 4 : 7;
       defs
@@ -450,9 +451,9 @@ export class MapPage implements AfterViewInit, OnDestroy {
       .selectAll<SVGLineElement, SimLink>('line')
       .data(links)
       .join('line')
-      .attr('class', (d) => `edge ${d.edge.kind}${termLink(d) ? ' term-link' : ''}`)
+      .attr('class', (d) => `edge ${d.edge.kind}${touchesTerm(d) ? ' term-link' : ''}`)
       .attr('stroke-width', (d) =>
-        d.edge.kind === 'defines' || termLink(d) ? 1 : Math.min(1.2 + d.edge.count * 0.6, 4),
+        d.edge.kind === 'defines' || touchesTerm(d) ? 1 : Math.min(1.2 + d.edge.count * 0.6, 4),
       )
       .attr('marker-end', (d) => restMarker(d));
 
@@ -515,7 +516,8 @@ export class MapPage implements AfterViewInit, OnDestroy {
         .filter((d) => d.type !== 'term')
         .append('circle')
         .attr('r', r)
-        .style('fill', tint);
+        // The stylesheet decides how to use it: projects fill with it, organizations ring with it.
+        .style('--c', tint);
       node
         .append('text')
         .attr('x', (d) => r(d) + 5)
@@ -667,7 +669,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
           ? null
           : hot(d)
             ? 'url(#arrow-hot)'
-            : termLink(d)
+            : touchesTerm(d)
               ? 'url(#arrow-term)'
               : 'url(#arrow-dim)',
       );
