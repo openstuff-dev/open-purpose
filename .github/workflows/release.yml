@@ -61,9 +61,16 @@ jobs:
 
       - id: meta
         uses: docker/metadata-action@v5
+        env:
+          # The attestation makes buildx push an index, and GHCR shows the description from there.
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
         with:
           images: ${{ env.IMAGE }}
           flavor: latest=false
+          labels: |
+            org.opencontainers.image.description=Shared context for people and agents
+          annotations: |
+            org.opencontainers.image.description=Shared context for people and agents
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}},enable=${{ !contains(github.ref_name, '-') }}
@@ -102,6 +109,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
           cache-from: type=gha
 
   # Hands a release (not a pre-release, not :edge) to a hosted instance: sets the new version in
