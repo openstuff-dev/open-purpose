@@ -32,7 +32,8 @@ run() {
   done
   mv "$out.partial" "$out"
 
-  find "$DIR" -mindepth 1 -maxdepth 1 -type d -mtime "+$((KEEP - 1))" -exec rm -rf {} +
+  # Only our own folders: a new disk also holds a lost+found that this user can't delete.
+  find "$DIR" -mindepth 1 -maxdepth 1 -type d -name '20*' -mtime "+$((KEEP - 1))" -exec rm -rf {} +
   if [ -n "${R2_BUCKET:-}" ]; then
     rclone copy "$out" "r2:$R2_BUCKET/$stamp"
     rclone delete --min-age "${KEEP}d" "r2:$R2_BUCKET"
