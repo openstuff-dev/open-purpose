@@ -3,6 +3,20 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.4.4
+
+No migrations.
+
+### Web app
+
+- The map shows scopes, and the document, scope and project lists show quiet section counts.
+- Dropdowns line up properly and their arrow is fixed (`@openstuff-dev/ui` 0.1.4).
+
+### Backups
+
+- Backups no longer start failing on a new disk once its `lost+found` folder is older than
+  `BACKUP_KEEP_DAYS`. The cleanup now deletes only backup folders, so the copy to R2 still runs.
+
 ## 0.4.3
 
 No migrations.
