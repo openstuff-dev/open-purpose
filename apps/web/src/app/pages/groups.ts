@@ -49,7 +49,7 @@ import { initials } from '../core/theme';
           }
           <div class="form-actions">
             <button os-button variant="primary" type="button" (click)="open(c.id)">
-              Open {{ c.name }}
+              Open workspace
             </button>
             <button os-button type="button" (click)="created.set(null)">Done</button>
           </div>
