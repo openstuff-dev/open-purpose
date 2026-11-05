@@ -1,0 +1,74 @@
+name: Use cases
+
+# Tells OpenUsecase which scenarios pass on the default branch, which is what lets a use case go live.
+# Runs every test, not the affected ones: a report replaces that suite's earlier results.
+# Stays off until the repository has the variable OPENUSECASE_URL and the secret OPENUSECASE_TOKEN.
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: usecases-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  report:
+    if: ${{ vars.OPENUSECASE_URL != '' }}
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: openpurpose
+          POSTGRES_PASSWORD: openpurpose
+          POSTGRES_DB: openpurpose_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U openpurpose"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://openpurpose:openpurpose@localhost:5432/openpurpose_test
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - run: npm ci
+
+      # A failing test is evidence too, so the report still goes out.
+      - run: npx nx run-many -t test --skip-nx-cache -- --reporter=default --reporter=junit --outputFile.junit=test-results.xml
+        continue-on-error: true
+
+      # Settings in a real browser, in its own database. The results are in e2e-results.xml.
+      - run: npx playwright install --with-deps chromium
+      - run: psql -h localhost -U openpurpose -d openpurpose_test -c 'CREATE DATABASE openpurpose_e2e'
+        env:
+          PGPASSWORD: openpurpose
+      - run: npx nx run web:e2e
+        continue-on-error: true
+        env:
+          E2E_DATABASE_URL: postgres://openpurpose:openpurpose@localhost:5432/openpurpose_e2e
+
+      - name: Report the results
+        env:
+          OPENUSECASE_URL: ${{ vars.OPENUSECASE_URL }}
+          OPENUSECASE_TOKEN: ${{ secrets.OPENUSECASE_TOKEN }}
+        run: |
+          shopt -s nullglob
+          for file in apps/*/test-results.xml packages/*/test-results.xml; do
+            npx --yes @openstuff-dev/usecase report --suite "$(basename "$(dirname "$file")")" "$file"
+          done
+          if [ -f apps/web/e2e-results.xml ]; then
+            npx --yes @openstuff-dev/usecase report --suite e2e apps/web/e2e-results.xml
+          fi
