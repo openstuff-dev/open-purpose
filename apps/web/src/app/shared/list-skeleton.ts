@@ -85,7 +85,7 @@ export class ListSkeleton {
         </div>
       </header>
       <div class="block">
-        <div class="block-head">
+        <div class="os-section-header">
           <os-skeleton [style.inline-size.rem]="9" class="skeleton-md" />
         </div>
         <app-list-skeleton kind="doc" [rows]="3" />

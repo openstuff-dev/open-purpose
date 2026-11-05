@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  type ElementRef,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -20,6 +28,8 @@ import {
   Checkbox,
   EmptyState,
   Radio,
+  SectionHeader,
+  SecretDialog,
 } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import { ROLE_LABEL, type AgentReview, type Member, type Role } from '../core/models';
@@ -33,13 +43,6 @@ interface Invited {
   existing: boolean;
   emailSent: boolean;
   signInUrl: string;
-  where: string;
-}
-
-interface NewToken {
-  actor: string;
-  kind: 'human' | 'agent';
-  token: string;
   where: string;
 }
 
@@ -78,6 +81,7 @@ const REVIEW_OPTIONS: { value: AgentReview; label: string; hint: string }[] = [
     Check,
     Checkbox,
     Radio,
+    SectionHeader,
     Control,
     Badge,
     Chip,
@@ -89,58 +93,44 @@ const REVIEW_OPTIONS: { value: AgentReview; label: string; hint: string }[] = [
     DialogClose,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'settings-tab' },
   template: `
     <section>
-      <h2>People and agents</h2>
-      <p class="quiet">
-        Everyone who reads or writes {{ session.group()?.name }} has a token. People sign in here;
-        agents send theirs to the MCP endpoint and work in one organization.
-      </p>
-    </section>
+      <header
+        os-section-header
+        title="People and agents"
+        description="Everyone who reads or writes {{
+          session.group()?.name
+        }} has a token. People sign in here; agents send theirs to the MCP endpoint and work in one organization."
+      ></header>
 
-    @if (fresh(); as t) {
-      <os-callout tone="success" role="alert" title="Token for {{ t.actor }}" level="2">
-        <p>Copy it now. It is not shown again.</p>
-        <pre><code>{{ t.token }}</code></pre>
-        @if (t.kind === 'agent') {
-          <p>This agent works in {{ t.where }}. Connect Claude Code:</p>
-          <pre><code>{{ claudeCommand(t.token) }}</code></pre>
-          <p>Or add to any MCP client's config:</p>
-          <pre><code>{{ mcpJson(t.token) }}</code></pre>
-        }
-        <div class="form-actions">
-          <button os-button type="button" (click)="copy(t.token)">Copy token</button>
-          <button os-button type="button" (click)="fresh.set(null)">Done</button>
-        </div>
-      </os-callout>
-    }
+      @if (invited(); as i) {
+        <os-callout
+          [tone]="i.emailSent ? 'success' : 'warning'"
+          role="alert"
+          title="{{ i.existing ? 'Gave ' + i.name + ' a role' : 'Added ' + i.name }} in {{
+            i.where
+          }}"
+          level="2"
+        >
+          @if (i.emailSent) {
+            <p>
+              We emailed {{ i.email }} a sign-in link. If it has expired by the time they open it,
+              they can get a new one at <a [href]="i.signInUrl">{{ i.signInUrl }}</a
+              >.
+            </p>
+          } @else {
+            <p>
+              We couldn't email {{ i.email }}. Ask them to sign in at
+              <a [href]="i.signInUrl">{{ i.signInUrl }}</a> with that address.
+            </p>
+          }
+          <div class="form-actions">
+            <button os-button type="button" (click)="invited.set(null)">Done</button>
+          </div>
+        </os-callout>
+      }
 
-    @if (invited(); as i) {
-      <os-callout
-        [tone]="i.emailSent ? 'success' : 'warning'"
-        role="alert"
-        title="{{ i.existing ? 'Gave ' + i.name + ' a role' : 'Added ' + i.name }} in {{ i.where }}"
-        level="2"
-      >
-        @if (i.emailSent) {
-          <p>
-            We emailed {{ i.email }} a sign-in link. If it has expired by the time they open it,
-            they can get a new one at <a [href]="i.signInUrl">{{ i.signInUrl }}</a
-            >.
-          </p>
-        } @else {
-          <p>
-            We couldn't email {{ i.email }}. Ask them to sign in at
-            <a [href]="i.signInUrl">{{ i.signInUrl }}</a> with that address.
-          </p>
-        }
-        <div class="form-actions">
-          <button os-button type="button" (click)="invited.set(null)">Done</button>
-        </div>
-      </os-callout>
-    }
-
-    <section>
       <form class="inline-form os-panel os-panel-body" (ngSubmit)="create()">
         <os-field label="Kind"
           ><select os-select name="kind" [(ngModel)]="kind" (ngModelChange)="fixLevel()">
@@ -161,6 +151,7 @@ const REVIEW_OPTIONS: { value: AgentReview; label: string; hint: string }[] = [
         }
         <os-field [label]="byEmail() && email.trim() ? 'Name (optional)' : 'Name'" class="grow"
           ><input
+            #nameInput
             os-input
             name="name"
             [(ngModel)]="name"
@@ -514,12 +505,13 @@ export class PeoplePage {
   private readonly confirmDialog = inject(ConfirmDialog);
   private api = inject(Api);
   private notices = inject(Notices);
+  private readonly secretDialog = inject(SecretDialog);
+  private readonly nameInput = viewChild.required<ElementRef<HTMLInputElement>>('nameInput');
   readonly GROUP = GROUP;
   readonly roleLabel = ROLE_LABEL;
   readonly members = signal<Member[]>([]);
   readonly people = computed(() => this.members().filter((m) => m.kind === 'human'));
   readonly agents = computed(() => this.members().filter((m) => m.kind === 'agent'));
-  readonly fresh = signal<NewToken | null>(null);
   readonly invited = signal<Invited | null>(null);
   private readonly magicLink = signal(false);
   /** Whose new token is being labelled. */
@@ -601,28 +593,21 @@ export class PeoplePage {
     }
   }
 
-  private get base(): string {
-    return this.session.me()?.public_url ?? location.origin;
-  }
-
-  claudeCommand(token: string): string {
-    return `claude mcp add --transport http openpurpose ${this.base}/mcp \\\n  --header "Authorization: Bearer ${token}"`;
-  }
-
-  mcpJson(token: string): string {
-    return JSON.stringify(
-      {
-        mcpServers: {
-          openpurpose: {
-            type: 'http',
-            url: `${this.base}/mcp`,
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        },
-      },
-      null,
-      2,
-    );
+  private showToken(
+    actor: string,
+    kind: 'human' | 'agent',
+    token: string,
+    where: string,
+  ): Promise<void> {
+    return this.secretDialog.show({
+      title: `Token for ${actor}`,
+      secret: token,
+      what: 'token',
+      instructions:
+        kind === 'agent'
+          ? `This agent works in ${where}. Put the token in your MCP client's config. Settings › Connect an agent has the commands.`
+          : `${actor} signs in with this token, so pass it on somewhere safe.`,
+    });
   }
 
   async create(): Promise<void> {
@@ -635,14 +620,11 @@ export class PeoplePage {
         organization_id: orgId,
         role: this.kind === 'human' ? this.role : undefined,
       });
-      this.fresh.set({
-        actor: r.actor.name,
-        kind: r.actor.kind,
-        token: r.token,
-        where: this.session.orgName(orgId),
-      });
       this.name = '';
-      await this.load();
+      void this.load();
+      await this.showToken(r.actor.name, r.actor.kind, r.token, this.session.orgName(orgId));
+      // The button goes disabled once the name is cleared, so focus goes to the name.
+      this.nameInput().nativeElement.focus();
     } catch (e) {
       this.notices.error(e);
     }
@@ -657,7 +639,6 @@ export class PeoplePage {
         organization_id: orgId,
         role: this.role as 'admin' | 'editor' | 'viewer',
       });
-      this.fresh.set(null);
       this.invited.set({
         name: r.actor.name,
         email: r.actor.email,
@@ -712,13 +693,8 @@ export class PeoplePage {
     try {
       const r = await this.api.issueToken(m.id, label);
       const org = m.memberships.find((x) => x.organization_id)?.organization_id ?? null;
-      this.fresh.set({
-        actor: m.name,
-        kind: m.kind,
-        token: r.token,
-        where: this.session.orgName(org),
-      });
-      await this.load();
+      void this.load();
+      await this.showToken(m.name, m.kind, r.token, this.session.orgName(org));
     } catch (e) {
       this.notices.error(e);
     }
@@ -770,15 +746,6 @@ export class PeoplePage {
       () => this.api.updateMember(m.id, { disabled: !m.disabled_at }),
       m.disabled_at ? `Enabled ${m.name}` : `Disabled ${m.name}`,
     );
-  }
-
-  async copy(text: string): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(text);
-      this.notices.ok('Copied token');
-    } catch {
-      this.notices.error('Copying is blocked in this browser. Select the text instead.');
-    }
   }
 
   private async run(fn: () => Promise<unknown>, ok: string): Promise<void> {

@@ -7,6 +7,7 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "stylelint": "stylelint \"src/**/*.css\""
   },
@@ -46,7 +47,8 @@
     "@types/d3-selection": "^3.0.12",
     "@types/d3-transition": "^3.0.9",
     "@types/d3-zoom": "^3.0.9",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
   },
   "nx": {
     "name": "web",

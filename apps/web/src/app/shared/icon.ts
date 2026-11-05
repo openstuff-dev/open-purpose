@@ -144,6 +144,11 @@ const ICONS: Partial<Record<string, IconNode>> = {
   'move-to': FolderInput,
 };
 
+/** An icon's drawing, for toolkit components that take one. */
+export function iconNode(name: string): IconNode | undefined {
+  return ICONS[name];
+}
+
 function esc(v: unknown): string {
   return String(v)
     .replaceAll('&', '&amp;')

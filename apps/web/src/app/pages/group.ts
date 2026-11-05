@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { Badge, Button, Chip } from '@openstuff-dev/ui-angular';
+import { Badge, Button, Chip, SectionHeader } from '@openstuff-dev/ui-angular';
 import { ROLE_LABEL, type Organization } from '../core/models';
 import { Session } from '../core/session';
 import { ContextSwitch } from '../core/switch';
@@ -11,7 +11,7 @@ import { ScopeList } from '../shared/scope-list';
 
 @Component({
   selector: 'app-group',
-  imports: [DocList, ScopeList, RouterLink, Icon, Button, Badge, Chip],
+  imports: [DocList, ScopeList, RouterLink, Icon, Button, Badge, Chip, SectionHeader],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (session.group(); as g) {
@@ -34,15 +34,11 @@ import { ScopeList } from '../shared/scope-list';
       </header>
 
       <section class="block">
-        <div class="block-head">
-          <div>
-            <h2>Organizations</h2>
-            <p class="quiet">
-              Each keeps its own rules, projects and inbox, and is private to its members unless
-              shared.
-            </p>
-          </div>
-        </div>
+        <header
+          os-section-header
+          title="Organizations"
+          description="Each keeps its own rules, projects and inbox, and is private to its members unless shared."
+        ></header>
         <ul class="org-list">
           @for (o of orgs(); track o.id) {
             <li>
@@ -90,15 +86,11 @@ import { ScopeList } from '../shared/scope-list';
       </section>
 
       <section class="block">
-        <div class="block-head">
-          <div>
-            <h2>Workspace documents</h2>
-            <p class="quiet">
-              Purpose, rules and glossary that hold in every organization: security, privacy, legal,
-              shared terms.
-            </p>
-          </div>
-        </div>
+        <header
+          os-section-header
+          title="Workspace documents"
+          description="Purpose, rules and glossary that hold in every organization: security, privacy, legal, shared terms."
+        ></header>
         <app-doc-list
           [organizationId]="null"
           [canEdit]="g.can_edit"
@@ -107,15 +99,11 @@ import { ScopeList } from '../shared/scope-list';
       </section>
 
       <section class="block">
-        <div class="block-head">
-          <div>
-            <h2>Workspace-wide scopes</h2>
-            <p class="quiet">
-              Rules for a kind of code in every organization, such as all .NET services. Matched by
-              stack tags or paths.
-            </p>
-          </div>
-        </div>
+        <header
+          os-section-header
+          title="Workspace-wide scopes"
+          description="Rules for a kind of code in every organization, such as all .NET services. Matched by stack tags or paths."
+        ></header>
         <app-scope-list
           [organizationId]="null"
           [canEdit]="g.can_edit"

@@ -13,6 +13,7 @@ import {
   SegmentedControl,
   EmptyState,
   Breadcrumbs,
+  SectionHeader,
   Skeleton,
 } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
@@ -48,6 +49,7 @@ function readPeriod(): ActivityPeriod {
 @Component({
   selector: 'app-organization',
   imports: [
+    SectionHeader,
     Breadcrumbs,
     EmptyState,
     DocList,
@@ -112,19 +114,19 @@ function readPeriod(): ActivityPeriod {
 
       <section
         class="block activity"
-        aria-labelledby="activity-h"
+        aria-label="Agent activity"
         [attr.aria-busy]="!activityLoaded()"
       >
-        <div class="block-head">
-          <div>
-            <h2 id="activity-h">Agent activity</h2>
-            <p class="quiet">What agents in {{ org.name }} requested over MCP.</p>
-          </div>
+        <header
+          os-section-header
+          title="Agent activity"
+          description="What agents in {{ org.name }} requested over MCP."
+        >
           <div class="activity-controls">
             <os-segmented-control label="Period" size="sm" [options]="periods" [(value)]="period" />
             <app-stat-style-switch />
           </div>
-        </div>
+        </header>
         @if (activity(); as a) {
           @if (!a.tracking_since) {
             <os-empty-state title="No agent requests yet" bordered>
@@ -244,12 +246,11 @@ function readPeriod(): ActivityPeriod {
 
       @if (org.projects) {
         <section class="block" [attr.aria-busy]="!recentLoaded()">
-          <div class="block-head">
-            <div><h2>Projects</h2></div>
+          <header os-section-header title="Projects">
             <a routerLink="/projects" os-button variant="link" size="sm"
               >All {{ org.projects }} projects</a
             >
-          </div>
+          </header>
           @if (!recentLoaded()) {
             <app-list-skeleton kind="project" [rows]="Math.min(org.projects, 6)" />
           } @else {
@@ -287,14 +288,13 @@ function readPeriod(): ActivityPeriod {
       }
 
       <section class="block">
-        <div class="block-head">
-          <div>
-            <h2>Organization documents</h2>
-            <p class="quiet">
-              Purpose, business logic, glossary and guidelines for every project in {{ org.name }}.
-            </p>
-          </div>
-        </div>
+        <header
+          os-section-header
+          title="Organization documents"
+          description="Purpose, business logic, glossary and guidelines for every project in {{
+            org.name
+          }}."
+        ></header>
         <app-doc-list
           [organizationId]="org.id"
           [canEdit]="session.canEdit(org.id)"
@@ -303,14 +303,13 @@ function readPeriod(): ActivityPeriod {
       </section>
 
       <section class="block">
-        <div class="block-head">
-          <div>
-            <h2>Organization-wide scopes</h2>
-            <p class="quiet">
-              Rules for a kind of code in every {{ org.name }} project, such as every Angular app.
-            </p>
-          </div>
-        </div>
+        <header
+          os-section-header
+          title="Organization-wide scopes"
+          description="Rules for a kind of code in every {{
+            org.name
+          }} project, such as every Angular app."
+        ></header>
         <app-scope-list
           [organizationId]="org.id"
           [canEdit]="session.canEdit(org.id)"

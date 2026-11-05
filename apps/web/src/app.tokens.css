@@ -78,10 +78,4 @@
 
   /* White on a coloured circle or the switch knob, in every theme. */
   --on-tone: #fff;
-
-  /* The theme picker previews light and dark, whatever the current theme is. */
-  --swatch-light-bg: #f4f5f7;
-  --swatch-light-surface: #fff;
-  --swatch-dark-bg: #101317;
-  --swatch-dark-surface: #14171c;
 }

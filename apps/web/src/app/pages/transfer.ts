@@ -12,6 +12,13 @@ import {
   SegmentedControl,
   Skeleton,
   Callout,
+  FormActions,
+  FormActionsNote,
+  SectionHeader,
+  SettingCard,
+  SettingCardFooter,
+  SettingItem,
+  SettingRow,
 } from '@openstuff-dev/ui-angular';
 import { Api, type ImportUpload } from '../core/api';
 import type {
@@ -86,6 +93,13 @@ async function readUpload(file: File): Promise<ImportUpload> {
 @Component({
   selector: 'app-transfer',
   imports: [
+    FormActions,
+    FormActionsNote,
+    SectionHeader,
+    SettingCard,
+    SettingCardFooter,
+    SettingItem,
+    SettingRow,
     Callout,
     FormsModule,
     Icon,
@@ -101,19 +115,19 @@ async function readUpload(file: File): Promise<ImportUpload> {
     Skeleton,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'settings-tab' },
   template: `
     <section>
-      <h2>Export</h2>
-      <p class="quiet">
-        Download everything in {{ session.group()?.name }} or one organization, to keep as a backup
-        or to import into another OpenPurpose server. A workspace export is a complete backup.
-      </p>
-      <div class="os-setting-card">
-        <div class="os-setting-row" data-inline>
-          <div class="os-setting-text">
-            <h3>What to export</h3>
-          </div>
-          <select os-select name="what" [(ngModel)]="what" aria-label="What to export">
+      <header
+        os-section-header
+        title="Export"
+        description="Download everything in {{
+          session.group()?.name
+        }} or one organization, to keep as a backup or to import into another OpenPurpose server. A workspace export is a complete backup."
+      ></header>
+      <div os-setting-card>
+        <os-setting-row label="What to export">
+          <select os-select name="what" [(ngModel)]="what">
             @if (session.canAdmin(null)) {
               <option value="">
                 {{ session.groupShown() ? 'The whole workspace' : 'Everything' }} ({{
@@ -125,25 +139,19 @@ async function readUpload(file: File): Promise<ImportUpload> {
               <option [value]="o.id">{{ o.name }}</option>
             }
           </select>
-        </div>
-        <div class="os-setting-row" data-inline>
-          <div class="os-setting-text">
-            <h3>Format</h3>
-            <p>
-              {{
-                format === 'json'
-                  ? 'One file with everything. Best for backups and imports.'
-                  : 'A Markdown file per document, easy to read or keep in git. Imports read the manifest.json inside.'
-              }}
-            </p>
-          </div>
+        </os-setting-row>
+        <os-setting-item
+          title="Format"
+          [meta]="
+            format === 'json'
+              ? 'One file with everything. Best for backups and imports.'
+              : 'A Markdown file per document, easy to read or keep in git. Imports read the manifest.json inside.'
+          "
+        >
           <os-segmented-control label="Format" size="sm" [options]="formats" [(value)]="format" />
-        </div>
-        <div class="os-setting-row stack">
-          <div class="os-setting-text">
-            <h3>Include</h3>
-          </div>
-          <div class="transfer-includes">
+        </os-setting-item>
+        <os-setting-item title="Include">
+          <div os-setting-item-meta class="transfer-includes">
             <label os-check
               ><input os-checkbox type="checkbox" name="history" [(ngModel)]="includes.history" />
               Earlier versions of every section</label
@@ -171,36 +179,38 @@ async function readUpload(file: File): Promise<ImportUpload> {
               <span class="quiet">(never their tokens)</span></label
             >
           </div>
-        </div>
-        <div class="os-setting-row" data-inline>
-          <p>
-            For scheduled backups, run
-            <code
-              >npm run -s export -w server -- --group {{ session.group()?.slug }} --out
-              backup.json</code
+        </os-setting-item>
+        <footer os-setting-card-footer>
+          <div os-form-actions>
+            <span os-form-actions-note>
+              For scheduled backups, run
+              <code
+                >npm run -s export -w server -- --group {{ session.group()?.slug }} --out
+                backup.json</code
+              >
+              on the server.
+            </span>
+            <button
+              os-button
+              variant="primary"
+              type="button"
+              (click)="exportNow()"
+              [disabled]="busy() && phase() !== 'exporting'"
+              [loading]="phase() === 'exporting'"
             >
-            on the server.
-          </p>
-          <button
-            os-button
-            variant="primary"
-            type="button"
-            (click)="exportNow()"
-            [disabled]="busy() && phase() !== 'exporting'"
-            [loading]="phase() === 'exporting'"
-          >
-            <app-icon name="download" />{{ phase() === 'exporting' ? 'Preparing…' : 'Download' }}
-          </button>
-        </div>
+              <app-icon name="download" />{{ phase() === 'exporting' ? 'Preparing…' : 'Download' }}
+            </button>
+          </div>
+        </footer>
       </div>
     </section>
 
     <section>
-      <h2>Import</h2>
-      <p class="quiet">
-        Bring in an export from this or another OpenPurpose server. You see what will happen before
-        anything changes.
-      </p>
+      <header
+        os-section-header
+        title="Import"
+        description="Bring in an export from this or another OpenPurpose server. You see what will happen before anything changes."
+      ></header>
 
       @if (done(); as d) {
         <os-callout tone="success" title="Imported" role="status">
@@ -224,18 +234,15 @@ async function readUpload(file: File): Promise<ImportUpload> {
         </os-callout>
       }
 
-      <div class="os-setting-card">
-        <div class="os-setting-row" data-inline>
-          <div class="os-setting-text">
-            <h3>File</h3>
-            <p role="status">
-              @if (phase() === 'checking' && !report()) {
-                Checking {{ fileName() }}…
-              } @else {
-                {{ fileName() || 'An OpenPurpose export, .json or .zip' }}
-              }
-            </p>
-          </div>
+      <div os-setting-card>
+        <os-setting-item title="File">
+          <p os-setting-item-meta class="os-setting-item-meta" role="status">
+            @if (phase() === 'checking' && !report()) {
+              Checking {{ fileName() }}…
+            } @else {
+              {{ fileName() || 'An OpenPurpose export, .json or .zip' }}
+            }
+          </p>
           <label class="os-button">
             <app-icon name="upload" />{{ fileName() ? 'Choose another' : 'Choose file' }}
             <input
@@ -245,21 +252,18 @@ async function readUpload(file: File): Promise<ImportUpload> {
               (change)="pick($event)"
             />
           </label>
-        </div>
+        </os-setting-item>
         @if (session.isSuperadmin && upload()) {
-          <div class="os-setting-row" data-inline>
-            <div class="os-setting-text">
-              <h3>Import into</h3>
-              <p>
-                {{
-                  asGroup()
-                    ? 'A new workspace with everything in the file, including its workspace-wide content. You become its admin.'
-                    : 'Organizations in ' +
-                      session.group()?.name +
-                      ', new or merged into ones already here.'
-                }}
-              </p>
-            </div>
+          <os-setting-item
+            title="Import into"
+            [meta]="
+              asGroup()
+                ? 'A new workspace with everything in the file, including its workspace-wide content. You become its admin.'
+                : 'Organizations in ' +
+                  session.group()?.name +
+                  ', new or merged into ones already here.'
+            "
+          >
             <os-segmented-control
               label="Import into"
               size="sm"
@@ -267,7 +271,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
               [value]="asGroup() ? 'new' : 'group'"
               (valueChange)="setAsGroup($event === 'new')"
             />
-          </div>
+          </os-setting-item>
         }
       </div>
 
@@ -362,12 +366,10 @@ async function readUpload(file: File): Promise<ImportUpload> {
           </ul>
 
           @if (merging()) {
-            <div class="os-setting-card">
-              <div class="os-setting-row stack">
-                <div class="os-setting-text">
-                  <h3>When a section here differs from the file</h3>
-                </div>
+            <div os-setting-card>
+              <os-setting-item title="When a section here differs from the file">
                 <div
+                  os-setting-item-meta
                   class="transfer-policies"
                   role="radiogroup"
                   aria-label="When a section differs"
@@ -389,8 +391,8 @@ async function readUpload(file: File): Promise<ImportUpload> {
                     >
                   }
                 </div>
-              </div>
-              <div class="os-setting-row stack">
+              </os-setting-item>
+              <div class="setting-card-form transfer-policies">
                 <label os-check
                   ><input
                     os-checkbox

@@ -36,36 +36,6 @@
   }
 }
 
-@media (width <= 900px) {
-  .settings {
-    grid-template-columns: 1fr;
-    gap: 1.25rem;
-  }
-
-  .settings-nav {
-    position: static;
-    display: flex;
-    overflow-x: auto;
-    gap: 0.25rem;
-  }
-
-  .settings-nav .nav-label {
-    display: none;
-  }
-
-  .settings-nav a {
-    white-space: nowrap;
-  }
-
-  .os-setting-row form input {
-    width: 100%;
-  }
-
-  .theme-options {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 @media (width <= 820px) {
   .map-page {
     height: calc(100vh - var(--bar));
