@@ -52,3 +52,12 @@ jobs:
         if: ${{ !inputs.all }}
       - run: npx nx run-many -t lint stylelint typecheck test build
         if: ${{ inputs.all }}
+
+      # Settings in a real browser, against the real server, in its own database.
+      - run: npx playwright install --with-deps chromium
+      - run: psql -h localhost -U openpurpose -d openpurpose_test -c 'CREATE DATABASE openpurpose_e2e'
+        env:
+          PGPASSWORD: openpurpose
+      - run: npx nx run web:e2e
+        env:
+          E2E_DATABASE_URL: postgres://openpurpose:openpurpose@localhost:5432/openpurpose_e2e

@@ -30,6 +30,11 @@ describe('Settings tabs', () => {
     expect(labels('server', true, false)).toEqual([]);
   });
 
+  it('UC-1/S4 an organization admin sees no Integrations tab for now', () => {
+    const all = tabsFor({ admin: true, serverAdmin: false }).map((tab) => tab.label);
+    expect(all).not.toContain('Integrations');
+  });
+
   it('UC-1/S5 a tab my role can\'t use sends me to Account', () => {
     expect(resolveTab('people', { admin: false, serverAdmin: false })).toBe('account');
     expect(resolveTab('server', { admin: true, serverAdmin: false })).toBe('account');
