@@ -179,6 +179,28 @@ test.describe('Choosing a theme', () => {
 test.describe('Settings on a phone', () => {
   test.use({ viewport: { width: 360, height: 800 } });
 
+  test('a workspace with a long name and slug stays inside its row', async ({ page }) => {
+    const name = `Workspace with a long name and slug ${String(Date.now())}`;
+    await page.goto('/settings/server');
+    await page.locator('input[name=name]').fill(name);
+    await page.locator('input[name=admin]').fill('Pat');
+    await page.getByRole('button', { name: 'Create workspace' }).click();
+    await closeSecret(page);
+    const row = page.locator('.group-list li', { hasText: name });
+    await expect(row).toBeVisible();
+    const past = await row.evaluate((element) => {
+      const edge = element.getBoundingClientRect().right;
+      return [...element.querySelectorAll('*')].filter(
+        (child) => child.getBoundingClientRect().right > edge + 1,
+      ).length;
+    });
+    expect(past).toBe(0);
+    const rowEnd = await row.evaluate((element) => element.getBoundingClientRect().right);
+    expect(rowEnd).toBeLessThanOrEqual(360);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
   test('UC-1/S8 settings fits a phone', async ({ page }) => {
     await page.goto('/settings/account');
     const nav = page.locator('nav.os-settings-nav');
