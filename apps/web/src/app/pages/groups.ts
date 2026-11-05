@@ -1,8 +1,23 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  type ElementRef,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Badge, Button, Control, Field, Callout } from '@openstuff-dev/ui-angular';
+import {
+  Badge,
+  Button,
+  Callout,
+  Control,
+  Field,
+  SectionHeader,
+  SecretDialog,
+} from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { GroupRow } from '../core/models';
 import { Session } from '../core/session';
@@ -14,67 +29,69 @@ import { initials } from '../core/theme';
 /** Server admins: every group (tenant) on this OpenPurpose server. */
 @Component({
   selector: 'app-groups',
-  imports: [Callout, FormsModule, DatePipe, Icon, Button, Field, Control, Badge],
+  imports: [Callout, FormsModule, DatePipe, Icon, Button, Field, Control, Badge, SectionHeader],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'settings-tab' },
   template: `
     <section>
-      <h2>All workspaces</h2>
-      <p class="quiet">
-        Each workspace is walled off from the others in the database: its people, agents and rules
-        never see another workspace's. Use one per company or client. A workspace starts as one
-        organization; its admins can add more later. Export downloads a full backup of a workspace,
-        people included; restore one under Settings › Export and import.
-      </p>
-    </section>
+      <header
+        os-section-header
+        title="All workspaces"
+        description="Each workspace is walled off from the others in the database: its people, agents and rules never see another workspace's. Use one per company or client. A workspace starts as one organization; its admins can add more later. Export downloads a full backup of a workspace, people included; restore one under Settings › Export and import."
+      ></header>
 
-    @if (created(); as c) {
-      <os-callout tone="success" role="alert" title="{{ c.name }} is ready" level="2">
-        @if (c.token) {
-          <p>
-            Give this token to {{ c.admin }}, the workspace's first admin. It is not shown again.
-          </p>
-          <pre><code>{{ c.token }}</code></pre>
-        } @else {
-          <p>You are its first admin. Switch to it to add organizations, people and agents.</p>
-        }
-        <div class="form-actions">
-          <button os-button variant="primary" type="button" (click)="open(c.id)">
-            Open {{ c.name }}
-          </button>
-          <button os-button type="button" (click)="created.set(null)">Done</button>
-        </div>
-      </os-callout>
-    }
-
-    <ul class="group-list">
-      @for (g of groups(); track g.id) {
-        <li>
-          <span class="group-name"
-            ><span class="badge sm group">{{ initials(g.name) }}</span
-            ><strong>{{ g.name }}</strong> <code class="quiet">{{ g.slug }}</code></span
-          >
-          <button os-button size="sm" type="button" (click)="exportGroup(g)">
-            <app-icon name="download" />Export
-          </button>
-          @if (g.id !== session.group()?.id) {
-            <button os-button size="sm" type="button" (click)="open(g.id)">Switch to it</button>
+      @if (created(); as c) {
+        <os-callout tone="success" role="alert" title="{{ c.name }} is ready" level="2">
+          @if (c.admin) {
+            <p>{{ c.admin }} is its first admin.</p>
           } @else {
-            <span os-badge>Current</span>
+            <p>You are its first admin. Switch to it to add organizations, people and agents.</p>
           }
-          <span class="quiet"
-            >{{ g.organizations }} {{ g.organizations === 1 ? 'organization' : 'organizations' }},
-            {{ g.members }} {{ g.members === 1 ? 'member' : 'members' }}, created
-            {{ g.created_at | date: 'd MMM y' }}</span
-          >
-        </li>
+          <div class="form-actions">
+            <button os-button variant="primary" type="button" (click)="open(c.id)">
+              Open {{ c.name }}
+            </button>
+            <button os-button type="button" (click)="created.set(null)">Done</button>
+          </div>
+        </os-callout>
       }
-    </ul>
+
+      <ul class="group-list">
+        @for (g of groups(); track g.id) {
+          <li>
+            <span class="group-name"
+              ><span class="badge sm group">{{ initials(g.name) }}</span
+              ><strong>{{ g.name }}</strong> <code class="quiet">{{ g.slug }}</code></span
+            >
+            <button os-button size="sm" type="button" (click)="exportGroup(g)">
+              <app-icon name="download" />Export
+            </button>
+            @if (g.id !== session.group()?.id) {
+              <button os-button size="sm" type="button" (click)="open(g.id)">Switch to it</button>
+            } @else {
+              <span os-badge>Current</span>
+            }
+            <span class="quiet"
+              >{{ g.organizations }} {{ g.organizations === 1 ? 'organization' : 'organizations' }},
+              {{ g.members }} {{ g.members === 1 ? 'member' : 'members' }}, created
+              {{ g.created_at | date: 'd MMM y' }}</span
+            >
+          </li>
+        }
+      </ul>
+    </section>
 
     <section>
       <h3 class="list-label">New workspace</h3>
       <form class="inline-form os-panel os-panel-body" (ngSubmit)="create()">
         <os-field label="Company or client" class="grow"
-          ><input os-input name="name" [(ngModel)]="draft.name" required placeholder="Contoso"
+          ><input
+            #nameInput
+            os-input
+            name="name"
+            [(ngModel)]="draft.name"
+            required
+            placeholder="Contoso"
         /></os-field>
         <label class="os-field grow"
           ><span class="os-label"
@@ -111,9 +128,9 @@ export class GroupsPage {
   private notices = inject(Notices);
   readonly groups = signal<GroupRow[]>([]);
   readonly initials = initials;
-  readonly created = signal<{ id: string; name: string; admin: string; token?: string } | null>(
-    null,
-  );
+  readonly created = signal<{ id: string; name: string; admin: string } | null>(null);
+  private readonly secretDialog = inject(SecretDialog);
+  private readonly nameInput = viewChild.required<ElementRef<HTMLInputElement>>('nameInput');
 
   draft = { name: '', organization_name: '', admin_name: '' };
 
@@ -140,14 +157,19 @@ export class GroupsPage {
         organization_name: this.draft.organization_name.trim() || undefined,
         admin_name: this.draft.admin_name.trim() || undefined,
       });
-      this.created.set({
-        id: r.group.id,
-        name: r.group.name,
-        admin: this.draft.admin_name.trim(),
-        token: r.token,
-      });
+      const admin = this.draft.admin_name.trim();
+      this.created.set({ id: r.group.id, name: r.group.name, admin });
       this.draft = { name: '', organization_name: '', admin_name: '' };
-      await this.load();
+      void this.load();
+      if (!r.token) return;
+      await this.secretDialog.show({
+        title: `Token for ${admin}`,
+        secret: r.token,
+        what: 'token',
+        instructions: `${admin} is the first admin of ${r.group.name} and signs in with this token, so pass it on somewhere safe.`,
+      });
+      // The button goes disabled once the name is cleared, so focus goes to the name.
+      this.nameInput().nativeElement.focus();
     } catch (e) {
       this.notices.error(e);
     }

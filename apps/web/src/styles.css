@@ -31,12 +31,12 @@ body {
 }
 
 /* Not on buttons: unlayered rules win over @openstuff-dev/ui's layers. */
-a:not(:where(.os-button, .os-tab, .os-menu-item, .os-breadcrumbs a)) {
+a:not(:where(.os-button, .os-tab, .os-menu-item, .os-nav-link, .os-breadcrumbs a)) {
   color: var(--accent-text);
   text-decoration: none;
 }
 
-a:not(:where(.os-button, .os-tab, .os-menu-item, .os-breadcrumbs a)):hover {
+a:not(:where(.os-button, .os-tab, .os-menu-item, .os-nav-link, .os-breadcrumbs a)):hover {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -65,7 +65,7 @@ h1:not(:where(.os-page-title)) {
   letter-spacing: -0.025em;
 }
 
-h2 {
+h2:not(:where(.os-section-header-text > h2)) {
   font-size: var(--fs-md);
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -83,7 +83,12 @@ p:not(
     .os-toast-message,
     .os-empty-state > p,
     .os-page-description,
-    .os-setting-text > p
+    .os-section-header-text > p,
+    .os-setting-card-header > p,
+    .os-setting-text > p,
+    .os-setting-item-title,
+    .os-setting-item-meta,
+    .os-settings-group-label
   )
 ) {
   margin: 0.5rem 0;
@@ -121,7 +126,16 @@ p:not(
  * Labels that aren't toolkit fields, checks, buttons or segments: unlayered rules win over
  * its layers.
  */
-label:not(:where(.os-field, .os-check, .os-button, .os-segmented > label)) {
+label:not(
+  :where(
+    .os-field,
+    .os-check,
+    .os-button,
+    .os-segmented > label,
+    .os-theme-option,
+    .os-setting-text > label
+  )
+) {
   display: block;
   font-weight: 500;
   font-size: var(--fs-sm);
@@ -677,31 +691,18 @@ kbd {
   margin: 0 0 2.5rem;
 }
 
-.block-head {
-  display: flex;
-  align-items: end;
-  gap: 1rem;
+.block > .os-section-header {
   margin-bottom: 0.75rem;
-}
-
-/* Only the title takes the free space; everything after it sits at the end. */
-.block-head > :first-child {
-  margin-right: auto;
 }
 
 .block > h2 {
   margin-bottom: 0.2rem;
 }
 
-.block > h2 + p.quiet,
-.block-head p.quiet {
+.block > h2 + p.quiet {
   margin: 0.15rem 0 0.75rem;
   max-width: 70ch;
   font-size: var(--fs-sm);
-}
-
-.block-head p.quiet {
-  margin-bottom: 0;
 }
 
 .two-col {
@@ -909,7 +910,7 @@ details.snippet summary {
   font-weight: 500;
 }
 
-pre {
+pre:not(:where(.os-code-block pre)) {
   background: var(--sunken);
   padding: 0.85rem 1rem;
   border-radius: var(--r-md);
@@ -1985,199 +1986,66 @@ mark {
 }
 
 /* ─── Settings ─── */
-.settings {
+.settings-tab {
   display: grid;
-  grid-template-columns: 13rem minmax(0, 1fr);
-  gap: 2.5rem;
-  align-items: start;
+  gap: var(--os-space-8);
+  align-content: start;
+  min-inline-size: 0;
 }
 
-.settings-nav {
-  position: sticky;
-  top: 4.5rem;
+/* Sign-ups show only when some wait: nothing of it may take up room in between. */
+app-signups {
+  display: contents;
+}
+
+:is(.settings-tab, app-signups) > section {
   display: grid;
-  gap: 1px;
+  gap: var(--os-space-3);
+  align-content: start;
+  min-inline-size: 0;
 }
 
-.settings-nav .nav-label {
-  padding-top: 0.6rem;
-}
-
-.settings-nav .nav-label:first-child {
-  padding-top: 0;
-}
-
-.settings-nav a {
+/* Saves one value: the field and its button on one line. */
+.setting-save {
   display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.4rem 0.6rem;
-  border-radius: var(--r-sm);
-  color: var(--ink-2);
-  font-weight: 500;
-  font-size: var(--fs-sm);
-}
-
-.settings-nav a .icon {
-  color: var(--muted);
-}
-
-.settings-nav a:hover {
-  background: var(--hover);
-  text-decoration: none;
-}
-
-.settings-nav a.active {
-  background: var(--sunken);
-  color: var(--ink);
-}
-
-.settings-nav a.active .icon {
-  color: var(--accent);
-}
-
-.settings-body > section {
-  margin-bottom: 2.25rem;
-}
-
-.settings-body h2 {
-  font-size: var(--fs-lg);
-  letter-spacing: -0.02em;
-}
-
-.settings-body h2 + .quiet {
-  margin-top: 0.25rem;
-  font-size: var(--fs-sm);
-  max-width: 64ch;
-}
-
-.os-setting-card {
-  margin-top: 1rem;
-}
-
-/* A row whose control needs the full width, such as the theme picker. */
-.os-setting-row.stack {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.os-setting-row form {
-  display: flex;
-  gap: 0.5rem;
+  gap: var(--os-space-2);
   align-items: center;
 }
 
-.os-setting-row form input {
-  width: 16rem;
+.setting-save > input {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  max-inline-size: 20rem;
 }
 
-/* An edit form or the slug rename, under the row's text and actions. */
-.os-setting-row > .full-row {
-  grid-column: 1 / -1;
-  margin: 0;
+/* A form or a picture inside a card, where a row doesn't fit. */
+.setting-card-pad,
+.setting-card-form {
+  padding: var(--os-space-4) var(--os-space-5);
 }
 
-/* An organization: its badge next to the name. */
-.org-row {
+.setting-card-form {
+  display: grid;
+  gap: var(--os-space-4);
+  min-inline-size: 0;
+}
+
+.setting-card-form.setting-save {
   display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  min-width: 0;
 }
 
-.org-row > .os-setting-text {
-  min-width: 0;
+.setting-card-form:not(:first-child),
+.setting-card-form + .os-setting-item {
+  border-block-start: 1px var(--os-border-style) var(--os-border-default);
 }
 
-.theme-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 9.5rem));
-  gap: 0.75rem;
-}
-
-.theme-option {
-  display: grid;
-  gap: 0.55rem;
-  padding: 0.55rem;
-  border: 1px var(--os-border-style) var(--line-strong);
-  border-radius: var(--r-md);
-  background: var(--surface);
-  cursor: pointer;
-  font: inherit;
-  color: var(--ink);
-  text-align: left;
-}
-
-.theme-option[aria-checked='true'] {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
-.theme-option span {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: var(--fs-sm);
-  font-weight: 500;
-}
-
-.theme-swatch {
-  height: 4.25rem;
-  border-radius: 6px;
-  border: 1px var(--os-border-style) var(--line);
-  display: grid;
-  grid-template-columns: 30% 1fr;
-  overflow: hidden;
-}
-
-.theme-swatch i {
-  display: block;
-}
-
-.theme-swatch.light i:first-child {
-  background: var(--swatch-light-bg);
-}
-
-.theme-swatch.light i:last-child {
-  background: var(--swatch-light-surface);
-}
-
-.theme-swatch.dark i:first-child {
-  background: var(--swatch-dark-bg);
-}
-
-.theme-swatch.dark i:last-child {
-  background: var(--swatch-dark-surface);
-}
-
-.theme-swatch.system i:first-child {
-  background: linear-gradient(135deg, var(--swatch-light-bg) 50%, var(--swatch-dark-bg) 50%);
-}
-
-.theme-swatch.system i:last-child {
-  background:
-    linear-gradient(
-      135deg,
-      var(--swatch-light-surface) 50%,
-      var(--swatch-dark-surface) 50%
-    );
-}
-
-.copy-block {
-  position: relative;
+/* An icon or badge in front of a setting item's title. */
+.setting-item-lead {
+  order: -1;
 }
 
 .sprite {
   position: absolute;
-}
-
-.copy-block.wide {
-  width: 100%;
-}
-
-.copy-block .os-button {
-  position: absolute;
-  top: 0.45rem;
-  right: 0.45rem;
 }
 
 .steps {
@@ -2685,43 +2553,19 @@ mark {
   }
 }
 
+.settings-tab > section > .list-label {
+  margin: 0;
+}
+
+.settings-tab > section > :not(.list-label) + .list-label {
+  margin-block-start: var(--os-space-3);
+}
+
 .list-label {
   font-size: var(--fs-sm);
   color: var(--muted);
   font-weight: 500;
   margin: 1.5rem 0 0.5rem;
-}
-
-.settings-body > section:first-child > h2 + .quiet {
-  margin-bottom: 0;
-}
-
-.settings-body :is(app-people, app-groups, app-signups) > section {
-  margin-bottom: 1.25rem;
-}
-
-.settings-body :is(app-people, app-groups, app-signups) > section > h2 + .quiet {
-  margin-top: 0.25rem;
-  font-size: var(--fs-sm);
-}
-
-.settings-body .os-panel {
-  margin-top: 0.5rem;
-}
-
-.os-setting-row > .os-button {
-  justify-self: start;
-}
-
-.os-setting-row h3 code,
-.os-setting-row h3 .os-badge {
-  margin-left: 0.35rem;
-  font-weight: 400;
-}
-
-.os-setting-row h3 .icon {
-  vertical-align: -2px;
-  color: var(--muted);
 }
 
 .tokens .os-button[data-variant='link'] {
@@ -2737,7 +2581,7 @@ mark {
   max-width: 52rem;
 }
 
-.steps pre {
+.steps .os-code-block pre {
   max-height: 18rem;
 }
 
@@ -4772,17 +4616,17 @@ mark {
 }
 
 .transfer-policies .os-check,
-.os-setting-row .os-check {
+.transfer-includes .os-check {
   align-items: flex-start;
 }
 
 .transfer-policies .os-check input,
-.os-setting-row .os-check input[type='checkbox'] {
+.transfer-includes .os-check input[type='checkbox'] {
   margin-top: 0.3rem;
 }
 
 .transfer-policies .quiet,
-.os-setting-row .os-check .quiet {
+.transfer-includes .os-check .quiet {
   display: block;
   font-size: var(--fs-sm);
 }

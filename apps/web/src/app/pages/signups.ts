@@ -13,6 +13,9 @@ import {
   DialogTitle,
   EmptyState,
   Field,
+  SectionHeader,
+  SettingCard,
+  SettingItem,
 } from '@openstuff-dev/ui-angular';
 import type { PendingSignup } from '../core/models';
 import { Signups } from '../core/signups';
@@ -22,6 +25,9 @@ import { Notices } from '../shared/notice';
 @Component({
   selector: 'app-signups',
   imports: [
+    SectionHeader,
+    SettingCard,
+    SettingItem,
     DatePipe,
     FormsModule,
     Button,
@@ -39,31 +45,26 @@ import { Notices } from '../shared/notice';
   template: `
     @if (shown()) {
       <section>
-        <h2>Sign-ups</h2>
-        <p class="quiet">
-          People who signed up wait here until you approve them. Approving gives them a workspace of
-          their own, with them as its admin. They're in the next time they sign in.
-        </p>
+        <header
+          os-section-header
+          title="Sign-ups"
+          description="People who signed up wait here until you approve them. Approving gives them a workspace of their own, with them as its admin. They're in the next time they sign in."
+        ></header>
         @if (signups.pending().length) {
-          <div class="os-setting-card">
+          <div os-setting-card>
             @for (s of signups.pending(); track s.id) {
-              <div class="os-setting-row" data-inline>
-                <div class="os-setting-text">
-                  <h3>{{ s.name }}</h3>
-                  <p>
-                    {{ s.email ?? 'No email' }} · {{ signedInWith(s) }} · signed up
-                    {{ s.signup_at | date: 'd MMM y, HH:mm' }}
-                  </p>
-                </div>
-                <div class="form-actions">
-                  <button os-button variant="primary" size="sm" type="button" (click)="start(s)">
-                    Approve
-                  </button>
-                  <button os-button variant="ghost" size="sm" type="button" (click)="reject(s)">
-                    Reject
-                  </button>
-                </div>
-              </div>
+              <os-setting-item [title]="s.name">
+                <p os-setting-item-meta class="os-setting-item-meta">
+                  {{ s.email ?? 'No email' }} · {{ signedInWith(s) }} · signed up
+                  {{ s.signup_at | date: 'd MMM y, HH:mm' }}
+                </p>
+                <button os-button variant="primary" size="sm" type="button" (click)="start(s)">
+                  Approve
+                </button>
+                <button os-button variant="ghost" size="sm" type="button" (click)="reject(s)">
+                  Reject
+                </button>
+              </os-setting-item>
             }
           </div>
         } @else {

@@ -101,7 +101,7 @@ export const routes: Routes = [
       {
         path: 'settings/:tab',
         title: 'Settings',
-        loadComponent: () => import('./pages/settings').then((m) => m.SettingsPage),
+        loadComponent: () => import('./pages/settings/settings').then((m) => m.SettingsPage),
       },
       { path: 'people', redirectTo: 'settings/people' },
       { path: 'groups', redirectTo: 'settings/server' },

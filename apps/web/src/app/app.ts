@@ -30,7 +30,7 @@ import { isPublicUrl } from './app.routes';
 import { type AuthStatus, ROLE_LABEL } from './core/models';
 import { Session, errorMessage } from './core/session';
 import { ContextSwitch } from './core/switch';
-import { Theme, initials } from './core/theme';
+import { initials } from './core/theme';
 import { Icon } from './shared/icon';
 import { Notices } from './shared/notice';
 import { Palette } from './shared/palette';
@@ -354,7 +354,6 @@ export class App {
   private router = inject(Router);
   private switcher = inject(ContextSwitch);
   readonly badges = inject(Badges);
-  readonly theme = inject(Theme);
   readonly railOpen = signal(false);
   readonly loadError = signal('');
   /** Set while the person signed in is waiting for a server admin to approve their sign-up. */
