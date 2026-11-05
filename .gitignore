@@ -23,3 +23,4 @@ OPENSTUFF_HANDOFF.md
 
 # Home deploy: backups stay on the home server
 deploy/backups/
+test-results.xml
