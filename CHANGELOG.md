@@ -3,6 +3,21 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.4.5
+
+No migrations.
+
+### Web app
+
+- Settings is rebuilt on the shared toolkit parts and fits a phone. Each tab has its own address, such as `/settings/account`.
+- A new token opens in a dialog you can't miss, which stays until you say you've copied it. The agent commands no longer have the token filled in, so paste it yourself.
+- A workspace with a long name no longer pushes All workspaces past the edge of a phone screen. The button on a new workspace's callout now says "Open workspace".
+- Moved onto `@openstuff-dev/ui` and `ui-angular` 0.1.6.
+
+### Image
+
+- Every published version now has its description on its GHCR package page.
+
 ## 0.4.4
 
 No migrations.
