@@ -18,6 +18,7 @@ import { buildGraph, relatedTo, type Related } from '../src/service/graph.js';
 import { sectionActivitySql } from '../src/service/activity.js';
 import { createServer } from 'node:http';
 import { BILLING_SWAGGER_YAML, ORDER_API } from '../src/demo-specs.js';
+import { vaultFor } from '@openstuff-dev/server';
 
 const DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
@@ -136,6 +137,68 @@ afterAll(async () => {
   // Unset when beforeAll failed early.
   await (app as FastifyInstance | undefined)?.close();
   await (pool as Pool | undefined)?.end();
+});
+
+// Keep this block before 'upgrade from v1': that block drops the schema, so the shared admin
+// token above no longer exists after it and every request would answer 401.
+describe('UC-5 server connections', () => {
+  it('UC-5/S6 never returns a saved signing secret, on the page or in an export', async () => {
+    const secret = 'sig_test_signing_secret_7d31a9c4';
+    const sealed = vaultFor('test-key-for-openpurpose-server-connections').seal(secret);
+    await pool.query(
+      `INSERT INTO server_integrations (kind, url, public_key, signing_secret_encrypted)
+       VALUES ('openannounce', 'https://announce.example.com', 'pk_test_public', $1)
+       ON CONFLICT (kind) DO UPDATE SET signing_secret_encrypted = EXCLUDED.signing_secret_encrypted`,
+      [sealed],
+    );
+    const list = await api('GET', '/admin/integrations');
+    expect(list.status).toBe(200);
+    expect(JSON.stringify(list.data)).not.toContain(secret);
+    expect(JSON.stringify(list.data)).toContain('pk_test_public');
+
+    const exported = await api('GET', '/export');
+    expect(exported.status).toBe(200);
+    expect(JSON.stringify(exported.data)).not.toContain(secret);
+    expect(JSON.stringify(exported.data)).not.toContain('signing_secret');
+  });
+
+  it('UC-5/S6 refuses a request with no sign-in', async () => {
+    const res = await fetch(`${base}/api/admin/integrations`);
+    expect(res.status).toBe(401);
+  });
+
+  it('UC-5/S6 refuses an organization admin, who is not a server admin', async () => {
+    const me = await api('GET', '/me');
+    const orgId = me.data.organizations[0].id as string;
+    const made = await api('POST', '/members', {
+      name: 'Org Admin',
+      kind: 'human',
+      organization_id: orgId,
+      role: 'admin',
+    });
+    expect(made.status).toBe(201);
+    const orgAdmin: Who = { token: made.data.token };
+    try {
+      expect((await api('GET', '/admin/integrations', undefined, orgAdmin)).status).toBe(403);
+      expect(
+        (
+          await api(
+            'PUT',
+            '/admin/integrations/openannounce',
+            { url: 'https://announce.example.com', publicKey: 'pk_x' },
+            orgAdmin,
+          )
+        ).status,
+      ).toBe(403);
+    } finally {
+      // Later tests count the members, so take this one back out.
+      await pool.query(
+        `DELETE FROM api_tokens WHERE actor_id IN (SELECT id FROM actors WHERE name = 'Org Admin');
+         DELETE FROM memberships WHERE actor_id IN (SELECT id FROM actors WHERE name = 'Org Admin');
+         DELETE FROM actors WHERE name = 'Org Admin';`,
+      );
+    }
+  });
 });
 
 describe('OpenPurpose with groups and organizations', () => {

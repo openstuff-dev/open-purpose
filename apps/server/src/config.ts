@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SignupMode } from '@openpurpose/contracts';
+import type { FetchPolicy } from '@openstuff-dev/server';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -31,6 +32,19 @@ export interface Config {
    * anyone (warned about at startup). Off by default.
    */
   trustProxy: boolean | string;
+  /** Encrypts saved connection secrets. Without one, a key is made and kept in the database. */
+  secretKey: string | undefined;
+  /** OpenVersion and OpenAnnounce this server connects to. Set here, they win over the tab. */
+  openVersion: { url: string | undefined; publicKey: string | undefined };
+  openAnnounce: {
+    url: string | undefined;
+    publicKey: string | undefined;
+    signingSecret: string | undefined;
+  };
+  /** `private` lets this server call internal addresses, such as an OpenVersion on your network. */
+  fetch: 'public' | 'private';
+  /** With `private`: only these hosts. Empty means any. */
+  fetchAllow: string[];
 }
 
 const SIGNUP_MODES: SignupMode[] = ['off', 'approval', 'open'];
@@ -97,8 +111,30 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     importMaxBytes: Number(env.OPENPURPOSE_IMPORT_MAX_MB ?? 100) * 1024 * 1024,
     auth,
     trustProxy: trustProxy(env.OPENPURPOSE_TRUST_PROXY),
+    secretKey: env.OPENPURPOSE_SECRET_KEY || undefined,
+    openVersion: {
+      url: env.OPENPURPOSE_OPENVERSION_URL?.replace(/\/$/, '') || undefined,
+      publicKey: env.OPENPURPOSE_OPENVERSION_PUBLIC_KEY || undefined,
+    },
+    openAnnounce: {
+      url: env.OPENPURPOSE_OPENANNOUNCE_URL?.replace(/\/$/, '') || undefined,
+      publicKey: env.OPENPURPOSE_OPENANNOUNCE_PUBLIC_KEY || undefined,
+      signingSecret: env.OPENPURPOSE_OPENANNOUNCE_SIGNING_SECRET || undefined,
+    },
+    fetch: env.OPENPURPOSE_FETCH === 'private' ? 'private' : 'public',
+    fetchAllow: (env.OPENPURPOSE_FETCH_ALLOW ?? '')
+      .split(',')
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean),
   };
 }
+
+/** The fetch policy integrations use, from OPENPURPOSE_FETCH and OPENPURPOSE_FETCH_ALLOW. */
+export const integrationFetchPolicy = (config: Config): FetchPolicy => ({
+  mode: config.fetch,
+  allow: config.fetchAllow,
+  envPrefix: 'OPENPURPOSE',
+});
 
 function trustProxy(value: string | undefined): boolean | string {
   const v = (value ?? '').trim();

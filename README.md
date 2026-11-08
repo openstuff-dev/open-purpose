@@ -254,6 +254,11 @@ connection is IPv6 only unless you buy the IPv4 add-on.
 | `OPENPURPOSE_SIGNUP` | `off` | `off`, `approval` or `open` |
 | `OPENPURPOSE_SUPABASE_URL`, `OPENPURPOSE_SUPABASE_KEY` | empty | the Supabase project URL and its publishable key |
 | `OPENPURPOSE_SITE_URL` | empty | your public website, linked from the sign-in page |
+| `OPENPURPOSE_SECRET_KEY` | generated, kept in the database | encrypts saved connection secrets. Set it yourself so a database dump alone can't reveal them |
+| `OPENPURPOSE_OPENVERSION_URL`, `OPENPURPOSE_OPENVERSION_PUBLIC_KEY` | empty | the OpenVersion this server connects to. Set here, it wins over the Integrations tab and shows read-only |
+| `OPENPURPOSE_OPENANNOUNCE_URL`, `OPENPURPOSE_OPENANNOUNCE_PUBLIC_KEY`, `OPENPURPOSE_OPENANNOUNCE_SIGNING_SECRET` | empty | the OpenAnnounce this server connects to, same rules as above |
+| `OPENPURPOSE_FETCH` | `public` | `private` lets the server call internal addresses for connections (such as an OpenVersion on your network) |
+| `OPENPURPOSE_FETCH_ALLOW` | empty | with `private`: only these hosts (`versions.internal,10.0.0.0/8`). Empty means any |
 | `OPENPURPOSE_SESSION_DAYS` | `30` | how long a browser stays signed in |
 
 Migrations run automatically on start.
