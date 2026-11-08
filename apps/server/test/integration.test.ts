@@ -18,6 +18,7 @@ import { buildGraph, relatedTo, type Related } from '../src/service/graph.js';
 import { sectionActivitySql } from '../src/service/activity.js';
 import { createServer } from 'node:http';
 import { BILLING_SWAGGER_YAML, ORDER_API } from '../src/demo-specs.js';
+import { vaultFor } from '@openstuff-dev/server';
 
 const DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
@@ -136,6 +137,33 @@ afterAll(async () => {
   // Unset when beforeAll failed early.
   await (app as FastifyInstance | undefined)?.close();
   await (pool as Pool | undefined)?.end();
+});
+
+describe('UC-5 server connections', () => {
+  it('UC-5/S6 never returns a saved signing secret, on the page or in an export', async () => {
+    const secret = 'sig_test_signing_secret_7d31a9c4';
+    const sealed = vaultFor('test-key-for-openpurpose-server-connections').seal(secret);
+    await pool.query(
+      `INSERT INTO server_integrations (kind, url, public_key, signing_secret_encrypted)
+       VALUES ('openannounce', 'https://announce.example.com', 'pk_test_public', $1)
+       ON CONFLICT (kind) DO UPDATE SET signing_secret_encrypted = EXCLUDED.signing_secret_encrypted`,
+      [sealed],
+    );
+    const list = await api('GET', '/admin/integrations');
+    expect(list.status).toBe(200);
+    expect(JSON.stringify(list.data)).not.toContain(secret);
+    expect(JSON.stringify(list.data)).toContain('pk_test_public');
+
+    const exported = await api('GET', '/export');
+    expect(exported.status).toBe(200);
+    expect(JSON.stringify(exported.data)).not.toContain(secret);
+    expect(JSON.stringify(exported.data)).not.toContain('signing_secret');
+  });
+
+  it('UC-5/S6 refuses a request with no sign-in', async () => {
+    const res = await fetch(`${base}/api/admin/integrations`);
+    expect(res.status).toBe(401);
+  });
 });
 
 describe('OpenPurpose with groups and organizations', () => {

@@ -21,7 +21,7 @@ import {
 } from './auth.js';
 import { createProvider, SignInError } from './auth/providers/index.js';
 import { clientKey, RateLimiter } from './auth/rate-limit.js';
-import type { Config } from './config.js';
+import { type Config, integrationFetchPolicy } from './config.js';
 import { endScope, type Pool } from './db.js';
 import { cacheControl } from './domain/cache.js';
 import { AppError, badRequest } from './errors.js';
@@ -48,6 +48,8 @@ import * as signin from './service/signin.js';
 import { deleteAlias, listAliases } from './service/aliases.js';
 import { renameSlug } from './service/slugs.js';
 import { DEFAULT_INCLUDES, exportContent } from './service/transfer/export.js';
+import { integrationOffers } from './integrations.js';
+import { loadVault, registerIntegrationRoutes, type Vault } from '@openstuff-dev/server';
 import { importAsGroup, importContent } from './service/transfer/import.js';
 import { exportZip, readExportZip } from './service/transfer/markdown.js';
 import { DOC_KINDS, EDIT_MODES } from './service/types.js';
@@ -170,6 +172,41 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
   app.decorateRequest('db', null as unknown as pg.PoolClient);
   app.decorateRequest('scopeOpen', false);
   app.decorateRequest('person', null);
+
+  // Server-wide connections (OpenVersion, OpenAnnounce), server admins only. The package's routes
+  // check `isServerAdmin` synchronously, so this scope resolves the token first.
+  // The key is opened on first use, so a server that never saves a connection doesn't need one.
+  let vault: Promise<Vault> | undefined;
+  const openVault = () => {
+    vault ??= loadVault(pool, {
+      secret: config.secretKey,
+      envName: 'OPENPURPOSE_SECRET_KEY',
+      settingName: 'secret_key',
+      log: app.log,
+    }).catch((err: unknown) => {
+      vault = undefined;
+      throw err;
+    });
+    return vault;
+  };
+  // Fastify waits for an async plugin, even one without an await.
+  // eslint-disable-next-line @typescript-eslint/require-await
+  await app.register(async (integrations) => {
+    integrations.addHook('preHandler', async (req) => {
+      // The public configuration (/api/client-config) needs no sign-in.
+      if (!req.url.startsWith('/api/admin/integrations')) return;
+      req.actor = await actorFromToken(pool, bearer(req.headers.authorization));
+    });
+    registerIntegrationRoutes(integrations, {
+      db: pool,
+      vault: openVault,
+      policy: integrationFetchPolicy(config),
+      origin: new URL(config.publicUrl).origin,
+      appName: 'OpenPurpose',
+      offers: integrationOffers(config),
+      isServerAdmin: (req) => req.actor.is_superadmin && req.actor.kind === 'human',
+    });
+  });
 
   app.get('/api/health', async () => {
     await pool.query('SELECT 1');
