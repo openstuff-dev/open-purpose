@@ -2,6 +2,11 @@ import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject, untracked } from '@angular/core';
 import { GetCache, type OnFresh, type StoreOptions } from './get-cache';
 import { Session } from './session';
+import type {
+  ServerConnection,
+  ServerConnectionInput,
+  ServerConnectionTest,
+} from '@openstuff-dev/ui-angular';
 
 export type { OnFresh } from './get-cache';
 import { firstValueFrom, type Observable } from 'rxjs';
@@ -135,6 +140,17 @@ export class Api {
       this.forget();
     });
   }
+
+  // server connections (Settings › Integrations), for server admins: @openstuff-dev/server's routes
+  serverConnections = () => this.get<ServerConnection[]>('/admin/integrations', {}, 'live');
+  saveServerConnection = (kind: string, body: ServerConnectionInput) =>
+    this.send<ServerConnection>('PUT', `/admin/integrations/${kind}`, body);
+
+  testServerConnection = (kind: string) =>
+    this.send<ServerConnectionTest>('POST', `/admin/integrations/${kind}/test`, {});
+
+  removeServerConnection = (kind: string) =>
+    this.send<undefined>('DELETE', `/admin/integrations/${kind}`);
 
   // signing in: config, start and exchange need no token
   authConfig = () => this.get<AuthConfig>('/auth/config', {}, { maxAge: Infinity });

@@ -3,7 +3,15 @@
  * read this list, and the server still decides what each person may change.
  */
 export type SettingsTabId =
-  'account' | 'appearance' | 'connect' | 'test' | 'workspace' | 'people' | 'transfer' | 'server';
+  | 'account' |
+  'appearance' |
+  'connect' |
+  'test' |
+  'workspace' |
+  'people' |
+  'integrations' |
+  'transfer' |
+  'server';
 
 export type SettingsGroupId = 'you' | 'tenant' | 'server';
 
@@ -28,12 +36,15 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { id: 'test', label: 'Test a repository', icon: 'eye', group: 'you' },
   { id: 'workspace', label: 'Organizations', icon: 'building', group: 'tenant' },
   { id: 'people', label: 'People and agents', icon: 'users', group: 'tenant' },
+  { id: 'integrations', label: 'Integrations', icon: 'plug', group: 'tenant' },
   { id: 'transfer', label: 'Export and import', icon: 'transfer', group: 'tenant' },
   { id: 'server', label: 'All workspaces', icon: 'server', group: 'server' },
 ];
 
 export function tabsFor(access: SettingsAccess): SettingsTab[] {
-  return SETTINGS_TABS.filter(({ group }) => {
+  return SETTINGS_TABS.filter(({ id, group }) => {
+    // Only server connections for now, so only server admins see Integrations.
+    if (id === 'integrations') return access.serverAdmin;
     if (group === 'tenant') return access.admin;
     if (group === 'server') return access.serverAdmin;
     return true;
