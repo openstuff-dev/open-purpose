@@ -32,7 +32,7 @@ describe('server connections from configuration', () => {
     expect(loadConfig({}).appVersion).toBe('unknown');
   });
 
-  it('UC-5/S5 keeps the OpenAnnounce signing secret out of the OpenVersion offer', () => {
+  it('UC-6/S4 offers the OpenAnnounce environment connection, its secret kept out of the OpenVersion offer', () => {
     const config = loadConfig({
       OPENPURPOSE_OPENANNOUNCE_URL: 'https://news.example.com',
       OPENPURPOSE_OPENANNOUNCE_PUBLIC_KEY: 'pk_news',

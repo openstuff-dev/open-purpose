@@ -18,7 +18,8 @@ import { buildGraph, relatedTo, type Related } from '../src/service/graph.js';
 import { sectionActivitySql } from '../src/service/activity.js';
 import { createServer } from 'node:http';
 import { BILLING_SWAGGER_YAML, ORDER_API } from '../src/demo-specs.js';
-import { vaultFor } from '@openstuff-dev/server';
+import { makeConnectionString, type ServerIntegration, vaultFor } from '@openstuff-dev/server';
+import { type StandIn, standInOpenAnnounce, standInOpenVersion } from '@openstuff-dev/server/testing';
 import { verifyUser } from '@openstuff-dev/announce/server';
 
 const DATABASE_URL =
@@ -145,7 +146,7 @@ afterAll(async () => {
 // Keep this block before 'upgrade from v1': that block drops the schema, so the shared admin
 // token above no longer exists after it and every request would answer 401.
 describe('UC-5 server connections', () => {
-  it('UC-5/S6 never returns a saved signing secret, on the page or in an export', async () => {
+  it('UC-6/S5 never returns a saved signing secret, on the page or in an export', async () => {
     const secret = 'sig_test_signing_secret_7d31a9c4';
     const sealed = vaultFor('test-key-for-openpurpose-server-connections').seal(secret);
     await pool.query(
@@ -189,12 +190,12 @@ describe('UC-5 server connections', () => {
     }
   });
 
-  it('UC-5/S6 refuses a request with no sign-in', async () => {
+  it('UC-5/S6 UC-6/S5 refuses a request with no sign-in', async () => {
     const res = await fetch(`${base}/api/admin/integrations`);
     expect(res.status).toBe(401);
   });
 
-  it('UC-5/S6 refuses an organization admin, who is not a server admin', async () => {
+  it('UC-5/S6 UC-6/S5 refuses an organization admin, who is not a server admin', async () => {
     const me = await api('GET', '/me');
     const orgId = me.data.organizations[0].id as string;
     const made = await api('POST', '/members', {
@@ -224,6 +225,165 @@ describe('UC-5 server connections', () => {
          DELETE FROM memberships WHERE actor_id IN (SELECT id FROM actors WHERE name = 'Org Admin');
          DELETE FROM actors WHERE name = 'Org Admin';`,
       );
+    }
+  });
+});
+
+// Before 'upgrade from v1' too: it needs the admin token. A second server on the same database
+// may reach the stand-ins on 127.0.0.1, as a self-hosted one with OPENPURPOSE_FETCH=private would.
+describe('UC-5 and UC-6 connecting by pasting a connection string', () => {
+  const PURPOSE = 'https://purpose.example.com';
+  const KEY = 'pk_purpose_app_12345678';
+  const DEPLOY = 'ov_purpose_deploy_12345678';
+  const FEED_KEY = 'pk_purpose_feed_12345678';
+  const SIGNING = 'sig_purpose_paste_secret_4c7e';
+  let wired: FastifyInstance;
+  let wiredBase: string;
+  let ov: StandIn;
+  let oa: StandIn;
+
+  const send = (method: string, path: string, body?: unknown) =>
+    fetch(`${wiredBase}/api${path}`, {
+      method,
+      headers: {
+        authorization: `Bearer ${ADMIN}`,
+        ...(body ? { 'content-type': 'application/json' } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  const put = async (kind: string, connectionString: string) => {
+    const res = await send('PUT', `/admin/integrations/${kind}`, { connectionString });
+    const text = await res.text();
+    return { status: res.status, text, card: JSON.parse(text) as ServerIntegration };
+  };
+
+  beforeAll(async () => {
+    ov = await standInOpenVersion({
+      publicKey: KEY,
+      deployToken: DEPLOY,
+      allowedOrigins: [PURPOSE],
+    });
+    oa = await standInOpenAnnounce({ publicKey: FEED_KEY, allowedOrigins: [PURPOSE] });
+    wired = await buildApp(pool, {
+      ...loadConfig({ OPENPURPOSE_FETCH: 'private', OPENPURPOSE_PUBLIC_URL: PURPOSE }),
+      databaseUrl: DATABASE_URL,
+      webDir: '/nonexistent',
+      secretKey: 'test-key-for-openpurpose-server-connections',
+    });
+    await wired.listen({ port: 0, host: '127.0.0.1' });
+    const addr = wired.server.address();
+    wiredBase = `http://127.0.0.1:${typeof addr === 'object' && addr ? addr.port : 0}`;
+  });
+
+  afterAll(async () => {
+    await pool.query('DELETE FROM server_integrations');
+    await wired.close();
+    await ov.close();
+    await oa.close();
+  });
+
+  it('UC-5/S1 one paste of an OpenVersion string connects it, tested with this server’s origin', async () => {
+    ov.requests.length = 0;
+    const saved = await put(
+      'openversion',
+      makeConnectionString('openversion', { url: ov.url, publicKey: KEY, deployToken: DEPLOY }),
+    );
+    expect(saved.status).toBe(200);
+    expect(saved.card).toMatchObject({ status: 'connected', hasDeployToken: true, source: 'database' });
+    expect(saved.text).not.toContain(DEPLOY);
+    const versionCheck = ov.requests.find((r) => r.path.startsWith('/api/v1/version'));
+    expect(versionCheck?.headers.origin).toBe(PURPOSE);
+  });
+
+  it('UC-5/S2 an unknown key, a blocked origin or a silent address says what to fix', async () => {
+    const unknown = await put(
+      'openversion',
+      makeConnectionString('openversion', { url: ov.url, publicKey: 'pk_unknown_12345678' }),
+    );
+    expect(unknown.card.message).toContain('OpenVersion doesn’t recognise this public key');
+
+    const strict = await standInOpenVersion({ publicKey: KEY, allowedOrigins: ['https://else.example.com'] });
+    const blocked = await put('openversion', makeConnectionString('openversion', { url: strict.url, publicKey: KEY }));
+    await strict.close();
+    expect(blocked.card.message).toContain(`Add ${PURPOSE} to allowed origins in OpenVersion`);
+    expect(blocked.card.copy).toBe(PURPOSE);
+
+    const down = await put('openversion', makeConnectionString('openversion', { url: strict.url, publicKey: KEY }));
+    expect(down.card.message).toContain('That address didn’t answer');
+  });
+
+  it('UC-5/S2 UC-6/S2 a connection string from the other product is refused by name', async () => {
+    const intoVersion = await put('openversion', makeConnectionString('openannounce', { url: oa.url, publicKey: FEED_KEY }));
+    expect(intoVersion.status).toBe(400);
+    expect(intoVersion.text).toContain('That’s a connection string from OpenAnnounce. Paste one from OpenVersion.');
+    const intoAnnounce = await put('openannounce', makeConnectionString('openversion', { url: ov.url, publicKey: KEY }));
+    expect(intoAnnounce.status).toBe(400);
+    expect(intoAnnounce.text).toContain('That’s a connection string from OpenVersion. Paste one from OpenAnnounce.');
+  });
+
+  it('UC-6/S1 one paste of an OpenAnnounce string connects it, and the web app gets it without a restart', async () => {
+    const saved = await put(
+      'openannounce',
+      makeConnectionString('openannounce', { url: oa.url, publicKey: FEED_KEY, signingSecret: SIGNING }),
+    );
+    expect(saved.card).toMatchObject({ status: 'connected', hasSigningSecret: true });
+    const client = await fetch(`${wiredBase}/api/client-config`);
+    const text = await client.text();
+    expect(JSON.parse(text)).toMatchObject({ openannounce: { url: oa.url, publicKey: FEED_KEY } });
+    expect(text).not.toContain(SIGNING);
+  });
+
+  it('UC-6/S2 a key OpenAnnounce doesn’t know, or an origin it doesn’t allow, says what to fix', async () => {
+    const unknown = await put(
+      'openannounce',
+      makeConnectionString('openannounce', { url: oa.url, publicKey: 'pk_unknown_12345678' }),
+    );
+    expect(unknown.card.message).toContain('OpenAnnounce doesn’t recognise this public key');
+
+    const strict = await standInOpenAnnounce({ publicKey: FEED_KEY, allowedOrigins: ['https://else.example.com'] });
+    const blocked = await put('openannounce', makeConnectionString('openannounce', { url: strict.url, publicKey: FEED_KEY }));
+    await strict.close();
+    expect(blocked.card.message).toContain(`Add ${PURPOSE} to allowed origins in OpenAnnounce`);
+    expect(blocked.card.copy).toBe(PURPOSE);
+  });
+
+  it('UC-6/S3 connected with no signing secret, the card says none is saved and nobody gets a token', async () => {
+    await pool.query("DELETE FROM server_integrations WHERE kind = 'openannounce'");
+    const saved = await put('openannounce', makeConnectionString('openannounce', { url: oa.url, publicKey: FEED_KEY }));
+    expect(saved.card).toMatchObject({ status: 'connected', hasSigningSecret: false });
+    const token = await fetch(`${wiredBase}/api/openannounce-token`, { headers: { authorization: `Bearer ${ADMIN}` } });
+    expect(token.status).toBe(204);
+  });
+
+  it('UC-5/S5 UC-6/S4 a connection the server’s variables set is read-only on the card', async () => {
+    const fromEnv = await buildApp(pool, {
+      ...loadConfig({
+        OPENPURPOSE_OPENVERSION_URL: 'https://versions.example.com',
+        OPENPURPOSE_OPENVERSION_PUBLIC_KEY: 'pk_env_version_1234',
+        OPENPURPOSE_OPENANNOUNCE_URL: 'https://news.example.com',
+        OPENPURPOSE_OPENANNOUNCE_PUBLIC_KEY: 'pk_env_news_1234',
+        OPENPURPOSE_OPENANNOUNCE_SIGNING_SECRET: 'sig_env_news_secret',
+      }),
+      databaseUrl: DATABASE_URL,
+      webDir: '/nonexistent',
+      secretKey: 'test-key-for-openpurpose-server-connections',
+    });
+    try {
+      const headers = { authorization: `Bearer ${ADMIN}` };
+      const list = await fromEnv.inject({ method: 'GET', url: '/api/admin/integrations', headers });
+      expect(list.body).not.toContain('sig_env_news_secret');
+      for (const kind of ['openversion', 'openannounce']) {
+        expect(list.json()).toContainEqual(expect.objectContaining({ kind, status: 'set-by-server' }));
+        const save = await fromEnv.inject({
+          method: 'PUT',
+          url: `/api/admin/integrations/${kind}`,
+          headers,
+          payload: { url: 'https://other.example.com', publicKey: 'pk_other_12345678' },
+        });
+        expect(save.statusCode).toBe(409);
+      }
+    } finally {
+      await fromEnv.close();
     }
   });
 });
