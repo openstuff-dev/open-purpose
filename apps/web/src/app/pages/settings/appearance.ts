@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { SectionHeader, SettingCard, ThemePicker } from '@openstuff-dev/ui-angular';
+import { SectionHeader, SettingCard, SettingCardBody, ThemePicker } from '@openstuff-dev/ui-angular';
 
 @Component({
   selector: 'app-settings-appearance',
-  imports: [SectionHeader, SettingCard, ThemePicker],
+  imports: [SectionHeader, SettingCard, SettingCardBody, ThemePicker],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'settings-tab' },
   template: `
@@ -14,7 +14,7 @@ import { SectionHeader, SettingCard, ThemePicker } from '@openstuff-dev/ui-angul
         description="Stored in this browser only. Other devices keep their own choice."
       ></header>
       <div os-setting-card>
-        <div class="setting-card-pad"><os-theme-picker /></div>
+        <div os-setting-card-body><os-theme-picker /></div>
       </div>
     </section>
   `,

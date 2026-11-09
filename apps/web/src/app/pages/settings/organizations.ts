@@ -16,6 +16,7 @@ import {
   Field,
   SectionHeader,
   SettingCard,
+  SettingCardBody,
   SettingItem,
   SettingRow,
 } from '@openstuff-dev/ui-angular';
@@ -39,6 +40,7 @@ import { SlugRenameField } from '../../shared/slug-rename';
     Icon,
     SectionHeader,
     SettingCard,
+    SettingCardBody,
     SettingItem,
     SettingRow,
     SlugRenameField,
@@ -112,7 +114,7 @@ import { SlugRenameField } from '../../shared/slug-rename';
       <div os-setting-card>
         @for (o of manageableOrgs(); track o.id) {
           @if (editingOrg() === o.id) {
-            <div class="setting-card-form">
+            <div os-setting-card-body>
               <form class="inline-form" (ngSubmit)="saveOrg(o)">
                 <os-field label="Name" class="grow"
                   ><input os-input name="oname" [(ngModel)]="orgDraft.name" required
@@ -203,7 +205,7 @@ import { SlugRenameField } from '../../shared/slug-rename';
           }
         }
         @if (session.canAdmin(null)) {
-          <div class="setting-card-form">
+          <div os-setting-card-body>
             @if (addingOrg()) {
               <form class="inline-form" (ngSubmit)="createOrg()">
                 <os-field label="Name" class="grow"

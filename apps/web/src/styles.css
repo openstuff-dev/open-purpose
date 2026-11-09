@@ -2022,25 +2022,9 @@ app-signups {
   max-inline-size: 20rem;
 }
 
-/* A form or a picture inside a card, where a row doesn't fit. */
-.setting-card-pad,
-.setting-card-form {
-  padding: var(--os-space-4) var(--os-space-5);
-}
-
-.setting-card-form {
-  display: grid;
-  gap: var(--os-space-4);
-  min-inline-size: 0;
-}
-
-.setting-card-form.setting-save {
+/* A form with its button on one line, in a card body. */
+.os-setting-card-body.setting-save {
   display: flex;
-}
-
-.setting-card-form:not(:first-child),
-.setting-card-form + .os-setting-item {
-  border-block-start: 1px var(--os-border-style) var(--os-border-default);
 }
 
 /* An icon or badge in front of a setting item's title. */

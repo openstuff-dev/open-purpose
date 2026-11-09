@@ -15,15 +15,16 @@ import {
   ConfirmDialog,
   Control,
   EmptyState,
-  SectionHeader,
   SecretDialog,
+  SectionHeader,
   SettingCard,
+  SettingCardBody,
   SettingItem,
   SettingRow,
   Skeleton,
+  slowLoading,
 } from '@openstuff-dev/ui-angular';
 import { Api } from '../../core/api';
-import { slowLoading } from '../../core/loading';
 import type { TokenRow } from '../../core/models';
 import { Session, errorMessage } from '../../core/session';
 import { Icon } from '../../shared/icon';
@@ -41,6 +42,7 @@ import { Notices } from '../../shared/notice';
     Icon,
     SectionHeader,
     SettingCard,
+    SettingCardBody,
     SettingItem,
     SettingRow,
     Skeleton,
@@ -119,7 +121,7 @@ import { Notices } from '../../shared/notice';
             }
           </os-setting-item>
         }
-        <form class="setting-card-form setting-save" (ngSubmit)="newToken()">
+        <form os-setting-card-body class="setting-save" (ngSubmit)="newToken()">
           <input
             #labelInput
             os-input

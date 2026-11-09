@@ -16,6 +16,7 @@ import {
   FormActionsNote,
   SectionHeader,
   SettingCard,
+  SettingCardBody,
   SettingCardFooter,
   SettingItem,
   SettingRow,
@@ -97,6 +98,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
     FormActionsNote,
     SectionHeader,
     SettingCard,
+    SettingCardBody,
     SettingCardFooter,
     SettingItem,
     SettingRow,
@@ -392,7 +394,7 @@ async function readUpload(file: File): Promise<ImportUpload> {
                   }
                 </div>
               </os-setting-item>
-              <div class="setting-card-form transfer-policies">
+              <div os-setting-card-body class="transfer-policies">
                 <label os-check
                   ><input
                     os-checkbox
