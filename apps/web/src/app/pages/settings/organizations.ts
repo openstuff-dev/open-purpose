@@ -48,7 +48,11 @@ import { SlugRenameField } from '../../shared/slug-rename';
   template: `
     @if (session.canAdmin(null) && session.groupShown()) {
       <section>
-        <header os-section-header title="Workspace"></header>
+        <header
+          os-section-header
+          title="Workspace"
+          description="The workspace holds your organizations. Its rules apply to every project in them."
+        ></header>
         <div os-setting-card>
           <os-setting-row
             label="Workspace name"

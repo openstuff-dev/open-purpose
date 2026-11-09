@@ -1,19 +1,31 @@
-import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  type ElementRef,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   Button,
+  Callout,
   ConfirmDialog,
   Control,
+  EmptyState,
   SectionHeader,
   SecretDialog,
   SettingCard,
   SettingItem,
   SettingRow,
+  Skeleton,
 } from '@openstuff-dev/ui-angular';
 import { Api } from '../../core/api';
+import { slowLoading } from '../../core/loading';
 import type { TokenRow } from '../../core/models';
-import { Session } from '../../core/session';
+import { Session, errorMessage } from '../../core/session';
 import { Icon } from '../../shared/icon';
 import { Notices } from '../../shared/notice';
 
@@ -21,7 +33,9 @@ import { Notices } from '../../shared/notice';
   selector: 'app-settings-account',
   imports: [
     Button,
+    Callout,
     Control,
+    EmptyState,
     DatePipe,
     FormsModule,
     Icon,
@@ -29,12 +43,17 @@ import { Notices } from '../../shared/notice';
     SettingCard,
     SettingItem,
     SettingRow,
+    Skeleton,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'settings-tab' },
   template: `
     <section>
-      <header os-section-header title="Account"></header>
+      <header
+        os-section-header
+        title="Account"
+        description="Your name, and the tokens you sign in with on each device or give to a script."
+      ></header>
       <div os-setting-card>
         <os-setting-row
           label="Name"
@@ -61,8 +80,22 @@ import { Notices } from '../../shared/notice';
         title="Personal tokens"
         description="Use one per device. A personal token also works over MCP, for scripts or an agent that acts as you."
       ></header>
+      @if (tokensError(); as error) {
+        <os-callout tone="danger" title="Your tokens didn’t load">{{ error }}</os-callout>
+      }
       <div os-setting-card>
-        @for (t of tokens(); track t.id) {
+        @if (tokens()?.length === 0) {
+          <os-empty-state title="No personal tokens yet" level="3">
+            <p>
+              A personal token signs you in on another device, or lets a script or an agent act as
+              you over MCP.
+            </p>
+            <div><button os-button type="button" (click)="focusLabel()">Create token</button></div>
+          </os-empty-state>
+        } @else if (!tokens() && loading.slow()) {
+          <os-skeleton [lines]="2" />
+        }
+        @for (t of tokens() ?? []; track t.id) {
           <os-setting-item [title]="t.label" [archived]="!!t.revoked_at">
             <app-icon os-setting-item-tag class="setting-item-lead" name="key" [size]="14" />
             <code os-setting-item-tag class="quiet">{{ t.prefix }}…</code>
@@ -88,6 +121,7 @@ import { Notices } from '../../shared/notice';
         }
         <form class="setting-card-form setting-save" (ngSubmit)="newToken()">
           <input
+            #labelInput
             os-input
             name="label"
             [(ngModel)]="tokenLabel"
@@ -107,7 +141,10 @@ export class AccountTab {
   private readonly notices = inject(Notices);
   private readonly secretDialog = inject(SecretDialog);
 
-  protected readonly tokens = signal<TokenRow[]>([]);
+  protected readonly tokens = signal<TokenRow[] | null>(null);
+  protected readonly tokensError = signal<string | null>(null);
+  protected readonly loading = slowLoading();
+  private readonly labelInput = viewChild<ElementRef<HTMLInputElement>>('labelInput');
   protected name = '';
   protected tokenLabel = '';
 
@@ -138,15 +175,22 @@ export class AccountTab {
     return !!this.session.token()?.startsWith(t.prefix);
   }
 
+  protected focusLabel(): void {
+    this.labelInput()?.nativeElement.focus();
+  }
+
   private async loadTokens(): Promise<void> {
+    this.tokensError.set(null);
     try {
       this.tokens.set(
-        await this.api.myTokens((fresh) => {
-          this.tokens.set(fresh);
-        }),
+        await this.loading.track(
+          this.api.myTokens((fresh) => {
+            this.tokens.set(fresh);
+          }),
+        ),
       );
     } catch (e) {
-      this.notices.error(e);
+      this.tokensError.set(errorMessage(e));
     }
   }
 
@@ -183,13 +227,15 @@ export class AccountTab {
       current
         ? {
             title: 'Revoke the token you are signed in with?',
-            message: 'You are signed out, and anything else using it stops working.',
+            message:
+              'You are signed out here, and anything else using it stops working. Your other tokens keep working.',
             confirmLabel: 'Revoke and sign out',
             danger: true,
           }
         : {
             title: `Revoke ${t.label}?`,
-            message: 'Anything using it stops working immediately.',
+            message:
+              'Anything using it stops working immediately. Your other tokens keep working, and you can create a new one.',
             confirmLabel: 'Revoke token',
             danger: true,
           },

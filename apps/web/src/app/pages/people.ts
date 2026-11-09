@@ -30,10 +30,12 @@ import {
   Radio,
   SectionHeader,
   SecretDialog,
+  Skeleton,
 } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import { ROLE_LABEL, type AgentReview, type Member, type Role } from '../core/models';
-import { Session } from '../core/session';
+import { Session, errorMessage } from '../core/session';
+import { slowLoading } from '../core/loading';
 import { Notices } from '../shared/notice';
 import { Icon } from '../shared/icon';
 
@@ -82,6 +84,7 @@ const REVIEW_OPTIONS: { value: AgentReview; label: string; hint: string }[] = [
     Checkbox,
     Radio,
     SectionHeader,
+    Skeleton,
     Control,
     Badge,
     Chip,
@@ -206,26 +209,33 @@ const REVIEW_OPTIONS: { value: AgentReview; label: string; hint: string }[] = [
       </form>
     </section>
 
-    <section>
-      <h3 class="list-label">People</h3>
-      <ul class="actor-list">
-        @for (m of people(); track m.id) {
-          <ng-container *ngTemplateOutlet="row; context: { $implicit: m }" />
-        }
-      </ul>
-      <h3 class="list-label">Agents</h3>
-      @if (agents().length) {
+    @if (loadError(); as error) {
+      <os-callout tone="danger" title="The people and agents didn’t load">{{ error }}</os-callout>
+    }
+    @if (loaded()) {
+      <section>
+        <h3 class="list-label">People</h3>
         <ul class="actor-list">
-          @for (m of agents(); track m.id) {
+          @for (m of people(); track m.id) {
             <ng-container *ngTemplateOutlet="row; context: { $implicit: m }" />
           }
         </ul>
-      } @else {
-        <os-empty-state title="No agents yet" level="4" bordered>
-          Add one above to get a token for Claude Code or another MCP client.
-        </os-empty-state>
-      }
-    </section>
+        <h3 class="list-label">Agents</h3>
+        @if (agents().length) {
+          <ul class="actor-list">
+            @for (m of agents(); track m.id) {
+              <ng-container *ngTemplateOutlet="row; context: { $implicit: m }" />
+            }
+          </ul>
+        } @else {
+          <os-empty-state title="No agents yet" level="4" bordered>
+            Add one above to get a token for Claude Code or another MCP client.
+          </os-empty-state>
+        }
+      </section>
+    } @else if (loading.slow()) {
+      <os-skeleton [lines]="5" />
+    }
 
     <ng-template #row let-m>
       <li [class.disabled]="m.disabled_at">
@@ -510,6 +520,9 @@ export class PeoplePage {
   readonly GROUP = GROUP;
   readonly roleLabel = ROLE_LABEL;
   readonly members = signal<Member[]>([]);
+  protected readonly loaded = signal(false);
+  protected readonly loadError = signal<string | null>(null);
+  protected readonly loading = slowLoading();
   readonly people = computed(() => this.members().filter((m) => m.kind === 'human'));
   readonly agents = computed(() => this.members().filter((m) => m.kind === 'agent'));
   readonly invited = signal<Invited | null>(null);
@@ -580,16 +593,20 @@ export class PeoplePage {
   }
 
   private async load(): Promise<void> {
+    this.loadError.set(null);
     try {
       this.members.set(
-        await this.api.members((fresh) => {
-          this.members.set(fresh);
-          this.fixLevel();
-        }),
+        await this.loading.track(
+          this.api.members((fresh) => {
+            this.members.set(fresh);
+            this.fixLevel();
+          }),
+        ),
       );
+      this.loaded.set(true);
       this.fixLevel();
     } catch (e) {
-      this.notices.error(e);
+      this.loadError.set(errorMessage(e));
     }
   }
 
@@ -678,7 +695,7 @@ export class PeoplePage {
     const where = this.session.orgName(ms.organization_id);
     const remove = await this.confirmDialog.confirm({
       title: `Remove ${m.name} from ${where}?`,
-      message: `They lose their role in ${where}.`,
+      message: `They lose their role in ${where} at once. Their account, their other roles and what they wrote stay.`,
       confirmLabel: 'Remove',
       danger: true,
     });
@@ -733,7 +750,8 @@ export class PeoplePage {
   async revoke(id: string): Promise<void> {
     const revoke = await this.confirmDialog.confirm({
       title: 'Revoke this token?',
-      message: 'Anything using it stops working immediately.',
+      message:
+        'Anything using it stops working immediately. Its owner, their history and their other tokens stay, and you can create a new token.',
       confirmLabel: 'Revoke token',
       danger: true,
     });
