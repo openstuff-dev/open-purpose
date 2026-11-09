@@ -12,6 +12,9 @@ import { FormsModule } from '@angular/forms';
 import {
   Badge,
   Button,
+  Callout,
+  Check,
+  Checkbox,
   Chip,
   ConfirmDialog,
   Control,
@@ -21,21 +24,18 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  EmptyState,
   Field,
   Fieldset,
-  Callout,
-  Check,
-  Checkbox,
-  EmptyState,
   Radio,
-  SectionHeader,
   SecretDialog,
+  SectionHeader,
   Skeleton,
+  slowLoading,
 } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import { ROLE_LABEL, type AgentReview, type Member, type Role } from '../core/models';
 import { Session, errorMessage } from '../core/session';
-import { slowLoading } from '../core/loading';
 import { Notices } from '../shared/notice';
 import { Icon } from '../shared/icon';
 

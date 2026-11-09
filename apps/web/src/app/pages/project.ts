@@ -11,13 +11,16 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import {
   Badge,
+  Breadcrumbs,
   Button,
+  Callout,
   Chip,
+  CodeBlock,
   ConfirmDialog,
   Control,
+  EmptyState,
   Field,
-  Callout,
-  EmptyState, Breadcrumbs } from '@openstuff-dev/ui-angular';
+} from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Graph, GraphNode, LinkRef, ProjectDetail, Website } from '../core/models';
 import { Session, provideHere } from '../core/session';
@@ -69,6 +72,7 @@ const TABS: Tab[] = [
     Control,
     Badge,
     Chip,
+    CodeBlock,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -368,8 +372,7 @@ const TABS: Tab[] = [
                 Optional. Put this file in the repository root to skip remote matching, for example
                 in forks or mirrors.
               </p>
-              <pre><code>// .openpurpose.json
-{{ agentContext() }}</code></pre>
+              <os-code-block [code]="agentContext()" what=".openpurpose.json" />
             </details>
           }
           @case ('settings') {
