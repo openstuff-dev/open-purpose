@@ -11,7 +11,7 @@ import { SectionHeader, SettingCard, ThemePicker } from '@openstuff-dev/ui-angul
       <header
         os-section-header
         title="Appearance"
-        description="Stored in this browser only."
+        description="Stored in this browser only. Other devices keep their own choice."
       ></header>
       <div os-setting-card>
         <div class="setting-card-pad"><os-theme-picker /></div>
