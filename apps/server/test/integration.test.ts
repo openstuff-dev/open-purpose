@@ -238,7 +238,7 @@ describe('UC-6 and UC-7 OpenAnnounce token', () => {
       },
     });
 
-  it('UC-7/S1 S2 S5 S7 signs an opaque id and the picked organization and role, never a name or email', async () => {
+  it('UC-7/S1 UC-7/S2 UC-7/S5 UC-7/S7 signs an opaque id and the picked organization and role, never a name or email', async () => {
     const secret = 'sig_purpose_token_secret_51c2e8';
     await pool.query(
       `INSERT INTO server_integrations (kind, url, public_key, signing_secret_encrypted)
