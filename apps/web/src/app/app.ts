@@ -26,6 +26,7 @@ import { positionAnchors } from '@openstuff-dev/ui';
 import { Api } from './core/api';
 import { MAX_AGE_MS } from './core/get-cache';
 import { Badges } from './core/badges';
+import { ServerIntegrations } from './core/integrations';
 import { isPublicUrl } from './app.routes';
 import { type AuthStatus, ROLE_LABEL } from './core/models';
 import { Session, errorMessage } from './core/session';
@@ -364,6 +365,8 @@ export class App {
   readonly mac = /Mac|iPhone|iPad/.test(navigator.platform);
 
   constructor() {
+    // OpenVersion and OpenAnnounce, when a server admin connected them. Nothing waits for it.
+    inject(ServerIntegrations).start();
     // Agent mode restyles the whole document (drawers and dialogs live outside the shell).
     effect(() =>
       document.documentElement.classList.toggle('agent-mode', !!this.session.me()?.agent_view),

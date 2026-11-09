@@ -152,6 +152,14 @@ export class Api {
   removeServerConnection = (kind: string) =>
     this.send<undefined>('DELETE', `/admin/integrations/${kind}`);
 
+  /** OpenAnnounce's signed token for the organization picked, or null when no secret is saved. */
+  announceToken = async (): Promise<string | null> => {
+    const res = await firstValueFrom(
+      this.http.get('/api/openannounce-token', { responseType: 'text', observe: 'response' }),
+    );
+    return res.status === 200 ? res.body : null;
+  };
+
   // signing in: config, start and exchange need no token
   authConfig = () => this.get<AuthConfig>('/auth/config', {}, { maxAge: Infinity });
   startSignIn = (method: AuthMethod, email?: string) =>

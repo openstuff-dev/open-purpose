@@ -19,6 +19,7 @@ import { sectionActivitySql } from '../src/service/activity.js';
 import { createServer } from 'node:http';
 import { BILLING_SWAGGER_YAML, ORDER_API } from '../src/demo-specs.js';
 import { vaultFor } from '@openstuff-dev/server';
+import { verifyUser } from '@openstuff-dev/announce/server';
 
 const DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
@@ -122,6 +123,8 @@ beforeAll(async () => {
     ...loadConfig({ OPENPURPOSE_API_FETCH_ALLOW: '127.0.0.1' }),
     databaseUrl: DATABASE_URL,
     webDir: '/nonexistent',
+    // The connection tests seal secrets with this key, so the server can open them.
+    secretKey: 'test-key-for-openpurpose-server-connections',
   };
   await migrate(DATABASE_URL, config.migrationsDir);
   pool = createPool(DATABASE_URL);
@@ -222,6 +225,62 @@ describe('UC-5 server connections', () => {
          DELETE FROM actors WHERE name = 'Org Admin';`,
       );
     }
+  });
+});
+
+// Before 'upgrade from v1' too: it needs the admin token.
+describe('UC-6 and UC-7 OpenAnnounce token', () => {
+  const tokenFor = (who: Who) =>
+    fetch(`${base}/api/openannounce-token`, {
+      headers: {
+        authorization: `Bearer ${who.token}`,
+        ...(who.org ? { 'x-openpurpose-org': who.org } : {}),
+      },
+    });
+
+  it('UC-7/S1 S2 S5 S7 signs an opaque id and the picked organization and role, never a name or email', async () => {
+    const secret = 'sig_purpose_token_secret_51c2e8';
+    await pool.query(
+      `INSERT INTO server_integrations (kind, url, public_key, signing_secret_encrypted)
+       VALUES ('openannounce', 'https://news.example.com', 'pk_news_token_12345678', $1)
+       ON CONFLICT (kind) DO UPDATE SET signing_secret_encrypted = EXCLUDED.signing_secret_encrypted`,
+      [vaultFor('test-key-for-openpurpose-server-connections').seal(secret)],
+    );
+    const me = await api('GET', '/me');
+    const org = me.data.organizations[0] as { id: string; slug: string };
+    const made = await api('POST', '/members', {
+      name: 'Token Editor',
+      kind: 'human',
+      organization_id: org.id,
+      role: 'editor',
+    });
+    expect(made.status).toBe(201);
+    try {
+      const res = await tokenFor({ token: made.data.token, org: org.id });
+      expect(res.status).toBe(200);
+      const token = await res.text();
+      const verified = await verifyUser(secret, token);
+      if (!verified.ok) throw new Error(verified.error);
+      expect(verified.claims.groups).toEqual([
+        `t-${org.slug}`,
+        'role-editor',
+        `t-${org.slug}-role-editor`,
+      ]);
+      expect(JSON.stringify(verified.claims)).not.toContain('Token Editor');
+
+      expect((await fetch(`${base}/api/openannounce-token`)).status).toBe(401);
+    } finally {
+      await pool.query(
+        `DELETE FROM server_integrations WHERE kind = 'openannounce';
+         DELETE FROM api_tokens WHERE actor_id IN (SELECT id FROM actors WHERE name = 'Token Editor');
+         DELETE FROM memberships WHERE actor_id IN (SELECT id FROM actors WHERE name = 'Token Editor');
+         DELETE FROM actors WHERE name = 'Token Editor';`,
+      );
+    }
+  });
+
+  it('UC-6/S6 gives no OpenAnnounce token once the connection is removed', async () => {
+    expect((await tokenFor(root)).status).toBe(204);
   });
 });
 

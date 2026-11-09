@@ -54,6 +54,7 @@ import {
   loadVault,
   publishVersionOnStart,
   registerIntegrationRoutes,
+  announceGroups,
   type Vault,
 } from '@openstuff-dev/server';
 import { importAsGroup, importContent } from './service/transfer/import.js';
@@ -209,7 +210,11 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
   await app.register(async (integrations) => {
     integrations.addHook('preHandler', async (req) => {
       // The public configuration (/api/client-config) needs no sign-in.
-      if (!req.url.startsWith('/api/admin/integrations')) return;
+      if (
+        !req.url.startsWith('/api/admin/integrations') &&
+        !req.url.startsWith('/api/openannounce-token')
+      )
+        return;
       req.actor = await actorFromToken(pool, bearer(req.headers.authorization));
     });
     // The decorator's default is null, so a request without sign-in has no caller here.
@@ -222,6 +227,21 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       appName: 'OpenPurpose',
       offers,
       isServerAdmin: (req) => req.actor.is_superadmin && req.actor.kind === 'human',
+      // OpenAnnounce sees the actor's id and the groups for the organization picked in the
+      // X-OpenPurpose-Org header, never a name or an email. Agents get no token.
+      announceUser: async (req) => {
+        const actor = req.actor as Actor | null;
+        if (actor?.kind !== 'human') return null;
+        const access = await resolveAccess(
+          pool,
+          actor,
+          header(req, 'x-openpurpose-group'),
+          header(req, 'x-openpurpose-org'),
+        );
+        const org = access.org(access.orgId);
+        const role = org ? access.orgRole(org.id) : null;
+        return { sub: actor.id, groups: org && role ? announceGroups(org.slug, role) : [] };
+      },
     });
   });
 
