@@ -1,6 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { allAnnounceGroups } from '@openstuff-dev/ui';
 import {
+  AnnounceGroups,
   Callout,
   SectionHeader,
   type ServerConnection,
@@ -9,7 +11,7 @@ import {
   Skeleton,
 } from '@openstuff-dev/ui-angular';
 import { Api } from '../../core/api';
-import { errorMessage } from '../../core/session';
+import { Session, errorMessage } from '../../core/session';
 
 /** The server package answers `{ error }`; anything else goes through the usual helper. */
 function failure(err: unknown): Error {
@@ -26,7 +28,7 @@ function failure(err: unknown): Error {
  */
 @Component({
   selector: 'app-settings-integrations',
-  imports: [Callout, SectionHeader, ServerConnectionCard, Skeleton],
+  imports: [AnnounceGroups, Callout, SectionHeader, ServerConnectionCard, Skeleton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'stack' },
   template: `
@@ -44,7 +46,11 @@ function failure(err: unknown): Error {
     }
     @if (connections(); as connections) {
       @for (connection of connections; track connection.kind) {
-        <os-server-connection-card [connection]="connection" [client]="client" />
+        <os-server-connection-card [connection]="connection" [client]="client">
+          @if (connection.kind === 'openannounce') {
+            <os-announce-groups [groups]="groups()" tenant="organization" />
+          }
+        </os-server-connection-card>
       }
     } @else if (!error()) {
       <os-skeleton [lines]="4" />
@@ -70,6 +76,16 @@ function failure(err: unknown): Error {
 })
 export class IntegrationsTab {
   private readonly api = inject(Api);
+  private readonly session = inject(Session);
+
+  /** Every organization in this workspace, with each role a person can have: groups to create. */
+  protected readonly groups = computed(() =>
+    allAnnounceGroups(
+      this.session.orgs().map((org) => org.slug),
+      ROLES,
+    ),
+  );
+
   protected readonly connections = signal<ServerConnection[] | null>(null);
   protected readonly error = signal<string | null>(null);
 
@@ -101,3 +117,6 @@ export class IntegrationsTab {
     }
   }
 }
+
+/** Agents get no OpenAnnounce token, so only the people's roles. */
+const ROLES = ['admin', 'editor', 'viewer'] as const;
