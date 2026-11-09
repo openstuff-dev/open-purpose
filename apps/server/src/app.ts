@@ -49,7 +49,12 @@ import { deleteAlias, listAliases } from './service/aliases.js';
 import { renameSlug } from './service/slugs.js';
 import { DEFAULT_INCLUDES, exportContent } from './service/transfer/export.js';
 import { integrationOffers } from './integrations.js';
-import { loadVault, registerIntegrationRoutes, type Vault } from '@openstuff-dev/server';
+import {
+  loadVault,
+  publishVersionOnStart,
+  registerIntegrationRoutes,
+  type Vault,
+} from '@openstuff-dev/server';
 import { importAsGroup, importContent } from './service/transfer/import.js';
 import { exportZip, readExportZip } from './service/transfer/markdown.js';
 import { DOC_KINDS, EDIT_MODES } from './service/types.js';
@@ -189,6 +194,15 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
     });
     return vault;
   };
+  const offers = integrationOffers(config);
+  publishVersionOnStart(app, {
+    db: pool,
+    vault: openVault,
+    offer: offers[0],
+    policy: integrationFetchPolicy(config),
+    appName: 'OpenPurpose',
+    version: config.appVersion,
+  });
   // Fastify waits for an async plugin, even one without an await.
   // eslint-disable-next-line @typescript-eslint/require-await
   await app.register(async (integrations) => {
@@ -203,7 +217,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       policy: integrationFetchPolicy(config),
       origin: new URL(config.publicUrl).origin,
       appName: 'OpenPurpose',
-      offers: integrationOffers(config),
+      offers,
       isServerAdmin: (req) => req.actor.is_superadmin && req.actor.kind === 'human',
     });
   });

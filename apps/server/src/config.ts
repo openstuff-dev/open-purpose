@@ -6,6 +6,8 @@ import type { FetchPolicy } from '@openstuff-dev/server';
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 export interface Config {
+  /** The release this image was built from, set by the image build. `unknown` for a local build. */
+  appVersion: string;
   port: number;
   host: string;
   databaseUrl: string;
@@ -35,7 +37,12 @@ export interface Config {
   /** Encrypts saved connection secrets. Without one, a key is made and kept in the database. */
   secretKey: string | undefined;
   /** OpenVersion and OpenAnnounce this server connects to. Set here, they win over the tab. */
-  openVersion: { url: string | undefined; publicKey: string | undefined };
+  openVersion: {
+    url: string | undefined;
+    publicKey: string | undefined;
+    /** Lets this server publish its own version to OpenVersion on start. Never sent to browsers. */
+    deployToken: string | undefined;
+  };
   openAnnounce: {
     url: string | undefined;
     publicKey: string | undefined;
@@ -88,6 +95,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const port = Number(env.PORT ?? 8080);
   const auth = loadAuthConfig(env);
   return {
+    appVersion: env.VERSION?.trim() || 'unknown',
     port,
     host: env.HOST ?? '0.0.0.0',
     databaseUrl:
@@ -115,6 +123,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     openVersion: {
       url: env.OPENPURPOSE_OPENVERSION_URL?.replace(/\/$/, '') || undefined,
       publicKey: env.OPENPURPOSE_OPENVERSION_PUBLIC_KEY || undefined,
+      deployToken: env.OPENPURPOSE_OPENVERSION_DEPLOY_TOKEN || undefined,
     },
     openAnnounce: {
       url: env.OPENPURPOSE_OPENANNOUNCE_URL?.replace(/\/$/, '') || undefined,

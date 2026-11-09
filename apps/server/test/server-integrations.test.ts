@@ -17,6 +17,21 @@ describe('server connections from configuration', () => {
     expect(announce.environment).toBeNull();
   });
 
+  it('takes the OpenVersion deploy token from the environment, and reads the image version', () => {
+    const config = loadConfig({
+      VERSION: ' 0.5.0 ',
+      OPENPURPOSE_OPENVERSION_URL: 'https://versions.example.com',
+      OPENPURPOSE_OPENVERSION_PUBLIC_KEY: 'pk_live',
+      OPENPURPOSE_OPENVERSION_DEPLOY_TOKEN: 'ov_live_token',
+    });
+    const [version] = integrationOffers(config);
+    expect(version.deployToken).toBe(true);
+    expect(version.environment?.deployToken).toBe('ov_live_token');
+    expect(version.environment).not.toHaveProperty('signingSecret');
+    expect(config.appVersion).toBe('0.5.0');
+    expect(loadConfig({}).appVersion).toBe('unknown');
+  });
+
   it('UC-5/S5 keeps the OpenAnnounce signing secret out of the OpenVersion offer', () => {
     const config = loadConfig({
       OPENPURPOSE_OPENANNOUNCE_URL: 'https://news.example.com',

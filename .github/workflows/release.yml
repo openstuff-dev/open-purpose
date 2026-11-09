@@ -51,6 +51,12 @@ jobs:
           done
           grep -q "^## $tag" CHANGELOG.md || { echo "::error file=CHANGELOG.md::CHANGELOG.md has no '## $tag' entry."; exit 1; }
 
+      # A tag builds its own version into the image; a push to master builds 'unknown', so its update prompt stays off.
+      - id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then value="${GITHUB_REF_NAME#v}"; else value=unknown; fi
+          echo "value=$value" >> "$GITHUB_OUTPUT"
+
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
@@ -84,6 +90,7 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: openpurpose:smoke
+          build-args: VERSION=${{ steps.version.outputs.value }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -107,6 +114,7 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
+          build-args: VERSION=${{ steps.version.outputs.value }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
