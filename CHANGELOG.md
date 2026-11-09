@@ -3,6 +3,41 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.5.0
+
+Migrations `020_server_integrations` and `021_deploy_token` add the server's connections table.
+Back up first.
+
+### Web app
+
+- New Integrations tab in Settings for server admins: paste a connection string from OpenVersion or
+  OpenAnnounce and see straight away whether it works and how to fix it. Each connection can be
+  tested, changed or removed.
+- With OpenVersion connected, open tabs offer to reload when a new version is live.
+- With OpenAnnounce connected, messages show for the organization and role someone is in. The card lists
+  the groups to create in OpenAnnounce.
+- Moved onto `@openstuff-dev/ui` and `ui-angular` 0.1.8.
+
+### API
+
+- A change sent again with the same `Idempotency-Key` now runs once, so a retry or a double click
+  no longer makes it twice.
+
+### Server
+
+- With an OpenVersion deploy token saved, the server publishes its own version on start.
+- New settings: `OPENPURPOSE_SECRET_KEY` encrypts the saved keys. Without it, a key is made and kept in
+  the database, with a warning in the log. Set it before connecting anything, because changing it
+  later means entering the keys again. `OPENPURPOSE_FETCH` and `OPENPURPOSE_FETCH_ALLOW` control which
+  addresses a connection may reach. `OPENPURPOSE_OPENVERSION_*` and `OPENPURPOSE_OPENANNOUNCE_*` set a
+  connection from the environment, and its card becomes read only.
+- Saved connection secrets never leave the server: not in the admin list, not in an export.
+
+### Image
+
+- The image carries its own version (`VERSION` build arg), so the server reports it and the web app
+  knows it.
+
 ## 0.4.5
 
 No migrations.
