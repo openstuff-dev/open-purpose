@@ -48,6 +48,7 @@ import * as signin from './service/signin.js';
 import { deleteAlias, listAliases } from './service/aliases.js';
 import { renameSlug } from './service/slugs.js';
 import { DEFAULT_INCLUDES, exportContent } from './service/transfer/export.js';
+import { registerIdempotency } from './idempotency.js';
 import { integrationOffers } from './integrations.js';
 import { loadVault, registerIntegrationRoutes, type Vault } from '@openstuff-dev/server';
 import { importAsGroup, importContent } from './service/transfer/import.js';
@@ -197,6 +198,8 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
       if (!req.url.startsWith('/api/admin/integrations')) return;
       req.actor = await actorFromToken(pool, bearer(req.headers.authorization));
     });
+    // The decorator's default is null, so a request without sign-in has no caller here.
+    registerIdempotency(integrations, (req) => (req.actor as Actor | null)?.id);
     registerIntegrationRoutes(integrations, {
       db: pool,
       vault: openVault,
@@ -304,6 +307,8 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
           req.access = agentViewOf(req.access);
         }
       });
+      // After sign-in above, so a retried change with the same Idempotency-Key runs once.
+      registerIdempotency(api, (req) => (req.actor as Actor | null)?.id);
       const close = async (req: FastifyRequest, ok: boolean) => {
         if (!req.scopeOpen) return;
         req.scopeOpen = false;
