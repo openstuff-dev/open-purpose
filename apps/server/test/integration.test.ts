@@ -201,6 +201,39 @@ describe('UC-5 server connections', () => {
   });
 });
 
+// Before 'upgrade from v1' too, for the same reason as the block above.
+describe('Idempotency-Key', () => {
+  const send = (method: string, path: string, key: string, body?: unknown) =>
+    fetch(`${base}/api${path}`, {
+      method,
+      headers: {
+        authorization: `Bearer ${ADMIN}`,
+        'idempotency-key': key,
+        ...(body ? { 'content-type': 'application/json' } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+  it('runs a retried change once and answers the retry with the first answer', async () => {
+    const body = { name: 'Retried project', slug: 'retried-project' };
+    const first = await send('POST', '/projects', 'retry-create-1', body);
+    expect(first.status).toBe(201);
+    const made = (await first.json()) as { id: string };
+    try {
+      const again = await send('POST', '/projects', 'retry-create-1', body);
+      expect(again.status).toBe(201);
+      expect(again.headers.get('idempotent-replayed')).toBe('true');
+      expect(((await again.json()) as { id: string }).id).toBe(made.id);
+      // A new key is a new request: the slug is taken now.
+      expect((await send('POST', '/projects', 'retry-create-2', body)).status).toBe(409);
+      // Without a key, nothing is replayed.
+      expect((await api('POST', '/projects', body)).status).toBe(409);
+    } finally {
+      expect((await api('DELETE', `/projects/${made.id}`)).status).toBeLessThan(300);
+    }
+  });
+});
+
 describe('OpenPurpose with groups and organizations', () => {
   const t: Record<string, string> = {}; // tokens
   const o: Record<string, string> = {}; // organization ids
