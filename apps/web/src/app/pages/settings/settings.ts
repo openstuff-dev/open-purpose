@@ -25,6 +25,7 @@ import { TransferPage } from '../transfer';
 import { AccountTab } from './account';
 import { AppearanceTab } from './appearance';
 import { ConnectTab } from './connect';
+import { IntegrationsTab } from './integrations';
 import { OrganizationsTab } from './organizations';
 import { resolveTab, tabsFor, type SettingsAccess, type SettingsGroupId } from './settings-tabs';
 
@@ -34,6 +35,7 @@ import { resolveTab, tabsFor, type SettingsAccess, type SettingsGroupId } from '
     AccountTab,
     AppearanceTab,
     ConnectTab,
+    IntegrationsTab,
     GroupsPage,
     NavLink,
     OrganizationsTab,
@@ -94,6 +96,9 @@ import { resolveTab, tabsFor, type SettingsAccess, type SettingsGroupId } from '
         }
         @case ('people') {
           <app-people />
+        }
+        @case ('integrations') {
+          <app-settings-integrations />
         }
         @case ('transfer') {
           <app-transfer />
