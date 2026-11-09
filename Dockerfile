@@ -12,7 +12,10 @@ COPY apps/web/package.json apps/web/
 FROM manifests AS web
 RUN npm ci -w apps/web
 COPY apps/web/ apps/web/
-RUN npm run tokens -w apps/web && npm run build -w apps/web
+# The release this image is built from. The web app knows it; a local build keeps 'unknown'.
+ARG VERSION=unknown
+RUN printf "/** The release this build came from. Docker sets it from the tag; a local build keeps 'unknown'. */\nexport const APP_VERSION = '%s';\n" "$VERSION" > apps/web/src/app/build-version.ts \
+    && npm run tokens -w apps/web && npm run build -w apps/web
 
 FROM manifests AS server
 RUN npm ci -w apps/server
@@ -24,7 +27,9 @@ FROM manifests AS server-deps
 RUN npm ci -w apps/server --omit=dev && mkdir -p apps/server/node_modules
 
 FROM node:24-alpine
+ARG VERSION=unknown
 ENV NODE_ENV=production \
+    VERSION=${VERSION} \
     PORT=8080 \
     OPENPURPOSE_WEB_DIR=/app/web \
     OPENPURPOSE_MIGRATIONS_DIR=/app/apps/server/migrations \

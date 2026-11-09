@@ -13,7 +13,13 @@ import type { Config } from './config.js';
 export function integrationOffers(config: Config): IntegrationOffer[] {
   const { openVersion: version, openAnnounce: announce } = config;
   const versionEnv: ConnectionDetails | null =
-    version.url && version.publicKey ? { url: version.url, publicKey: version.publicKey } : null;
+    version.url && version.publicKey
+      ? {
+          url: version.url,
+          publicKey: version.publicKey,
+          ...(version.deployToken ? { deployToken: version.deployToken } : {}),
+        }
+      : null;
   const announceEnv: ConnectionDetails | null =
     announce.url && announce.publicKey
       ? {
@@ -26,6 +32,7 @@ export function integrationOffers(config: Config): IntegrationOffer[] {
     {
       kind: openVersion,
       signingSecret: false,
+      deployToken: true,
       environment: versionEnv,
       envPrefix: 'OPENPURPOSE_OPENVERSION',
     },

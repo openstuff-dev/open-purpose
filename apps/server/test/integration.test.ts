@@ -162,6 +162,30 @@ describe('UC-5 server connections', () => {
     expect(JSON.stringify(exported.data)).not.toContain('signing_secret');
   });
 
+  it('UC-5/S6 never returns a saved deploy token, on the page or in an export', async () => {
+    const token = 'ov_purpose_saved_deploy_token_3e9b';
+    const sealed = vaultFor('test-key-for-openpurpose-server-connections').seal(token);
+    await pool.query(
+      `INSERT INTO server_integrations (kind, url, public_key, deploy_token_encrypted)
+       VALUES ('openversion', 'https://versions.example.com', 'pk_versions_public', $1)
+       ON CONFLICT (kind) DO UPDATE SET deploy_token_encrypted = EXCLUDED.deploy_token_encrypted`,
+      [sealed],
+    );
+    try {
+      const list = await api('GET', '/admin/integrations');
+      expect(list.status).toBe(200);
+      expect(JSON.stringify(list.data)).toContain('"hasDeployToken":true');
+      expect(JSON.stringify(list.data)).not.toContain(token);
+
+      const exported = await api('GET', '/export');
+      expect(exported.status).toBe(200);
+      expect(JSON.stringify(exported.data)).not.toContain(token);
+      expect(JSON.stringify(exported.data)).not.toContain('deploy_token');
+    } finally {
+      await pool.query("DELETE FROM server_integrations WHERE kind = 'openversion'");
+    }
+  });
+
   it('UC-5/S6 refuses a request with no sign-in', async () => {
     const res = await fetch(`${base}/api/admin/integrations`);
     expect(res.status).toBe(401);
