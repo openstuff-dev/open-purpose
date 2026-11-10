@@ -25,7 +25,7 @@ import { type Config, integrationFetchPolicy } from './config.js';
 import { endScope, type Pool } from './db.js';
 import { cacheControl } from './domain/cache.js';
 import { AppError, badRequest } from './errors.js';
-import { callReadTool, createMcpServer } from './mcp.js';
+import { callReadTool, createMcpServer, parseToolFilter } from './mcp.js';
 import * as activity from './service/activity.js';
 import * as admin from './service/admin.js';
 import * as apis from './service/apis.js';
@@ -109,7 +109,11 @@ const kind = z
 const id = z.uuid();
 const optId = id.nullable().optional();
 const role = z.enum(['admin', 'editor', 'viewer', 'agent']);
-const manifest = z.object({ path: z.string(), content: z.string() });
+const manifest = z.object({
+  path: z.string(),
+  dependencies: z.array(z.string()).optional(),
+  content: z.string().optional(),
+});
 const websitesBody = z.object({ websites });
 
 function parse<T extends z.ZodType>(schema: T, value: unknown): z.infer<T> {
@@ -253,7 +257,12 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
   // ───────────────────────────── MCP (streamable HTTP, stateless) ─────────────────────────────
   app.post('/mcp', async (req, reply) => {
     let access: Access;
+    let tools: ReadonlySet<string> | undefined;
     try {
+      const asked = (req.query as { tools?: unknown }).tools;
+      tools = parseToolFilter(
+        header(req, 'x-openpurpose-tools') ?? (typeof asked === 'string' ? asked : undefined),
+      );
       const actor = await actorFromToken(pool, bearer(req.headers.authorization));
       access = await resolveAccess(
         pool,
@@ -272,7 +281,7 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
           id: null,
         });
     }
-    const server = createMcpServer(pool, access, VERSION, config.apiSpecs);
+    const server = createMcpServer(pool, access, VERSION, config.apiSpecs, { tools });
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,

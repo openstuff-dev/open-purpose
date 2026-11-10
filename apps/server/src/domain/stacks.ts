@@ -2,11 +2,16 @@
  * Stack detection from manifest files, so that every agent tags code the same
  * way ("angular", not "Angular 18" or "ng"). Agents send the manifest nearest to
  * the code they are touching (package.json, *.csproj, ...) and get tags back.
+ * The file name and its dependency names are enough, so an agent need not copy
+ * the whole file into every call.
  */
 export interface Manifest {
   /** Path of the manifest relative to the repo root, e.g. "frontend/package.json". */
   path: string;
-  content: string;
+  /** Package names it depends on; for a *.csproj also its Sdk, e.g. "Microsoft.NET.Sdk.Web". */
+  dependencies?: string[];
+  /** The full file, for agents that send it instead of `dependencies`. */
+  content?: string;
 }
 
 const NPM_TAGS: [pkg: string | RegExp, tags: string[]][] = [
@@ -56,19 +61,21 @@ export function normalizeTags(tags: Iterable<string>): string[] {
   return [...out].sort();
 }
 
-function fromPackageJson(content: string): string[] {
+function packageJsonDeps(content: string): string[] {
   let pkg: Record<string, unknown>;
   try {
     pkg = JSON.parse(content) as Record<string, unknown>;
   } catch {
-    return ['node'];
+    return [];
   }
-  const deps = {
+  return Object.keys({
     ...(pkg.dependencies as Record<string, string> | undefined),
     ...(pkg.devDependencies as Record<string, string> | undefined),
     ...(pkg.peerDependencies as Record<string, string> | undefined),
-  };
-  const names = Object.keys(deps);
+  });
+}
+
+function fromNpm(names: string[]): string[] {
   const tags = ['node'];
   for (const [match, add] of NPM_TAGS) {
     if (names.some((n) => (typeof match === 'string' ? n === match : match.test(n))))
@@ -77,14 +84,22 @@ function fromPackageJson(content: string): string[] {
   return tags;
 }
 
-function fromCsproj(content: string): string[] {
+function fromCsproj(m: Manifest): string[] {
+  const content = m.content ?? '';
+  const names = m.dependencies ?? [];
   const tags = ['dotnet', 'csharp'];
-  const sdk = /<Project[^>]*\sSdk="([^"]+)"/i.exec(content)?.[1] ?? '';
+  const sdk =
+    /<Project[^>]*\sSdk="([^"]+)"/i.exec(content)?.[1] ??
+    names.find((n) => /^Microsoft\.NET\.Sdk/i.test(n)) ??
+    '';
   if (/Microsoft\.NET\.Sdk\.Web/i.test(sdk)) tags.push('aspnetcore', 'backend');
   if (/Microsoft\.NET\.Sdk\.BlazorWebAssembly/i.test(sdk)) tags.push('blazor', 'frontend');
   if (/Microsoft\.NET\.Sdk\.Worker/i.test(sdk)) tags.push('worker', 'backend');
   if (/Microsoft\.NET\.Sdk\.Razor/i.test(sdk)) tags.push('razor');
-  const refs = [...content.matchAll(/<PackageReference[^>]*Include="([^"]+)"/gi)].map((m) => m[1]);
+  const refs = [
+    ...names,
+    ...[...content.matchAll(/<PackageReference[^>]*Include="([^"]+)"/gi)].map((r) => r[1]),
+  ];
   for (const [match, add] of NUGET_TAGS) {
     if (refs.some((r) => match.test(r))) tags.push(...add);
   }
@@ -96,8 +111,9 @@ export function detectStacks(manifests: Manifest[]): string[] {
   const tags: string[] = [];
   for (const m of manifests) {
     const file = m.path.replace(/\\/g, '/').split('/').pop()?.toLowerCase() ?? '';
-    if (file === 'package.json') tags.push(...fromPackageJson(m.content));
-    else if (file.endsWith('.csproj')) tags.push(...fromCsproj(m.content));
+    if (file === 'package.json')
+      tags.push(...fromNpm([...(m.dependencies ?? []), ...packageJsonDeps(m.content ?? '')]));
+    else if (file.endsWith('.csproj')) tags.push(...fromCsproj(m));
     else if (file.endsWith('.fsproj')) tags.push('dotnet', 'fsharp');
     else if (file.endsWith('.sln') || file === 'directory.build.props' || file === 'global.json')
       tags.push('dotnet');

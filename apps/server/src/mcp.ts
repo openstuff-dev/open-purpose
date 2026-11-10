@@ -70,15 +70,16 @@ Workflow:
 1. Before starting a task in a repository, call get_context with the repo's git remote URL
    (\`git remote get-url origin\`), plus the "project" value from .openpurpose.json if that file exists
    (an older .agentcontext.json means the same: rename it to .openpurpose.json),
-   the path you are working in and the nearest manifest (package.json, *.csproj, ...). Always send the
-   remote: parts of a project can be bound to one repository.
+   the path you are working in and the nearest manifest (package.json, *.csproj, ...): its path and the
+   names of its dependencies, not the whole file. Always send the remote: parts of a project can be bound
+   to one repository. On later calls for the same path, send the stacks it returned instead of manifests.
    Follow what it says. More specific rules override general ones. When a context is large, its most
    general sections are shortened to their first sentence; read those with read_section when they matter.
 2. If no project is found, ask the user which project the repo belongs to, then call register_repository
    (or create_project), and write .openpurpose.json with {"project": "<slug>"} in the repo root.
 3. When the user corrects you in a way that should also apply next time, call propose_learning with the
-   same remote/path/manifests. A person reviews it before it becomes a rule. Keep it to one rule, stated
-   positively, with the reason. When a part of the code (a package, a folder, a stack) keeps collecting
+   same remote/path and the stacks get_context returned. A person reviews it before it becomes a rule.
+   Keep it to one rule, stated positively, with the reason. When a part of the code (a package, a folder, a stack) keeps collecting
    rules of its own and list_scopes has no scope for it, suggest one with create_scope.
    get_context shows each document's id as [d:xxxxxxxx]; add sections with add_section. When a document is
    missing (a new project often has no glossary or business logic yet), suggest it with its first sections
@@ -107,10 +108,12 @@ Workflow:
 const manifestSchema = z.object({
   path: z
     .string()
-    .describe(
-      'Repo-relative path of the manifest, e.g. "frontend/package.json" or "src/Api/Api.csproj"',
-    ),
-  content: z.string().describe('Full file content'),
+    .describe('Repo-relative path, e.g. "frontend/package.json" or "src/Api/Api.csproj"'),
+  dependencies: z
+    .array(z.string())
+    .optional()
+    .describe('Package names it depends on, without versions; for *.csproj also its Sdk'),
+  content: z.string().optional().describe('Full file, only if you cannot list dependencies'),
 });
 
 const locate = {
@@ -133,14 +136,12 @@ const locate = {
   stacks: z
     .array(z.string())
     .optional()
-    .describe(
-      'Stack tags you already know, e.g. ["angular"]. Usually leave empty and send manifests instead.',
-    ),
+    .describe('The stacks get_context returned for this path. Send these instead of manifests.'),
   manifests: z
     .array(manifestSchema)
     .optional()
     .describe(
-      'The manifest nearest to the path (package.json, *.csproj, go.mod, ...). Used to detect stacks consistently.',
+      'The manifest nearest to the path (package.json, *.csproj, go.mod, ...), when you have no stacks yet',
     ),
 };
 
@@ -152,7 +153,8 @@ interface ToolResult {
 }
 
 const text = (t: string): ToolResult => ({ content: [{ type: 'text', text: t }] });
-const json = (v: unknown): ToolResult => text(JSON.stringify(v, null, 2));
+// Compact: indentation would add a fifth or more to every reply's tokens.
+const json = (v: unknown): ToolResult => text(JSON.stringify(v));
 
 /**
  * Tools that change something; the activity overview counts them as writes, every other tool as a
@@ -192,6 +194,37 @@ export const READ_TOOLS = [
   'read_section',
   'list_findings',
 ] as const;
+
+/** Reads about the caller's own proposals. Agent mode's simulated agent has none. */
+const OWN_READ_TOOLS = ['list_my_proposals', 'get_review'];
+
+const ALL_TOOLS: readonly string[] = [...READ_TOOLS, ...OWN_READ_TOOLS, ...WRITE_TOOLS];
+
+/** Named tool sets a client can ask for instead of listing tools one by one. */
+const TOOL_PROFILES = new Map<string, readonly string[]>([
+  ['all', ALL_TOOLS],
+  ['read', [...READ_TOOLS, ...OWN_READ_TOOLS]],
+]);
+
+/**
+ * The tools a client asked for with `?tools=` or the `x-openpurpose-tools` header: profiles and
+ * tool names, comma-separated, e.g. "read,propose_learning". A shorter list costs the agent fewer
+ * tokens. Nothing asked for: every tool.
+ */
+export function parseToolFilter(spec: string | undefined): ReadonlySet<string> | undefined {
+  const parts = (spec ?? '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (!parts.length) return undefined;
+  const unknown = parts.filter((t) => !TOOL_PROFILES.has(t) && !ALL_TOOLS.includes(t));
+  if (unknown.length)
+    throw new AppError(
+      'bad_request',
+      `Unknown tools: ${unknown.join(', ')}. Use a profile (${[...TOOL_PROFILES.keys()].join(', ')}) or tool names.`,
+    );
+  return new Set(parts.flatMap((t) => TOOL_PROFILES.get(t) ?? [t]));
+}
 
 /**
  * Call one read tool in-process, through the same MCP server an agent talks to,
@@ -233,12 +266,20 @@ export function createMcpServer(
   a: Access,
   version: string,
   apiConfig?: ApiSpecConfig,
-  opts: { simulated?: boolean } = {},
+  opts: { simulated?: boolean; tools?: ReadonlySet<string> } = {},
 ): McpServer {
   const server = new McpServer(
     { name: 'openpurpose', version },
     { instructions: SERVER_INSTRUCTIONS, capabilities: { tools: {} } },
   );
+  // Agent mode only ever calls read tools, so it lists only those.
+  const offered = opts.simulated ? new Set<string>(READ_TOOLS) : opts.tools;
+  /** server.registerTool, for the tools this caller is offered. */
+  const registerTool = ((name: string, ...rest: unknown[]) => {
+    if (!ALL_TOOLS.includes(name)) throw new Error(`${name} is missing from the MCP tool lists`);
+    if (offered && !offered.has(name)) return undefined;
+    return (server.registerTool as (...args: unknown[]) => unknown)(name, ...rest);
+  }) as typeof server.registerTool;
 
   /**
    * Each tool call runs in its own transaction, scoped to the caller's group.
@@ -287,7 +328,7 @@ export function createMcpServer(
     return s;
   };
 
-  server.registerTool(
+  registerTool(
     'get_context',
     {
       title: 'Get context',
@@ -324,7 +365,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'resolve_project',
     {
       title: 'Resolve project',
@@ -361,7 +402,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'list_organizations',
     {
       title: 'List organizations',
@@ -380,7 +421,7 @@ export function createMcpServer(
       ),
   );
 
-  server.registerTool(
+  registerTool(
     'list_skills',
     {
       title: 'List skills',
@@ -391,7 +432,7 @@ export function createMcpServer(
     () => run('list_skills', async () => json(await listSkills())),
   );
 
-  server.registerTool(
+  registerTool(
     'get_skill',
     {
       title: 'Get a skill',
@@ -402,7 +443,7 @@ export function createMcpServer(
     ({ name }) => run('get_skill', async () => text((await getSkill(name)).body)),
   );
 
-  server.registerTool(
+  registerTool(
     'list_projects',
     {
       title: 'List projects',
@@ -434,7 +475,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'list_scopes',
     {
       title: 'List scopes',
@@ -479,7 +520,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'get_related',
     {
       title: 'Get related projects',
@@ -549,7 +590,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'get_api',
     {
       title: 'Get API',
@@ -605,7 +646,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'search',
     {
       title: 'Search',
@@ -639,7 +680,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'read_section',
     {
       title: 'Read section',
@@ -666,7 +707,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'update_section',
     {
       title: 'Update section',
@@ -707,7 +748,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'add_section',
     {
       title: 'Add section',
@@ -741,7 +782,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'archive_section',
     {
       title: 'Archive section',
@@ -772,7 +813,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'move_section',
     {
       title: 'Move section',
@@ -811,7 +852,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'propose_document',
     {
       title: 'Propose document',
@@ -912,12 +953,12 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'propose_learning',
     {
       title: 'Propose learning',
       description:
-        'Record something the user taught you so every agent gets it next time. It is filed under the most specific matching scope (e.g. only the Angular frontend of this project), and a person approves it first; they can also promote it to the whole organization or workspace. Pass the same remote_url/path/manifests you used for get_context.',
+        'Record something the user taught you so every agent gets it next time. It is filed under the most specific matching scope (e.g. only the Angular frontend of this project), and a person approves it first; they can also promote it to the whole organization or workspace. Pass the same remote_url and path you used for get_context, with the stacks it returned.',
       inputSchema: {
         heading: z
           .string()
@@ -1013,7 +1054,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'list_my_proposals',
     {
       title: 'List my proposals',
@@ -1076,14 +1117,14 @@ export function createMcpServer(
       f.proposed_fix || '_(none given)_',
     ].join('\n');
 
-  server.registerTool(
+  registerTool(
     'report_finding',
     {
       title: 'Report finding',
       description:
         "Record a real problem you noticed outside your task and didn't fix (a bug, a security risk, broken behaviour; not a style preference), so it isn't lost. " +
         'It is filed under the most specific scope of the file, and a person sorts it. If open findings look like the same problem, nothing is filed and they are listed instead. ' +
-        'Pass the same remote_url/manifests you used for get_context.',
+        'Pass the same remote_url you used for get_context, with the stacks it returned.',
       inputSchema: {
         file: z
           .string()
@@ -1166,7 +1207,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'list_findings',
     {
       title: 'List findings',
@@ -1223,7 +1264,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'update_finding',
     {
       title: 'Update finding',
@@ -1277,7 +1318,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'resolve_finding',
     {
       title: 'Resolve finding',
@@ -1301,7 +1342,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'dismiss_finding',
     {
       title: 'Dismiss finding',
@@ -1325,7 +1366,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'get_review',
     {
       title: 'Get review',
@@ -1342,7 +1383,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'reply_to_review',
     {
       title: 'Reply to review',
@@ -1374,7 +1415,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'revise_proposal',
     {
       title: 'Revise proposal',
@@ -1401,7 +1442,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'apply_suggestion',
     {
       title: 'Apply suggestion',
@@ -1417,7 +1458,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'register_repository',
     {
       title: 'Register repository',
@@ -1446,7 +1487,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'create_scope',
     {
       title: 'Create scope',
@@ -1543,7 +1584,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'create_project',
     {
       title: 'Create project',

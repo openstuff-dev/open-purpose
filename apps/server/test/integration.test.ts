@@ -683,6 +683,62 @@ describe('OpenPurpose with groups and organizations', () => {
     await client.close();
   });
 
+  it('detects stacks from dependency names, and tells the agent to send them back', async () => {
+    const { client, call } = await mcp(t.jonas);
+    const fe = await call('get_context', {
+      remote_url: SSH_REMOTE,
+      path: 'frontend/src/app/editor.ts',
+      manifests: [{ path: 'frontend/package.json', dependencies: ['@angular/core'] }],
+    });
+    expect(fe.text).toContain('Acme Logistics › Angular apps (stack "angular")');
+    expect(fe.text).toContain(
+      'Pass `stacks: ["angular","frontend","node"]` to later calls for this path instead of manifests.',
+    );
+    const again = await call('get_context', {
+      remote_url: SSH_REMOTE,
+      path: 'frontend/src/app/editor.ts',
+      stacks: ['angular', 'frontend', 'node'],
+    });
+    expect(again.text).toContain('Acme Logistics › Angular apps (stack "angular")');
+    await client.close();
+  });
+
+  it('offers only the tools a client asks for', async () => {
+    const names = async (query: string) => {
+      const client = new Client({ name: 'test-agent', version: '1.0.0' });
+      await client.connect(
+        new StreamableHTTPClientTransport(new URL(`${base}/mcp${query}`), {
+          requestInit: { headers: { authorization: `Bearer ${t.jonas}` } },
+        }),
+      );
+      const { tools } = await client.listTools();
+      await client.close();
+      return tools.map((x) => x.name);
+    };
+    const all = await names('');
+    expect(all).toHaveLength(30);
+    const read = await names('?tools=read');
+    expect(read).toContain('get_context');
+    expect(read).toContain('get_review');
+    expect(read).not.toContain('propose_learning');
+    expect(await names('?tools=read,propose_learning')).toEqual(
+      all.filter((n) => read.includes(n) || n === 'propose_learning'),
+    );
+    const res = await fetch(`${base}/mcp?tools=get_contxt`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${t.jonas}`,
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { message: string } }).error.message).toContain(
+      'Unknown tools: get_contxt',
+    );
+  });
+
   it('files a learning under the frontend only', async () => {
     const { client, call } = await mcp(t.jonas);
     const r = await call('propose_learning', {

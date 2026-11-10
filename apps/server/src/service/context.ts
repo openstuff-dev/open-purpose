@@ -502,6 +502,11 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
       `- Path: ${ctx.path ? '`' + ctx.path + '`' : '_repo root_'}`,
       `- Stacks: ${ctx.stacks.length ? ctx.stacks.join(', ') : '_none given_'}`,
     );
+    // Sending these back is a few words; sending the manifest again is the whole file.
+    if (ctx.stacks.length)
+      out.push(
+        `  Pass \`stacks: ${JSON.stringify(ctx.stacks)}\` to later calls for this path instead of manifests.`,
+      );
   }
   const scoped = ctx.blocks.filter((b) => b.scope);
   out.push(

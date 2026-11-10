@@ -82,6 +82,23 @@ describe('detectStacks', () => {
     expect(tags).toEqual(['aspnetcore', 'backend', 'csharp', 'dotnet', 'efcore']);
   });
 
+  it('detects the same stacks from dependency names alone', () => {
+    expect(
+      detectStacks([
+        { path: 'frontend/package.json', dependencies: ['@angular/core', 'rxjs', 'typescript'] },
+      ]),
+    ).toEqual(['angular', 'frontend', 'node', 'rxjs', 'typescript']);
+    expect(
+      detectStacks([
+        {
+          path: 'src/Api/Api.csproj',
+          dependencies: ['Microsoft.NET.Sdk.Web', 'Microsoft.EntityFrameworkCore.SqlServer'],
+        },
+      ]),
+    ).toEqual(['aspnetcore', 'backend', 'csharp', 'dotnet', 'efcore']);
+    expect(detectStacks([{ path: 'go.mod' }])).toEqual(['go']);
+  });
+
   it('handles Windows paths and broken JSON', () => {
     expect(detectStacks([{ path: 'web\\package.json', content: '{oops' }])).toEqual(['node']);
   });

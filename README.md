@@ -363,6 +363,11 @@ Codex, ...). Personal tokens work over MCP too; if the person belongs to several
 organizations, add `--header "X-OpenPurpose-Org: <org-slug>"` (and `X-OpenPurpose-Workspace`
 if they belong to several workspaces).
 
+Every tool schema an agent is offered costs it tokens. To offer fewer, add `?tools=` to the URL
+(or send `X-OpenPurpose-Tools`): profiles and tool names, comma-separated. `read` gives only the
+tools that read, and `read,propose_learning,report_finding` adds those two to it. Without it, the
+agent gets every tool.
+
 The server sends its workflow as MCP instructions, but agents follow it more
 reliably when the repo says so too: copy [`agent/AGENTS.snippet.md`](agent/AGENTS.snippet.md)
 into your repo's `AGENTS.md` or `CLAUDE.md`.
