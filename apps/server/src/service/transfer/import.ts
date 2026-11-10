@@ -713,8 +713,8 @@ async function apply(run: Run): Promise<void> {
   ) => {
     const { rows } = await c.query<{ id: string }>(
       `INSERT INTO sections (document_id, heading, body, mode, position, version, created_at, updated_at, updated_by,
-                             archived_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+                             archived_at, pinned)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
       [
         documentId,
         s.heading,
@@ -726,6 +726,7 @@ async function apply(run: Run): Promise<void> {
         s.updated_at,
         actor(s.updated_by),
         s.archived_at ?? null,
+        s.pinned ?? false,
       ],
     );
     const sectionId = rows[0].id;

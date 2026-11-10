@@ -408,6 +408,11 @@ describe('background sections and the task', () => {
     expect(taskScore({ heading: 'Theming', body: 'Use color tokens.' }, terms)).toBe(0);
   });
 
+  it('never shortens a pinned section', () => {
+    const rule = { ...(section('e', 'Generated code', long('Never edit it.')) as object), pinned: true };
+    expect(briefGeneral([block('organization', 'guidelines', [rule as never])], undefined)).toBe(0);
+  });
+
   it('sends background as first sentences, rules for this code in full, and task matches in full', () => {
     const purpose = section('a', 'What we do', long('We run trains.'));
     const orgRules = section('b', 'Colours', long('Use the --os tokens.'));

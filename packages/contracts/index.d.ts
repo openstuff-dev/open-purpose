@@ -633,6 +633,8 @@ export interface ExportSection {
   updated_by: string | null;
   /** Archived: kept with its history, but agents don't get it. Missing in older files. */
   archived_at?: string | null;
+  /** Agents always get it in full. Missing in older files. */
+  pinned?: boolean;
   /** Every version, oldest first. Empty unless `includes.history`. */
   versions: {
     version: number;

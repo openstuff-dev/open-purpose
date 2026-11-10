@@ -459,7 +459,7 @@ export async function ensureLearningsDocument(db: Queryable, level: Level): Prom
 
 // ───────────────────────────── sections ─────────────────────────────
 
-export const SECTION_COLS = `s.id, s.document_id, s.heading, s.body, s.mode, s.position, s.version, s.updated_at,
+export const SECTION_COLS = `s.id, s.document_id, s.heading, s.body, s.mode, s.pinned, s.position, s.version, s.updated_at,
   s.updated_by, a.name AS updated_by_name, s.archived_at,
   (SELECT x.name FROM actors x WHERE x.id = s.archived_by) AS archived_by_name`;
 
@@ -655,6 +655,24 @@ export async function reorderSections(
 }
 
 /** Delete a section for good, with its history. Only archived sections: archive it first. */
+/**
+ * Pin a section so agents always get it in full, or unpin it. Editors and admins only: it decides
+ * what every agent reads, like the edit mode. It doesn't make a new version.
+ */
+export async function setSectionPinned(
+  db: Queryable,
+  a: Access,
+  ref: string,
+  pinned: boolean,
+): Promise<Section> {
+  const s = await getSection(db, a, ref);
+  a.requireEdit(s.organization_id);
+  if (s.archived_at)
+    throw new AppError('conflict', `Section "${s.heading}" is archived. Restore it first.`);
+  await db.query('UPDATE sections SET pinned = $2 WHERE id = $1', [s.id, pinned]);
+  return loadSection(db, s.id);
+}
+
 export async function deleteSection(db: Db, a: Access, ref: string): Promise<void> {
   const s = await getSection(db, a, ref);
   a.requireEdit(s.organization_id);

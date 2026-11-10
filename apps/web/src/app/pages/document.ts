@@ -248,6 +248,11 @@ interface Draft {
                 } @else {
                   <app-mode-badge [mode]="s.mode" />
                 }
+                @if (s.pinned) {
+                  <span os-badge title="Agents always get this section in full, whatever their task"
+                    >Pinned</span
+                  >
+                }
               </header>
               <app-md
                 [text]="s.body"
@@ -344,6 +349,21 @@ interface Draft {
                     </button>
                     <button os-button variant="link" size="sm" type="button" (click)="startMove(s)">
                       Move to…
+                    </button>
+                    <button
+                      os-button
+                      variant="link"
+                      size="sm"
+                      type="button"
+                      (click)="togglePinned(s)"
+                      [attr.aria-pressed]="s.pinned"
+                      [title]="
+                        s.pinned
+                          ? 'Let agents get its first sentence when it is background'
+                          : 'Agents always get it in full, whatever their task'
+                      "
+                    >
+                      {{ s.pinned ? 'Unpin' : 'Pin' }}
                     </button>
                     <button os-button variant="link" size="sm" type="button" (click)="archive(s)">
                       Archive
@@ -750,6 +770,20 @@ export class DocumentPage {
     [ids[i], ids[j]] = [ids[j], ids[i]];
     try {
       await this.api.reorder(this.id(), ids);
+      await this.reload();
+    } catch (e) {
+      this.notices.error(e);
+    }
+  }
+
+  async togglePinned(s: Section): Promise<void> {
+    try {
+      await this.api.setPinned(s.id, !s.pinned);
+      this.notices.ok(
+        s.pinned
+          ? `Unpinned ${s.heading}`
+          : `Pinned ${s.heading}. Agents always get it in full`,
+      );
       await this.reload();
     } catch (e) {
       this.notices.error(e);

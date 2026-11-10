@@ -129,7 +129,9 @@ second organization under Settings › Organizations.
   (purpose, business logic, glossary, reference, and what applies to the whole organization or
   workspace) comes as its heading and first sentence, with the `read_section` call for the rest.
   An agent that passes `task` ("change the primary button colour") gets the five background
-  sections that match it best in full too. `full: true` sends everything in full.
+  sections that match it best in full too. `full: true` sends everything in full. Editors **pin**
+  the few sections that must never be skipped ("never edit generated files"): those always go in
+  full, and the context budget leaves them whole too.
 - **Context budget.** Big rule sets don't flood an agent. When `get_context` would be
   larger than the budget (estimated as characters / 4), the most general sections are
   cut to their heading and first sentence: workspace first, then organization, project and

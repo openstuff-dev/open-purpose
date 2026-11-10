@@ -150,6 +150,10 @@ function samplePath(glob: string): string {
                               title="Agents get the first sentence only, to stay within the context budget"
                               >Shortened</span
                             >
+                          } @else if (s.pinned) {
+                            <span os-badge title="Always sent in full, whatever the task"
+                              >Pinned</span
+                            >
                           } @else if (s.brief) {
                             <span
                               os-badge

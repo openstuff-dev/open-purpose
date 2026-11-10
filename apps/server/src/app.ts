@@ -1098,6 +1098,14 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
         );
         return reply.status(r.status === 'applied' ? 200 : 202).send(r);
       });
+      api.put('/sections/:id/pinned', async (req) =>
+        content.setSectionPinned(
+          req.db,
+          req.access,
+          (req.params as { id: string }).id,
+          parse(z.object({ pinned: z.boolean() }), req.body).pinned,
+        ),
+      );
       api.post('/sections/:id/restore', async (req) =>
         content.restoreSection(req.db, req.access, (req.params as { id: string }).id),
       );

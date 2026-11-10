@@ -1538,6 +1538,18 @@ describe('OpenPurpose with groups and organizations', () => {
     expect(full.text).toContain('signed off by finance');
     expect(full.text).not.toContain('only the first sentence');
 
+    // A pinned section always goes in full. Only people who edit there may pin it.
+    const pin = (pinned: boolean, token?: string) =>
+      api('PUT', `/sections/${ledger.id}/pinned`, { pinned }, token ? { token } : undefined);
+    expect((await pin(true, t.jonas)).status).toBe(403);
+    expect((await pin(true)).data.pinned).toBe(true);
+    const pinned = (await call('get_context', args)).text;
+    expect(pinned).toContain('signed off by finance');
+    expect(pinned).toContain(`\`[s:${ledger.id.slice(0, 8)} · propose · pinned]\``);
+    expect(pinned).toContain('**pinned** sections always apply, whatever your task.');
+    expect((await pin(false)).data.pinned).toBe(false);
+    expect((await call('get_context', args)).text).not.toContain('signed off by finance');
+
     await removeSection(ledger.id);
     await client.close();
   });

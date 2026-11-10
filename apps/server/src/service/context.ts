@@ -448,7 +448,7 @@ export function taskScore(s: Pick<Section, 'heading' | 'body'>, terms: string[])
 
 /**
  * Marks background sections brief, except the few that match the task best, and returns how many
- * it marked. A section barely longer than its first sentence stays as it is.
+ * it marked. Pinned sections, and those barely longer than their first sentence, stay whole.
  */
 export function briefGeneral(blocks: ContextBlock[], task: string | null | undefined): number {
   const terms = taskTerms(task);
@@ -456,7 +456,9 @@ export function briefGeneral(blocks: ContextBlock[], task: string | null | undef
     b.documents
       .filter((d) => !isRuleForThisCode(b.level, d.kind))
       .flatMap((d) =>
-        d.sections.filter((s) => s.body.trim().length - excerpt(s).length >= BRIEF_MIN_SAVING),
+        d.sections.filter(
+          (s) => !s.pinned && s.body.trim().length - excerpt(s).length >= BRIEF_MIN_SAVING,
+        ),
       ),
   );
   const matching = new Set(
@@ -514,7 +516,7 @@ export function compact(
     let estimate = tokens + estimateTokens(shortenedNotice(candidates.length, maxTokens));
     for (const { s } of candidates) {
       if (estimate <= maxTokens) break;
-      if (s.brief) continue;
+      if (s.brief || s.pinned) continue;
       const saved = s.body.trim().length - excerpt(s).length;
       if (saved <= 0) continue;
       s.shortened = true;
@@ -649,6 +651,8 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
   out.push(
     'Each section has a marker `[s:<id> · <mode>]`. **locked**: read-only for you. **propose**: your edits become proposals a person approves. **open**: you may edit directly.',
   );
+  if (ctx.blocks.some((b) => b.documents.some((d) => d.sections.some((x) => x.pinned))))
+    out.push('**pinned** sections always apply, whatever your task.');
   out.push(
     'Each document has a marker `[d:<id> · <mode>]`: pass the id to `add_section` to add a section to it. When a document is missing (a glossary, the business logic, ...), propose one with `propose_document`.',
   );
@@ -671,7 +675,7 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
       for (const s of doc.sections) {
         out.push(
           '',
-          `#### ${s.heading}  \`[s:${shortId(s.id)} · ${s.mode}]\``,
+          `#### ${s.heading}  \`[s:${shortId(s.id)} · ${s.mode}${s.pinned ? ' · pinned' : ''}]\``,
           '',
           s.shortened || s.brief ? excerpt(s) : s.body.trim() || '_(empty)_',
         );

@@ -113,7 +113,7 @@ export async function exportContent(
   const sections = (
     await db.query<SectionRow>(
       `SELECT s.id AS key, s.document_id, s.heading, s.body, s.mode, s.position, s.version, s.created_at, s.updated_at, s.updated_by,
-            s.archived_at
+            s.archived_at, s.pinned
        FROM sections s JOIN documents d ON d.id = s.document_id
       WHERE $1::uuid IS NULL OR d.organization_id = $1 ORDER BY s.position, s.created_at`,
       [org],
