@@ -1962,6 +1962,48 @@ definitions:`,
     }
   });
 
+  it("shows which stacks the organization's projects share, and which no scope covers", async () => {
+    const made: string[] = [];
+    for (const slug of ['vue-one', 'vue-two']) {
+      const p = await api('POST', '/projects', { organization_id: o.logistics, name: slug, slug });
+      made.push(p.data.id);
+      await api('POST', `/projects/${p.data.id}/repositories`, {
+        remote_url: `https://github.com/acme/${slug}.git`,
+      });
+    }
+    const { client, call } = await mcp(t.jonas);
+    for (const slug of ['vue-one', 'vue-two'])
+      await call('get_context', {
+        remote_url: `https://github.com/acme/${slug}.git`,
+        path: '.',
+        manifests: [{ path: 'package.json', dependencies: ['vue'] }],
+      });
+    const listed = JSON.parse((await call('list_scopes', { project: 'logistics/vue-one' })).text);
+    expect(listed.stacks_in_organization).toContainEqual({
+      stack: 'vue',
+      projects: ['vue-one', 'vue-two'],
+      scopes: [],
+    });
+    expect(listed.next).toContain('No organization scope covers');
+    expect(listed.next).toContain('vue (2 projects)');
+    expect(listed.next).toContain('create_scope with level "organization"');
+
+    // Once an organization scope covers it, there is nothing to suggest for vue.
+    const vue = await api('POST', '/scopes', {
+      organization_id: o.logistics,
+      name: 'Vue apps',
+      stacks: ['vue'],
+    });
+    const after = JSON.parse((await call('list_scopes', { project: 'logistics/vue-one' })).text);
+    expect(after.stacks_in_organization).toContainEqual(
+      expect.objectContaining({ stack: 'vue', scopes: ['vue-apps'] }),
+    );
+    expect(after.next ?? '').not.toContain('vue (');
+    await client.close();
+    await api('DELETE', `/scopes/${vue.data.id}`);
+    for (const id of made) await api('DELETE', `/projects/${id}`);
+  });
+
   it('resolves the same slug per organization', async () => {
     await api('POST', '/projects', { organization_id: o.logistics, name: 'API', slug: 'api' });
     await api('POST', '/projects', {

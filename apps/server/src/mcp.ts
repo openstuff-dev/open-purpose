@@ -13,6 +13,7 @@ import { recordRequest, type Track } from './service/activity.js';
 import { buildContext, resolveTarget } from './service/context.js';
 import { relatedTo } from './service/graph.js';
 import { getSkill, listSkills } from './service/skills.js';
+import { recordStacks, stacksOfOrganization } from './service/stacks.js';
 import { tryParseRemote } from './domain/remote.js';
 import {
   addRepository,
@@ -105,7 +106,8 @@ Workflow:
    detail of your own finding wrong (commit, file, lines, wording), correct it with update_finding.
 8. Skills are guides the server offers. When the user is new to OpenPurpose or asks you to set it up, call
    get_skill with "init-openpurpose": a guided first run in their repository. When they want to describe
-   their organization, use "describe-organization". list_skills shows all of them.`;
+   their organization, use "describe-organization"; to populate a project or add scopes, use
+   "describe-project". list_skills shows all of them.`;
 
 const manifestSchema = z.object({
   path: z
@@ -360,6 +362,10 @@ export function createMcpServer(
           b.documents.flatMap((d) => d.sections.map((s) => ({ id: s.id, document_id: d.id }))),
         );
         if (apiConfig) refreshStale(pool, a.group.id, built.apis, apiConfig);
+        // So list_scopes can show which stacks the organization's projects share.
+        const { project: proj, resolution } = built;
+        if (!opts.simulated && proj && resolution.remote && a.canContribute(proj.organization_id))
+          await recordStacks(db, proj.id, resolution.remote.key, built.stacks);
         const ctx = built.markdown;
         const waiting = opts.simulated ? [] : await waitingOn(db, a);
         if (!waiting.length) return text(ctx);
@@ -488,7 +494,8 @@ export function createMcpServer(
     {
       title: 'List scopes',
       description:
-        'List the scopes (parts of a project: some of its repositories and/or folders; or stacks across the organization or workspace) that guidelines and learnings can be filed under.',
+        'List the scopes (parts of a project: some of its repositories and/or folders; or stacks across the organization or workspace) that guidelines and learnings can be filed under, ' +
+        "and the stacks the organization's projects use, with the scopes that cover each.",
       inputSchema: {
         project: z
           .string()
@@ -520,10 +527,19 @@ export function createMcpServer(
           stacks: s.stacks,
           description: s.description,
         });
+        const stacks = orgId ? await stacksOfOrganization(db, orgId) : [];
+        // A stack several projects share, with no scope above them, is where shared rules belong.
+        const shared = stacks.filter((s) => s.projects.length > 1 && !s.scopes.length);
         return json({
           group: (await at(null, null)).map(fmt),
           organization: orgId ? (await at(orgId, null)).map(fmt) : [],
           project: p ? (await at(p.organization_id, p.id)).map(fmt) : [],
+          stacks_in_organization: stacks,
+          ...(shared.length
+            ? {
+                next: `No organization scope covers ${shared.map((s) => `${s.stack} (${s.projects.length} projects)`).join(', ')}. Read those projects with get_context(project=...), and for the rules they share call create_scope with level "organization", the stack and those rules as sections.`,
+              }
+            : {}),
         });
       }),
   );

@@ -26,6 +26,12 @@ describe('skills', () => {
     expect(skill.body).toContain('# Describe the organization');
   });
 
+  it('offers the describe-project skill, which gives every scope its first rules', async () => {
+    const skill = await getSkill('describe-project');
+    expect(skill.body).toContain('# Describe the project');
+    expect(skill.body).toContain('stacks_in_organization');
+  });
+
   it('returns the full text of one skill, and not_found for an unknown one', async () => {
     expect((await getSkill('init-openpurpose')).body).toContain('# Get started with OpenPurpose');
     await expect(getSkill('nope')).rejects.toBeInstanceOf(AppError);

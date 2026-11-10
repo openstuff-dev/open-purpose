@@ -65,7 +65,7 @@ Done when `propose_learning` has returned and you have told them where to approv
 In three short lines, list what is now set up. Then suggest what to try next, picking the two that fit what you saw:
 
 - Approve the learning in the **Inbox**, then ask an agent for a task in this repo and watch it follow the rule.
-- Add a scope for a part of the code with its own rules (`frontend/**`, or the `angular` stack).
+- Ask to "describe this project": the `describe-project` skill adds a scope with its first rules for each part of the code that has its own (`frontend/**`, or the `angular` stack).
 - Link related projects with `[[project-name]]` so agents learn about the services this one talks to.
 - Attach the project's OpenAPI spec on its **API** tab, so agents call endpoints with exact shapes.
 - Ask "anything you could fix here?" to see the findings agents have reported.

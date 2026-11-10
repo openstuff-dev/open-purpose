@@ -394,6 +394,12 @@ An empty **Organization purpose**? Ask your agent to "describe my organization".
 (and reads your website if you give it a link), pushes back on vague answers and ends with a text
 you paste into the organization's purpose.
 
+To fill a project, ask your agent to "describe this project". The
+[`describe-project`](agent/skills/describe-project/SKILL.md) skill maps the repository, shows you a
+plan, and suggests a scope with its first rules for each part of the code that has rules of its
+own. `list_scopes` shows which stacks the organization's projects share (agents report them with
+every `get_context`), so it also suggests organization scopes for rules several projects follow.
+
 ### MCP tools
 
 | Tool | What it does |
