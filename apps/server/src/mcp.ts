@@ -79,8 +79,10 @@ Workflow:
    (or create_project), and write .openpurpose.json with {"project": "<slug>"} in the repo root.
 3. When the user corrects you in a way that should also apply next time, call propose_learning with the
    same remote/path and the stacks get_context returned. A person reviews it before it becomes a rule.
-   Keep it to one rule, stated positively, with the reason. When a part of the code (a package, a folder, a stack) keeps collecting
-   rules of its own and list_scopes has no scope for it, suggest one with create_scope.
+   Keep it to one rule, stated positively, with the reason. When a part of the code (a package, a
+   folder, a stack) has rules of its own and list_scopes has no scope for it, suggest one with
+   create_scope, with those rules as its first sections. When you describe a project, do this for each
+   such part.
    get_context shows each document's id as [d:xxxxxxxx]; add sections with add_section. When a document is
    missing (a new project often has no glossary or business logic yet), suggest it with its first sections
    via propose_document, and tell the user in one line that you proposed it. When a section is outdated or
@@ -1498,7 +1500,8 @@ export function createMcpServer(
     {
       title: 'Create scope',
       description:
-        "Suggest a new scope: a part of a project (some folders, stacks or one of its repositories) that needs its own guidelines and learnings, e.g. \"Lint package\" for packages/lint/**. Call list_scopes first so you don't repeat one. A person approves it before it exists; if your token can edit the organization, it's created right away. Pass the same project/remote_url you used for get_context.",
+        "Suggest a new scope: a part of a project (some folders, stacks or one of its repositories) that needs its own guidelines and learnings, e.g. \"Lint package\" for packages/lint/**. Call list_scopes first so you don't repeat one. " +
+        'Send its first guidelines as sections: a scope without rules changes nothing for agents. A person approves it, sections included; if your token can edit the organization, it is created right away. Pass the same project/remote_url you used for get_context.',
       inputSchema: {
         name: z.string().describe('Short name a person recognises, e.g. "Angular frontend"'),
         slug: z.string().optional().describe('Lower-case, dashes; derived from name when omitted'),
@@ -1517,6 +1520,15 @@ export function createMcpServer(
           .boolean()
           .optional()
           .describe('Bind it to the repository of remote_url, for a project with several repositories'),
+        sections: z
+          .array(
+            z.object({
+              heading: z.string().describe('The rule in a few words, e.g. "Rules are kebab-case"'),
+              body: z.string().describe('Markdown. Use "###" or deeper for headings inside it.'),
+            }),
+          )
+          .optional()
+          .describe('Its first guidelines: the rules that hold here and not elsewhere'),
         reason: z.string().describe('Why it needs its own scope, in a sentence or two'),
         project: locate.project,
         remote_url: locate.remote_url,
@@ -1573,20 +1585,33 @@ export function createMcpServer(
           path_globs: x.paths,
           stacks: x.stacks,
           repository_ids: repositoryIds,
+          guidelines: x.sections,
           rationale: x.reason,
           context: { remote: r.remote?.key ?? null },
         });
-        if (result.status === 'applied' && result.proposal)
+        const n = x.sections?.length ?? 0;
+        const sent = `${n} guideline${n === 1 ? '' : 's'}`;
+        if (result.status === 'proposed') {
           return text(
-            `Scope \`${result.scope.slug}\` approved automatically in **${label}** (proposal ${result.proposal.id.slice(0, 8)}). ${AUTO_APPROVED} File guidelines under it with propose_learning (scope="${result.scope.slug}").`,
+            `Scope \`${result.proposal.scope_spec?.slug}\` proposed for **${label}** with ${sent} (proposal ${result.proposal.id.slice(0, 8)}). ` +
+            'Tell the user in one line that they can approve it in the OpenPurpose Inbox. ' +
+            'It exists once a person approves it. To change or add guidelines before then, call revise_proposal with the whole text: the description, then a "## Heading" line per guideline.',
           );
-        return result.status === 'applied'
-          ? text(
-              `Created scope \`${result.scope.slug}\` in **${label}**. File guidelines under it with propose_learning (scope="${result.scope.slug}").`,
-            )
-          : text(
-              `Scope \`${result.proposal.scope_spec?.slug}\` proposed for **${label}** (proposal ${result.proposal.id}). It exists once a person approves it; until then, file learnings at the project level.`,
-            );
+        }
+        const doc = (
+          await db.query<{ id: string }>(
+            "SELECT id FROM documents WHERE scope_id = $1 AND slug = 'guidelines'",
+            [result.scope.id],
+          )
+        ).rows.at(0);
+        const more = doc
+          ? `Add more rules with add_section(document_id="${doc.id.slice(0, 8)}").`
+          : `Add rules with propose_document(scope="${result.scope.slug}").`;
+        return text(
+          result.proposal
+            ? `Scope \`${result.scope.slug}\` approved automatically in **${label}** with ${sent} (proposal ${result.proposal.id.slice(0, 8)}). ${AUTO_APPROVED} ${more}`
+            : `Created scope \`${result.scope.slug}\` in **${label}** with ${sent}. ${more}`,
+        );
       }),
   );
 

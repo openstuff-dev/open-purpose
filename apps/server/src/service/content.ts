@@ -6,6 +6,7 @@ import { normalizePath } from '../domain/scopes.js';
 import { normalizeTags } from '../domain/stacks.js';
 import { slugify } from '../domain/remote.js';
 import { extractLinks } from '../domain/links.js';
+import type { SectionDraft } from '../domain/document-body.js';
 import {
   type DocumentActivity,
   type DocumentReadRow,
@@ -103,6 +104,8 @@ export interface ScopeInput {
   position?: number;
   /** Take the slug even if it is another scope's old slug. */
   take_alias?: boolean;
+  /** First sections of its Guidelines document. */
+  guidelines?: SectionDraft[];
 }
 
 export const SCOPE_COLS = `id, organization_id, project_id, slug, name, description, path_globs, stacks, position,
@@ -176,14 +179,24 @@ export async function createScope(
   a: Access,
   level: { organization_id?: string | null; project_id?: string | null },
   input: ScopeInput,
+  author: { actorId: string | null; note: string } = { actorId: a.actor.id, note: '' },
 ): Promise<Scope> {
   const lv = await resolveLevel(db, level);
   a.requireEdit(lv.organization_id);
-  return insertScope(db, lv, input);
+  return insertScope(db, lv, input, author);
 }
 
-/** createScope without the permission check, for proposals that were approved automatically. */
-export async function insertScope(db: Db, lv: Level, input: ScopeInput): Promise<Scope> {
+/**
+ * createScope without the permission check, for proposals that were approved automatically.
+ * A scope starts with a Guidelines document, with `guidelines` as its first sections: an empty
+ * scope would never show in get_context, so agents could not see where its rules go.
+ */
+export async function insertScope(
+  db: Db,
+  lv: Level,
+  input: ScopeInput,
+  author: { actorId: string | null; note: string } = { actorId: null, note: '' },
+): Promise<Scope> {
   if (!input.name.trim()) throw badRequest('name is required');
   const slug = input.slug || slugify(input.name);
   return wrap(
@@ -203,7 +216,15 @@ export async function insertScope(db: Db, lv: Level, input: ScopeInput): Promise
           input.position ?? 0,
         ],
       );
-      return bindRepositories(c, rows[0], input.repository_ids);
+      const scope = await bindRepositories(c, rows[0], input.repository_ids);
+      const doc = await insertDocument(
+        c,
+        { organization_id: lv.organization_id, project_id: lv.project_id, scope_id: scope.id },
+        { kind: 'guidelines', title: 'Guidelines', slug: 'guidelines' },
+      );
+      for (const g of input.guidelines ?? [])
+        await insertSection(c, doc.id, g, author.actorId, author.note);
+      return scope;
     }),
   );
 }

@@ -665,7 +665,7 @@ function ago(iso: string): string {
                   [rows]="12"
                   [label]="
                     p.kind === 'new_scope'
-                      ? 'Description'
+                      ? 'Description, then a ## heading per first guideline'
                       : p.kind === 'new_document'
                         ? 'Sections'
                         : 'Text'
@@ -959,7 +959,9 @@ function ago(iso: string): string {
                 @if (takesMode(p)) {
                   <span class="quiet foot-hint">{{ modeLabel[r.mode] }} after approval</span>
                 } @else if (p.kind === 'new_scope') {
-                  <span class="quiet foot-hint">Approving creates the scope</span>
+                  <span class="quiet foot-hint"
+                    >Approving creates the scope, with each ## section as a guideline</span
+                  >
                 } @else if (p.kind === 'archive_section') {
                   <span class="quiet foot-hint"
                     >Approving archives it. You can restore it later</span

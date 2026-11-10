@@ -29,6 +29,10 @@ organization, the project and the part of the code you are in (a repository or a
    outdated or repeats another, call \`archive_section\`; when it belongs in
    another document, call \`move_section\`. Give the reason and tell me in one
    line what you archived or moved.
+   Check \`list_scopes\` for the project: if a distinct area (e.g. \`apps/server/**\`,
+   \`apps/web/**\`, \`packages/<name>/**\`, \`site/**\`) or stack lacks a scope,
+   suggest it with \`create_scope\`, with the rules that hold there as its first
+   \`sections\`. When \`get_context\` says a scope has no rules yet, add them there.
 4. When I correct you and the correction should apply next time, call
    \`propose_learning\` with the same remote/path and stacks. Say in one line that
    you did. Do not propose one-off preferences or task-specific details.

@@ -934,6 +934,58 @@ describe('OpenPurpose with groups and organizations', () => {
       if (s.slug === 'lint-package' || s.slug === 'scripts') await api('DELETE', `/scopes/${s.id}`);
   });
 
+  it('creates a scope with its first guidelines, and says where rules go while it has none', async () => {
+    const { client, call } = await mcp(t.jonas);
+    const r = await call('create_scope', {
+      name: 'Docs site',
+      description: 'The public docs.',
+      paths: ['site/**'],
+      sections: [{ heading: 'Pages are MDX', body: 'Write every page as MDX, never as HTML.' }],
+      reason: 'The site has its own conventions.',
+      remote_url: HTTPS_REMOTE,
+    });
+    expect(r.text).toContain('Scope `docs-site` proposed for **Customer Portal** with 1 guideline');
+    const p = (await api('GET', '/proposals?status=pending')).data.find(
+      (x: any) => x.kind === 'new_scope' && x.heading === 'Docs site',
+    );
+    // Reviewed as one text: the description, then a "## " section per guideline.
+    expect(p.body).toBe(
+      'The public docs.\n\n## Pages are MDX\n\nWrite every page as MDX, never as HTML.',
+    );
+    expect((await call('get_review', { proposal_id: p.id })).text).toContain(
+      'each "## " line after it starts one of its first guidelines',
+    );
+    expect((await api('POST', `/proposals/${p.id}/approve`, {})).status).toBe(200);
+    const done = (await api('GET', `/proposals/${p.id}`)).data;
+    const scope = (await api('GET', `/scopes/${done.result_scope_id}`)).data;
+    expect(scope.description).toBe('The public docs.');
+    const ctx = (await call('get_context', { remote_url: HTTPS_REMOTE, path: 'site/index.mdx' })).text;
+    expect(ctx).toContain('## Customer Portal › Docs site');
+    expect(ctx).toContain('Write every page as MDX, never as HTML.');
+    await client.close();
+
+    // A scope without rules is named in get_context, with the document its rules go in.
+    const admin = await mcp(ADMIN);
+    const bare = await admin.call('create_scope', {
+      name: 'Infra',
+      description: 'Terraform.',
+      paths: ['infra/**'],
+      reason: 'Own conventions.',
+      remote_url: HTTPS_REMOTE,
+    });
+    const docId = /add_section\(document_id="([0-9a-f]{8})"\)/.exec(bare.text)?.[1];
+    expect(docId).toBeDefined();
+    const empty = (await admin.call('get_context', { remote_url: HTTPS_REMOTE, path: 'infra/main.tf' }))
+      .text;
+    expect(empty).toContain(
+      `> **Customer Portal › Infra applies here (path "infra/**") but has no rules yet.**`,
+    );
+    expect(empty).toContain(`add it with \`add_section\` to Guidelines \`[d:${docId}]\``);
+    await admin.client.close();
+    for (const x of (await api('GET', `/scopes?project_id=${projectId}`)).data)
+      if (x.slug === 'docs-site' || x.slug === 'infra') await api('DELETE', `/scopes/${x.id}`);
+  });
+
   it('lets agents propose a document with its first sections, which a person creates by approving', async () => {
     const { client, call } = await mcp(t.jonas);
     const r = await call('propose_document', {
@@ -1100,7 +1152,10 @@ describe('OpenPurpose with groups and organizations', () => {
     expect(listed.find((d: any) => d.id === doc.id).section_count).toBe(1);
     const scopes = (await api('GET', `/scopes?project_id=${projectId}`)).data;
     expect(scopes.find((x: any) => x.id === scope.id).section_count).toBe(1);
-    expect((await api('GET', `/scopes/${scope.id}`)).data.documents[0].section_count).toBe(1);
+    const docs = (await api('GET', `/scopes/${scope.id}`)).data.documents;
+    expect(docs.find((d: any) => d.id === scopeDoc.id).section_count).toBe(1);
+    // A new scope starts with an empty Guidelines document, so agents see where its rules go.
+    expect(docs.find((d: any) => d.slug === 'guidelines').section_count).toBe(0);
     // The project counts its own documents and its scopes' documents.
     expect(await projectCount()).toBe(before + 2);
 

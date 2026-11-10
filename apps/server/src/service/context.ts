@@ -624,6 +624,20 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
     out.push('');
   }
 
+  // A scope that applies but holds no rules does nothing for agents: say where its rules go.
+  const emptyScopes = ctx.blocks.filter((b) => b.scope && b.documents.length === 0);
+  for (const b of emptyScopes) {
+    const doc =
+      b.empty_documents.find((d) => d.kind === 'guidelines') ?? b.empty_documents.at(0);
+    out.push(
+      `> **${b.label} applies here (${b.scope?.reason ?? ''}) but has no rules yet.** ` +
+      (doc
+        ? `When you learn what holds in this part of the code, add it with \`add_section\` to ${doc.title} \`[d:${shortId(doc.id)}]\`.`
+        : `When you learn what holds in this part of the code, add it with \`propose_document\` (scope "${b.scope?.slug ?? ''}").`),
+    );
+  }
+  if (emptyScopes.length) out.push('');
+
   if (!ctx.project) {
     const wide = ctx.organization
       ? ctx.group.shown
@@ -684,7 +698,10 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
   }
   if (!any) out.push('', '_No guidelines have been written for this context yet._');
 
-  const empty = ctx.blocks.filter((b) => b.empty_documents.length);
+  // Empty scopes were named above already.
+  const empty = ctx.blocks.filter(
+    (b) => b.empty_documents.length && !(b.scope && b.documents.length === 0),
+  );
   if (empty.length) {
     out.push('', '---', '', '## Empty documents');
     out.push(

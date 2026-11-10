@@ -11,7 +11,12 @@ import { detectStacks } from '../src/domain/stacks.js';
 import { matchScopes, mostSpecific, normalizePath } from '../src/domain/scopes.js';
 import { extractLinks, rewriteLinks } from '../src/domain/links.js';
 import { cacheControl } from '../src/domain/cache.js';
-import { parseDocumentBody, renderDocumentBody } from '../src/domain/document-body.js';
+import {
+  parseDocumentBody,
+  parseScopeBody,
+  renderDocumentBody,
+  renderScopeBody,
+} from '../src/domain/document-body.js';
 
 describe('parseRemote', () => {
   const key = 'azure:acme/big project/portal-frontend';
@@ -431,5 +436,26 @@ describe('background sections and the task', () => {
       false,
       false,
     ]);
+  });
+});
+
+describe('scope proposal text', () => {
+  it('holds the description, then one section per first guideline', () => {
+    const guidelines = [{ heading: 'Pages are MDX', body: '```md\n## not a heading\n```' }];
+    const text = renderScopeBody('The public docs.', guidelines);
+    expect(text).toBe('The public docs.\n\n## Pages are MDX\n\n```md\n## not a heading\n```');
+    expect(parseScopeBody(text)).toEqual({ description: 'The public docs.', guidelines });
+  });
+
+  it('reads a description alone, and guidelines alone', () => {
+    expect(parseScopeBody('Just a description.')).toEqual({
+      description: 'Just a description.',
+      guidelines: [],
+    });
+    expect(parseScopeBody('## Rule\n\nText.')).toEqual({
+      description: '',
+      guidelines: [{ heading: 'Rule', body: 'Text.' }],
+    });
+    expect(parseScopeBody('Intro.\n\n##\n\nNo heading.')).toHaveProperty('error');
   });
 });
