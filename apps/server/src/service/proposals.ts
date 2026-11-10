@@ -4,7 +4,13 @@ import { tx } from '../db.js';
 import { AppError, badRequest, forbidden, notFound } from '../errors.js';
 import { slugify } from '../domain/remote.js';
 import { normalizeTags } from '../domain/stacks.js';
-import { parseDocumentBody, renderDocumentBody, type SectionDraft } from '../domain/document-body.js';
+import {
+  parseDocumentBody,
+  parseScopeBody,
+  renderDocumentBody,
+  renderScopeBody,
+  type SectionDraft,
+} from '../domain/document-body.js';
 import {
   applySectionChange,
   archiveSectionRow,
@@ -659,7 +665,8 @@ export async function proposeScope(
       organization_id: lv.organization_id,
       project_id: lv.project_id,
       heading: input.name.trim(),
-      body: input.description?.trim() ?? '',
+      // Reviewed together: the description, then a "## Heading" line per first guideline.
+      body: renderScopeBody(input.description ?? '', input.guidelines ?? []),
       rationale: input.rationale ?? '',
       context: input.context ?? {},
       scope_spec: spec,
@@ -689,6 +696,13 @@ export interface DocumentProposalInput {
 export type DocumentResult =
   | { status: 'applied'; document: Document; sections: Section[]; proposal?: Proposal } |
   { status: 'proposed'; proposal: Proposal };
+
+/** A new_scope proposal's description and first guidelines, or a 400 that says how to fix it. */
+export function scopeText(body: string): { description: string; guidelines: SectionDraft[] } {
+  const r = parseScopeBody(body);
+  if ('error' in r) throw badRequest(r.error);
+  return r;
+}
 
 /** The sections of a new_document proposal's text, or a 400 that says how to fix it. */
 export function documentSections(body: string): SectionDraft[] {
@@ -917,17 +931,21 @@ async function applyApproval(
         ).rows.map((r) => r.id)
       : undefined;
     const scopeLevel = { organization_id: p.organization_id, project_id: p.project_id };
+    const { description, guidelines } = scopeText(body);
     const scopeInput = {
       name: heading,
-      description: body,
+      description,
+      guidelines,
       slug: spec?.slug,
       path_globs: spec?.path_globs,
       stacks: spec?.stacks,
       repository_ids: repositoryIds,
     };
+    // The guidelines are the proposer's words, approved with the scope.
+    const author = { actorId: p.created_by, note: note || 'Approved with the scope' };
     scope = auto
-      ? await insertScope(c, { ...scopeLevel, scope_id: null }, scopeInput)
-      : await createScope(c, a, scopeLevel, scopeInput);
+      ? await insertScope(c, { ...scopeLevel, scope_id: null }, scopeInput, author)
+      : await createScope(c, a, scopeLevel, scopeInput, author);
   } else if (p.kind === 'archive_section' || p.kind === 'move_section') {
     if (!p.section_id)
       throw new AppError('conflict', 'The section this proposal is about no longer exists');

@@ -6,6 +6,7 @@ import { normalizePath } from '../domain/scopes.js';
 import { normalizeTags } from '../domain/stacks.js';
 import { slugify } from '../domain/remote.js';
 import { extractLinks } from '../domain/links.js';
+import type { SectionDraft } from '../domain/document-body.js';
 import {
   type DocumentActivity,
   type DocumentReadRow,
@@ -103,6 +104,8 @@ export interface ScopeInput {
   position?: number;
   /** Take the slug even if it is another scope's old slug. */
   take_alias?: boolean;
+  /** First sections of its Guidelines document. */
+  guidelines?: SectionDraft[];
 }
 
 export const SCOPE_COLS = `id, organization_id, project_id, slug, name, description, path_globs, stacks, position,
@@ -176,14 +179,24 @@ export async function createScope(
   a: Access,
   level: { organization_id?: string | null; project_id?: string | null },
   input: ScopeInput,
+  author: { actorId: string | null; note: string } = { actorId: a.actor.id, note: '' },
 ): Promise<Scope> {
   const lv = await resolveLevel(db, level);
   a.requireEdit(lv.organization_id);
-  return insertScope(db, lv, input);
+  return insertScope(db, lv, input, author);
 }
 
-/** createScope without the permission check, for proposals that were approved automatically. */
-export async function insertScope(db: Db, lv: Level, input: ScopeInput): Promise<Scope> {
+/**
+ * createScope without the permission check, for proposals that were approved automatically.
+ * A scope starts with a Guidelines document, with `guidelines` as its first sections: an empty
+ * scope would never show in get_context, so agents could not see where its rules go.
+ */
+export async function insertScope(
+  db: Db,
+  lv: Level,
+  input: ScopeInput,
+  author: { actorId: string | null; note: string } = { actorId: null, note: '' },
+): Promise<Scope> {
   if (!input.name.trim()) throw badRequest('name is required');
   const slug = input.slug || slugify(input.name);
   return wrap(
@@ -203,7 +216,15 @@ export async function insertScope(db: Db, lv: Level, input: ScopeInput): Promise
           input.position ?? 0,
         ],
       );
-      return bindRepositories(c, rows[0], input.repository_ids);
+      const scope = await bindRepositories(c, rows[0], input.repository_ids);
+      const doc = await insertDocument(
+        c,
+        { organization_id: lv.organization_id, project_id: lv.project_id, scope_id: scope.id },
+        { kind: 'guidelines', title: 'Guidelines', slug: 'guidelines' },
+      );
+      for (const g of input.guidelines ?? [])
+        await insertSection(c, doc.id, g, author.actorId, author.note);
+      return scope;
     }),
   );
 }
@@ -459,7 +480,7 @@ export async function ensureLearningsDocument(db: Queryable, level: Level): Prom
 
 // ───────────────────────────── sections ─────────────────────────────
 
-export const SECTION_COLS = `s.id, s.document_id, s.heading, s.body, s.mode, s.position, s.version, s.updated_at,
+export const SECTION_COLS = `s.id, s.document_id, s.heading, s.body, s.mode, s.pinned, s.position, s.version, s.updated_at,
   s.updated_by, a.name AS updated_by_name, s.archived_at,
   (SELECT x.name FROM actors x WHERE x.id = s.archived_by) AS archived_by_name`;
 
@@ -655,6 +676,24 @@ export async function reorderSections(
 }
 
 /** Delete a section for good, with its history. Only archived sections: archive it first. */
+/**
+ * Pin a section so agents always get it in full, or unpin it. Editors and admins only: it decides
+ * what every agent reads, like the edit mode. It doesn't make a new version.
+ */
+export async function setSectionPinned(
+  db: Queryable,
+  a: Access,
+  ref: string,
+  pinned: boolean,
+): Promise<Section> {
+  const s = await getSection(db, a, ref);
+  a.requireEdit(s.organization_id);
+  if (s.archived_at)
+    throw new AppError('conflict', `Section "${s.heading}" is archived. Restore it first.`);
+  await db.query('UPDATE sections SET pinned = $2 WHERE id = $1', [s.id, pinned]);
+  return loadSection(db, s.id);
+}
+
 export async function deleteSection(db: Db, a: Access, ref: string): Promise<void> {
   const s = await getSection(db, a, ref);
   a.requireEdit(s.organization_id);

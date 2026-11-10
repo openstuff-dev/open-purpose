@@ -124,6 +124,14 @@ second organization under Settings › Organizations.
   the real MCP tool's output, word for word. The server runs the tool as that
   agent, offers only read tools, and only lets a person look through an agent's
   eyes if they can already read everything that agent can.
+- **Background on demand.** `get_context` sends the rules for the code at hand in full: the
+  guidelines and learnings of the project and of the scopes that matched. Everything else
+  (purpose, business logic, glossary, reference, and what applies to the whole organization or
+  workspace) comes as its heading and first sentence, with the `read_section` call for the rest.
+  An agent that passes `task` ("change the primary button colour") gets the five background
+  sections that match it best in full too. `full: true` sends everything in full. Editors **pin**
+  the few sections that must never be skipped ("never edit generated files"): those always go in
+  full, and the context budget leaves them whole too.
 - **Context budget.** Big rule sets don't flood an agent. When `get_context` would be
   larger than the budget (estimated as characters / 4), the most general sections are
   cut to their heading and first sentence: workspace first, then organization, project and
@@ -363,6 +371,11 @@ Codex, ...). Personal tokens work over MCP too; if the person belongs to several
 organizations, add `--header "X-OpenPurpose-Org: <org-slug>"` (and `X-OpenPurpose-Workspace`
 if they belong to several workspaces).
 
+Every tool schema an agent is offered costs it tokens. To offer fewer, add `?tools=` to the URL
+(or send `X-OpenPurpose-Tools`): profiles and tool names, comma-separated. `read` gives only the
+tools that read, and `read,propose_learning,report_finding` adds those two to it. Without it, the
+agent gets every tool.
+
 The server sends its workflow as MCP instructions, but agents follow it more
 reliably when the repo says so too: copy [`agent/AGENTS.snippet.md`](agent/AGENTS.snippet.md)
 into your repo's `AGENTS.md` or `CLAUDE.md`.
@@ -380,6 +393,12 @@ An empty **Organization purpose**? Ask your agent to "describe my organization".
 [`describe-organization`](agent/skills/describe-organization/SKILL.md) skill interviews you
 (and reads your website if you give it a link), pushes back on vague answers and ends with a text
 you paste into the organization's purpose.
+
+To fill a project, ask your agent to "describe this project". The
+[`describe-project`](agent/skills/describe-project/SKILL.md) skill maps the repository, shows you a
+plan, and suggests a scope with its first rules for each part of the code that has rules of its
+own. `list_scopes` shows which stacks the organization's projects share (agents report them with
+every `get_context`), so it also suggests organization scopes for rules several projects follow.
 
 ### MCP tools
 

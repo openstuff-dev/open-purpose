@@ -30,6 +30,10 @@ export interface ContextRequest {
   /** Scope slugs to include regardless of path/stack matching. */
   scopes?: string[];
   include_learnings?: boolean;
+  /** What the agent is about to do, in a line. Sections about it are sent in full. */
+  task?: string | null;
+  /** Every section in full, instead of first sentences for the general ones. */
+  full?: boolean;
 }
 
 export type LevelKind =
@@ -46,16 +50,19 @@ export interface ContextBlock {
 
 /**
  * shortened: only the first sentence goes to the agent, to stay within the organization's budget.
+ * brief: only the first sentence goes to the agent, because it is general background.
  */
-export type ContextSection = Section & { shortened?: boolean };
+export type ContextSection = Section & { shortened?: boolean; brief?: boolean };
 
 export interface ContextBudget {
   /** The organization's limit; null = no limit. */
   max_tokens: number | null;
   /** Estimated size of the markdown sent (characters / 4). */
   tokens: number;
-  /** How many sections were cut to their first sentence. */
+  /** How many sections were cut to their first sentence to fit the budget. */
   shortened: number;
+  /** How many general sections were sent as their first sentence only. */
+  brief: number;
 }
 
 export interface ContextResult {
@@ -349,8 +356,9 @@ export async function buildContext(
     related: [],
     apis: [],
     findings: null,
-    budget: { max_tokens: null, tokens: 0, shortened: 0 },
+    budget: { max_tokens: null, tokens: 0, shortened: 0, brief: 0 },
   };
+  if (!req.full) result.budget.brief = briefGeneral(blocks, req.task);
   if (project) {
     result.related = await relatedTo(db, a, project.id);
     const relatedProjects = result.related.filter(
@@ -386,6 +394,89 @@ export async function buildContext(
 }
 
 const estimateTokens = (text: string) => Math.ceil(text.length / 4);
+
+/**
+ * Rules for the code at hand reach the agent in full: guidelines and learnings of the project and
+ * of the scopes that matched. Everything else is background (purpose, business logic, glossary,
+ * reference, and whatever applies to the whole organization or workspace) and goes as its first
+ * sentence, which the agent reads in full when it matters.
+ */
+function isRuleForThisCode(level: LevelKind, kind: Document['kind']): boolean {
+  return (
+    (kind === 'guidelines' || kind === 'learnings') && level !== 'group' && level !== 'organization'
+  );
+}
+
+/** A background section is shortened only when that saves at least this many characters. */
+const BRIEF_MIN_SAVING = 200;
+
+/** How many background sections that match the task best are sent in full anyway. */
+const TASK_MATCHES = 5;
+
+/** Words that say nothing about what a task touches. */
+const TASK_STOPWORDS = new Set(
+  (
+    'the and for with from into onto that this these those then than when what which where who ' +
+    'how why are was were will would should could can not but all any some our your their its ' +
+    'add change changes fix make update remove delete use using new old please want need just ' +
+    'also only one two get set put let able like more less via per'
+  ).split(' '),
+);
+
+/** The words of a task to look for, lower-cased, at least three letters. */
+export function taskTerms(task: string | null | undefined): string[] {
+  const words = (task ?? '').toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [];
+  return [...new Set(words.filter((w) => !TASK_STOPWORDS.has(w)))].slice(0, 12);
+}
+
+/**
+ * How well a section matches the task: each word found at the start of a word in the heading
+ * counts 2, in the body 1. "colour" also finds "colours"; it doesn't find "color".
+ */
+export function taskScore(s: Pick<Section, 'heading' | 'body'>, terms: string[]): number {
+  if (!terms.length) return 0;
+  const words = (t: string) => t.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  const heading = words(s.heading);
+  const body = words(s.body);
+  let score = 0;
+  for (const term of terms) {
+    if (heading.some((w) => w.startsWith(term))) score += 2;
+    else if (body.some((w) => w.startsWith(term))) score += 1;
+  }
+  return score;
+}
+
+/**
+ * Marks background sections brief, except the few that match the task best, and returns how many
+ * it marked. Pinned sections, and those barely longer than their first sentence, stay whole.
+ */
+export function briefGeneral(blocks: ContextBlock[], task: string | null | undefined): number {
+  const terms = taskTerms(task);
+  const background = blocks.flatMap((b) =>
+    b.documents
+      .filter((d) => !isRuleForThisCode(b.level, d.kind))
+      .flatMap((d) =>
+        d.sections.filter(
+          (s) => !s.pinned && s.body.trim().length - excerpt(s).length >= BRIEF_MIN_SAVING,
+        ),
+      ),
+  );
+  const matching = new Set(
+    background
+      .map((s) => ({ s, score: taskScore(s, terms) }))
+      .filter((x) => x.score > 0)
+      .sort((x, y) => y.score - x.score)
+      .slice(0, TASK_MATCHES)
+      .map((x) => x.s),
+  );
+  let n = 0;
+  for (const s of background) {
+    if (matching.has(s)) continue;
+    s.brief = true;
+    n++;
+  }
+  return n;
+}
 
 /** Which kinds of document give way first inside one level. */
 const SHORTEN_ORDER: Record<Document['kind'], number> = {
@@ -425,17 +516,18 @@ export function compact(
     let estimate = tokens + estimateTokens(shortenedNotice(candidates.length, maxTokens));
     for (const { s } of candidates) {
       if (estimate <= maxTokens) break;
+      if (s.brief || s.pinned) continue;
       const saved = s.body.trim().length - excerpt(s).length;
       if (saved <= 0) continue;
       s.shortened = true;
       estimate -= saved / 4;
     }
     const shortened = candidates.filter((c) => c.s.shortened).length;
-    ctx.budget = { max_tokens: maxTokens, tokens: 0, shortened };
+    ctx.budget = { ...ctx.budget, max_tokens: maxTokens, tokens: 0, shortened };
     markdown = renderMarkdown(ctx);
     tokens = estimateTokens(markdown);
   }
-  ctx.budget = { max_tokens: maxTokens, tokens, shortened: ctx.budget.shortened };
+  ctx.budget = { ...ctx.budget, max_tokens: maxTokens, tokens };
   return { ...ctx, markdown };
 }
 
@@ -502,6 +594,11 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
       `- Path: ${ctx.path ? '`' + ctx.path + '`' : '_repo root_'}`,
       `- Stacks: ${ctx.stacks.length ? ctx.stacks.join(', ') : '_none given_'}`,
     );
+    // Sending these back is a few words; sending the manifest again is the whole file.
+    if (ctx.stacks.length)
+      out.push(
+        `  Pass \`stacks: ${JSON.stringify(ctx.stacks)}\` to later calls for this path instead of manifests.`,
+      );
   }
   const scoped = ctx.blocks.filter((b) => b.scope);
   out.push(
@@ -526,6 +623,20 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
     );
     out.push('');
   }
+
+  // A scope that applies but holds no rules does nothing for agents: say where its rules go.
+  const emptyScopes = ctx.blocks.filter((b) => b.scope && b.documents.length === 0);
+  for (const b of emptyScopes) {
+    const doc =
+      b.empty_documents.find((d) => d.kind === 'guidelines') ?? b.empty_documents.at(0);
+    out.push(
+      `> **${b.label} applies here (${b.scope?.reason ?? ''}) but has no rules yet.** ` +
+      (doc
+        ? `When you learn what holds in this part of the code, add it with \`add_section\` to ${doc.title} \`[d:${shortId(doc.id)}]\`.`
+        : `When you learn what holds in this part of the code, add it with \`propose_document\` (scope "${b.scope?.slug ?? ''}").`),
+    );
+  }
+  if (emptyScopes.length) out.push('');
 
   if (!ctx.project) {
     const wide = ctx.organization
@@ -554,9 +665,17 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
   out.push(
     'Each section has a marker `[s:<id> · <mode>]`. **locked**: read-only for you. **propose**: your edits become proposals a person approves. **open**: you may edit directly.',
   );
+  if (ctx.blocks.some((b) => b.documents.some((d) => d.sections.some((x) => x.pinned))))
+    out.push('**pinned** sections always apply, whatever your task.');
   out.push(
     'Each document has a marker `[d:<id> · <mode>]`: pass the id to `add_section` to add a section to it. When a document is missing (a glossary, the business logic, ...), propose one with `propose_document`.',
   );
+  if (ctx.budget.brief)
+    out.push(
+      '',
+      `> **${ctx.budget.brief} background section${ctx.budget.brief === 1 ? ' shows' : 's show'} only the first sentence**: purpose, business logic, glossary, reference, and what applies to the whole ${ctx.group.shown ? 'workspace or organization' : 'organization'}. ` +
+      'Rules for this code are in full. When a section bears on your task, read it with `read_section`; pass `task` to get the ones about it in full.',
+    );
   if (ctx.budget.shortened && ctx.budget.max_tokens !== null)
     out.push('', shortenedNotice(ctx.budget.shortened, ctx.budget.max_tokens));
 
@@ -570,16 +689,19 @@ export function renderMarkdown(ctx: Omit<ContextResult, 'markdown'>): string {
       for (const s of doc.sections) {
         out.push(
           '',
-          `#### ${s.heading}  \`[s:${shortId(s.id)} · ${s.mode}]\``,
+          `#### ${s.heading}  \`[s:${shortId(s.id)} · ${s.mode}${s.pinned ? ' · pinned' : ''}]\``,
           '',
-          s.shortened ? excerpt(s) : s.body.trim() || '_(empty)_',
+          s.shortened || s.brief ? excerpt(s) : s.body.trim() || '_(empty)_',
         );
       }
     }
   }
   if (!any) out.push('', '_No guidelines have been written for this context yet._');
 
-  const empty = ctx.blocks.filter((b) => b.empty_documents.length);
+  // Empty scopes were named above already.
+  const empty = ctx.blocks.filter(
+    (b) => b.empty_documents.length && !(b.scope && b.documents.length === 0),
+  );
   if (empty.length) {
     out.push('', '---', '', '## Empty documents');
     out.push(

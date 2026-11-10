@@ -13,6 +13,7 @@ import { recordRequest, type Track } from './service/activity.js';
 import { buildContext, resolveTarget } from './service/context.js';
 import { relatedTo } from './service/graph.js';
 import { getSkill, listSkills } from './service/skills.js';
+import { recordStacks, stacksOfOrganization } from './service/stacks.js';
 import { tryParseRemote } from './domain/remote.js';
 import {
   addRepository,
@@ -70,16 +71,19 @@ Workflow:
 1. Before starting a task in a repository, call get_context with the repo's git remote URL
    (\`git remote get-url origin\`), plus the "project" value from .openpurpose.json if that file exists
    (an older .agentcontext.json means the same: rename it to .openpurpose.json),
-   the path you are working in and the nearest manifest (package.json, *.csproj, ...). Always send the
-   remote: parts of a project can be bound to one repository.
-   Follow what it says. More specific rules override general ones. When a context is large, its most
-   general sections are shortened to their first sentence; read those with read_section when they matter.
+   the path you are working in and the nearest manifest (package.json, *.csproj, ...): its path and the
+   names of its dependencies, not the whole file. Always send the remote: parts of a project can be bound
+   to one repository. On later calls for the same path, send the stacks it returned instead of manifests.
+   Pass the task in a line as task. Follow what it says. More specific rules override general ones.
+   Background sections come as their first sentence; read those with read_section when they matter.
 2. If no project is found, ask the user which project the repo belongs to, then call register_repository
    (or create_project), and write .openpurpose.json with {"project": "<slug>"} in the repo root.
 3. When the user corrects you in a way that should also apply next time, call propose_learning with the
-   same remote/path/manifests. A person reviews it before it becomes a rule. Keep it to one rule, stated
-   positively, with the reason. When a part of the code (a package, a folder, a stack) keeps collecting
-   rules of its own and list_scopes has no scope for it, suggest one with create_scope.
+   same remote/path and the stacks get_context returned. A person reviews it before it becomes a rule.
+   Keep it to one rule, stated positively, with the reason. When a part of the code (a package, a
+   folder, a stack) has rules of its own and list_scopes has no scope for it, suggest one with
+   create_scope, with those rules as its first sections. When you describe a project, do this for each
+   such part.
    get_context shows each document's id as [d:xxxxxxxx]; add sections with add_section. When a document is
    missing (a new project often has no glossary or business logic yet), suggest it with its first sections
    via propose_document, and tell the user in one line that you proposed it. When a section is outdated or
@@ -102,15 +106,18 @@ Workflow:
    detail of your own finding wrong (commit, file, lines, wording), correct it with update_finding.
 8. Skills are guides the server offers. When the user is new to OpenPurpose or asks you to set it up, call
    get_skill with "init-openpurpose": a guided first run in their repository. When they want to describe
-   their organization, use "describe-organization". list_skills shows all of them.`;
+   their organization, use "describe-organization"; to populate a project or add scopes, use
+   "describe-project". list_skills shows all of them.`;
 
 const manifestSchema = z.object({
   path: z
     .string()
-    .describe(
-      'Repo-relative path of the manifest, e.g. "frontend/package.json" or "src/Api/Api.csproj"',
-    ),
-  content: z.string().describe('Full file content'),
+    .describe('Repo-relative path, e.g. "frontend/package.json" or "src/Api/Api.csproj"'),
+  dependencies: z
+    .array(z.string())
+    .optional()
+    .describe('Package names it depends on, without versions; for *.csproj also its Sdk'),
+  content: z.string().optional().describe('Full file, only if you cannot list dependencies'),
 });
 
 const locate = {
@@ -133,14 +140,12 @@ const locate = {
   stacks: z
     .array(z.string())
     .optional()
-    .describe(
-      'Stack tags you already know, e.g. ["angular"]. Usually leave empty and send manifests instead.',
-    ),
+    .describe('The stacks get_context returned for this path. Send these instead of manifests.'),
   manifests: z
     .array(manifestSchema)
     .optional()
     .describe(
-      'The manifest nearest to the path (package.json, *.csproj, go.mod, ...). Used to detect stacks consistently.',
+      'The manifest nearest to the path (package.json, *.csproj, go.mod, ...), when you have no stacks yet',
     ),
 };
 
@@ -152,7 +157,8 @@ interface ToolResult {
 }
 
 const text = (t: string): ToolResult => ({ content: [{ type: 'text', text: t }] });
-const json = (v: unknown): ToolResult => text(JSON.stringify(v, null, 2));
+// Compact: indentation would add a fifth or more to every reply's tokens.
+const json = (v: unknown): ToolResult => text(JSON.stringify(v));
 
 /**
  * Tools that change something; the activity overview counts them as writes, every other tool as a
@@ -192,6 +198,37 @@ export const READ_TOOLS = [
   'read_section',
   'list_findings',
 ] as const;
+
+/** Reads about the caller's own proposals. Agent mode's simulated agent has none. */
+const OWN_READ_TOOLS = ['list_my_proposals', 'get_review'];
+
+const ALL_TOOLS: readonly string[] = [...READ_TOOLS, ...OWN_READ_TOOLS, ...WRITE_TOOLS];
+
+/** Named tool sets a client can ask for instead of listing tools one by one. */
+const TOOL_PROFILES = new Map<string, readonly string[]>([
+  ['all', ALL_TOOLS],
+  ['read', [...READ_TOOLS, ...OWN_READ_TOOLS]],
+]);
+
+/**
+ * The tools a client asked for with `?tools=` or the `x-openpurpose-tools` header: profiles and
+ * tool names, comma-separated, e.g. "read,propose_learning". A shorter list costs the agent fewer
+ * tokens. Nothing asked for: every tool.
+ */
+export function parseToolFilter(spec: string | undefined): ReadonlySet<string> | undefined {
+  const parts = (spec ?? '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (!parts.length) return undefined;
+  const unknown = parts.filter((t) => !TOOL_PROFILES.has(t) && !ALL_TOOLS.includes(t));
+  if (unknown.length)
+    throw new AppError(
+      'bad_request',
+      `Unknown tools: ${unknown.join(', ')}. Use a profile (${[...TOOL_PROFILES.keys()].join(', ')}) or tool names.`,
+    );
+  return new Set(parts.flatMap((t) => TOOL_PROFILES.get(t) ?? [t]));
+}
 
 /**
  * Call one read tool in-process, through the same MCP server an agent talks to,
@@ -233,12 +270,20 @@ export function createMcpServer(
   a: Access,
   version: string,
   apiConfig?: ApiSpecConfig,
-  opts: { simulated?: boolean } = {},
+  opts: { simulated?: boolean; tools?: ReadonlySet<string> } = {},
 ): McpServer {
   const server = new McpServer(
     { name: 'openpurpose', version },
     { instructions: SERVER_INSTRUCTIONS, capabilities: { tools: {} } },
   );
+  // Agent mode only ever calls read tools, so it lists only those.
+  const offered = opts.simulated ? new Set<string>(READ_TOOLS) : opts.tools;
+  /** server.registerTool, for the tools this caller is offered. */
+  const registerTool = ((name: string, ...rest: unknown[]) => {
+    if (!ALL_TOOLS.includes(name)) throw new Error(`${name} is missing from the MCP tool lists`);
+    if (offered && !offered.has(name)) return undefined;
+    return (server.registerTool as (...args: unknown[]) => unknown)(name, ...rest);
+  }) as typeof server.registerTool;
 
   /**
    * Each tool call runs in its own transaction, scoped to the caller's group.
@@ -287,20 +332,26 @@ export function createMcpServer(
     return s;
   };
 
-  server.registerTool(
+  registerTool(
     'get_context',
     {
       title: 'Get context',
       description:
         'Get the workspace, organization, project and scope-specific guidelines that apply to the code you are about to work on. Call this before starting a task. ' +
-        "Over the organization's size budget, the most general sections are shortened to their first sentence; read_section gives the full text.",
+        'Rules for this code come in full; background (purpose, glossary, organization-wide content, ...) as first sentences, except what matches task. read_section gives the full text.',
       inputSchema: {
         ...locate,
         scopes: z
           .array(z.string())
           .optional()
           .describe('Scope slugs to include even if path/stack do not match'),
-        include_learnings: z.boolean().optional().describe('Default true'),
+        include_learnings: z.boolean().default(true),
+        task: z
+          .string()
+          .max(500)
+          .optional()
+          .describe('What you are about to do, in a line, e.g. "change the primary button colour"'),
+        full: z.boolean().default(false).describe('Every section in full'),
       },
     },
     (args) =>
@@ -311,6 +362,10 @@ export function createMcpServer(
           b.documents.flatMap((d) => d.sections.map((s) => ({ id: s.id, document_id: d.id }))),
         );
         if (apiConfig) refreshStale(pool, a.group.id, built.apis, apiConfig);
+        // So list_scopes can show which stacks the organization's projects share.
+        const { project: proj, resolution } = built;
+        if (!opts.simulated && proj && resolution.remote && a.canContribute(proj.organization_id))
+          await recordStacks(db, proj.id, resolution.remote.key, built.stacks);
         const ctx = built.markdown;
         const waiting = opts.simulated ? [] : await waitingOn(db, a);
         if (!waiting.length) return text(ctx);
@@ -324,7 +379,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'resolve_project',
     {
       title: 'Resolve project',
@@ -361,7 +416,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'list_organizations',
     {
       title: 'List organizations',
@@ -380,7 +435,7 @@ export function createMcpServer(
       ),
   );
 
-  server.registerTool(
+  registerTool(
     'list_skills',
     {
       title: 'List skills',
@@ -391,7 +446,7 @@ export function createMcpServer(
     () => run('list_skills', async () => json(await listSkills())),
   );
 
-  server.registerTool(
+  registerTool(
     'get_skill',
     {
       title: 'Get a skill',
@@ -402,7 +457,7 @@ export function createMcpServer(
     ({ name }) => run('get_skill', async () => text((await getSkill(name)).body)),
   );
 
-  server.registerTool(
+  registerTool(
     'list_projects',
     {
       title: 'List projects',
@@ -434,12 +489,13 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'list_scopes',
     {
       title: 'List scopes',
       description:
-        'List the scopes (parts of a project: some of its repositories and/or folders; or stacks across the organization or workspace) that guidelines and learnings can be filed under.',
+        'List the scopes (parts of a project: some of its repositories and/or folders; or stacks across the organization or workspace) that guidelines and learnings can be filed under, ' +
+        "and the stacks the organization's projects use, with the scopes that cover each.",
       inputSchema: {
         project: z
           .string()
@@ -471,15 +527,24 @@ export function createMcpServer(
           stacks: s.stacks,
           description: s.description,
         });
+        const stacks = orgId ? await stacksOfOrganization(db, orgId) : [];
+        // A stack several projects share, with no scope above them, is where shared rules belong.
+        const shared = stacks.filter((s) => s.projects.length > 1 && !s.scopes.length);
         return json({
           group: (await at(null, null)).map(fmt),
           organization: orgId ? (await at(orgId, null)).map(fmt) : [],
           project: p ? (await at(p.organization_id, p.id)).map(fmt) : [],
+          stacks_in_organization: stacks,
+          ...(shared.length
+            ? {
+                next: `No organization scope covers ${shared.map((s) => `${s.stack} (${s.projects.length} projects)`).join(', ')}. Read those projects with get_context(project=...), and for the rules they share call create_scope with level "organization", the stack and those rules as sections.`,
+              }
+            : {}),
         });
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'get_related',
     {
       title: 'Get related projects',
@@ -549,7 +614,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'get_api',
     {
       title: 'Get API',
@@ -605,7 +670,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'search',
     {
       title: 'Search',
@@ -639,7 +704,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'read_section',
     {
       title: 'Read section',
@@ -666,7 +731,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'update_section',
     {
       title: 'Update section',
@@ -707,7 +772,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'add_section',
     {
       title: 'Add section',
@@ -741,7 +806,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'archive_section',
     {
       title: 'Archive section',
@@ -772,7 +837,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'move_section',
     {
       title: 'Move section',
@@ -811,7 +876,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'propose_document',
     {
       title: 'Propose document',
@@ -912,12 +977,12 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'propose_learning',
     {
       title: 'Propose learning',
       description:
-        'Record something the user taught you so every agent gets it next time. It is filed under the most specific matching scope (e.g. only the Angular frontend of this project), and a person approves it first; they can also promote it to the whole organization or workspace. Pass the same remote_url/path/manifests you used for get_context.',
+        'Record something the user taught you so every agent gets it next time. It is filed under the most specific matching scope (e.g. only the Angular frontend of this project), and a person approves it first; they can also promote it to the whole organization or workspace. Pass the same remote_url and path you used for get_context, with the stacks it returned.',
       inputSchema: {
         heading: z
           .string()
@@ -1013,7 +1078,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'list_my_proposals',
     {
       title: 'List my proposals',
@@ -1076,14 +1141,14 @@ export function createMcpServer(
       f.proposed_fix || '_(none given)_',
     ].join('\n');
 
-  server.registerTool(
+  registerTool(
     'report_finding',
     {
       title: 'Report finding',
       description:
         "Record a real problem you noticed outside your task and didn't fix (a bug, a security risk, broken behaviour; not a style preference), so it isn't lost. " +
         'It is filed under the most specific scope of the file, and a person sorts it. If open findings look like the same problem, nothing is filed and they are listed instead. ' +
-        'Pass the same remote_url/manifests you used for get_context.',
+        'Pass the same remote_url you used for get_context, with the stacks it returned.',
       inputSchema: {
         file: z
           .string()
@@ -1166,7 +1231,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'list_findings',
     {
       title: 'List findings',
@@ -1223,7 +1288,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'update_finding',
     {
       title: 'Update finding',
@@ -1277,7 +1342,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'resolve_finding',
     {
       title: 'Resolve finding',
@@ -1301,7 +1366,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'dismiss_finding',
     {
       title: 'Dismiss finding',
@@ -1325,7 +1390,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'get_review',
     {
       title: 'Get review',
@@ -1342,7 +1407,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'reply_to_review',
     {
       title: 'Reply to review',
@@ -1374,7 +1439,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'revise_proposal',
     {
       title: 'Revise proposal',
@@ -1401,7 +1466,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'apply_suggestion',
     {
       title: 'Apply suggestion',
@@ -1417,7 +1482,7 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'register_repository',
     {
       title: 'Register repository',
@@ -1446,12 +1511,13 @@ export function createMcpServer(
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'create_scope',
     {
       title: 'Create scope',
       description:
-        "Suggest a new scope: a part of a project (some folders, stacks or one of its repositories) that needs its own guidelines and learnings, e.g. \"Lint package\" for packages/lint/**. Call list_scopes first so you don't repeat one. A person approves it before it exists; if your token can edit the organization, it's created right away. Pass the same project/remote_url you used for get_context.",
+        "Suggest a new scope: a part of a project (some folders, stacks or one of its repositories) that needs its own guidelines and learnings, e.g. \"Lint package\" for packages/lint/**. Call list_scopes first so you don't repeat one. " +
+        'Send its first guidelines as sections: a scope without rules changes nothing for agents. A person approves it, sections included; if your token can edit the organization, it is created right away. Pass the same project/remote_url you used for get_context.',
       inputSchema: {
         name: z.string().describe('Short name a person recognises, e.g. "Angular frontend"'),
         slug: z.string().optional().describe('Lower-case, dashes; derived from name when omitted'),
@@ -1470,6 +1536,15 @@ export function createMcpServer(
           .boolean()
           .optional()
           .describe('Bind it to the repository of remote_url, for a project with several repositories'),
+        sections: z
+          .array(
+            z.object({
+              heading: z.string().describe('The rule in a few words, e.g. "Rules are kebab-case"'),
+              body: z.string().describe('Markdown. Use "###" or deeper for headings inside it.'),
+            }),
+          )
+          .optional()
+          .describe('Its first guidelines: the rules that hold here and not elsewhere'),
         reason: z.string().describe('Why it needs its own scope, in a sentence or two'),
         project: locate.project,
         remote_url: locate.remote_url,
@@ -1526,24 +1601,37 @@ export function createMcpServer(
           path_globs: x.paths,
           stacks: x.stacks,
           repository_ids: repositoryIds,
+          guidelines: x.sections,
           rationale: x.reason,
           context: { remote: r.remote?.key ?? null },
         });
-        if (result.status === 'applied' && result.proposal)
+        const n = x.sections?.length ?? 0;
+        const sent = `${n} guideline${n === 1 ? '' : 's'}`;
+        if (result.status === 'proposed') {
           return text(
-            `Scope \`${result.scope.slug}\` approved automatically in **${label}** (proposal ${result.proposal.id.slice(0, 8)}). ${AUTO_APPROVED} File guidelines under it with propose_learning (scope="${result.scope.slug}").`,
+            `Scope \`${result.proposal.scope_spec?.slug}\` proposed for **${label}** with ${sent} (proposal ${result.proposal.id.slice(0, 8)}). ` +
+            'Tell the user in one line that they can approve it in the OpenPurpose Inbox. ' +
+            'It exists once a person approves it. To change or add guidelines before then, call revise_proposal with the whole text: the description, then a "## Heading" line per guideline.',
           );
-        return result.status === 'applied'
-          ? text(
-              `Created scope \`${result.scope.slug}\` in **${label}**. File guidelines under it with propose_learning (scope="${result.scope.slug}").`,
-            )
-          : text(
-              `Scope \`${result.proposal.scope_spec?.slug}\` proposed for **${label}** (proposal ${result.proposal.id}). It exists once a person approves it; until then, file learnings at the project level.`,
-            );
+        }
+        const doc = (
+          await db.query<{ id: string }>(
+            "SELECT id FROM documents WHERE scope_id = $1 AND slug = 'guidelines'",
+            [result.scope.id],
+          )
+        ).rows.at(0);
+        const more = doc
+          ? `Add more rules with add_section(document_id="${doc.id.slice(0, 8)}").`
+          : `Add rules with propose_document(scope="${result.scope.slug}").`;
+        return text(
+          result.proposal
+            ? `Scope \`${result.scope.slug}\` approved automatically in **${label}** with ${sent} (proposal ${result.proposal.id.slice(0, 8)}). ${AUTO_APPROVED} ${more}`
+            : `Created scope \`${result.scope.slug}\` in **${label}** with ${sent}. ${more}`,
+        );
       }),
   );
 
-  server.registerTool(
+  registerTool(
     'create_project',
     {
       title: 'Create project',

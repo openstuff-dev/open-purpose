@@ -18,7 +18,7 @@ Call `list_organizations`.
 
 ## 2. Find the project
 
-Call `get_context` with `remote_url` from `git remote get-url origin`, `project` from `.openpurpose.json` if it exists, `path: "."` and the root manifest (`package.json`, `*.csproj`, `go.mod`, ...) with its content.
+Call `get_context` with `remote_url` from `git remote get-url origin`, `project` from `.openpurpose.json` if it exists, `path: "."` and the root manifest (`package.json`, `*.csproj`, `go.mod`, ...): its `path` and its `dependencies` (the package names, not the whole file).
 
 - A project is found: name it and move on.
 - No project is found: call `list_projects`, show the person the candidates and ask which one this repository belongs to, or whether to create a new one. Then call `register_repository` (existing project) or `create_project` (new one), and write `.openpurpose.json` in the repository root with `{"project": "<slug>"}`. Call `get_context` again.
@@ -52,7 +52,7 @@ If nothing is missing, skip this step and say so.
 
 This is the step that matters most. Ask: "What do you keep telling coding agents in this repo? One rule you're tired of repeating." Offer two examples from what you saw in the code, e.g. a naming convention or a command that must run before committing.
 
-Turn their answer into one rule, stated positively, with the reason, and call `propose_learning` with the same `remote_url`, `path` and `manifests` as in step 2. Tell them:
+Turn their answer into one rule, stated positively, with the reason, and call `propose_learning` with the same `remote_url` and `path` as in step 2, and the `stacks` that `get_context` returned. Tell them:
 
 - where it was filed (organization › project › scope),
 - that it waits in the **Inbox** until a person approves it, reviewed like a pull request,
@@ -65,7 +65,7 @@ Done when `propose_learning` has returned and you have told them where to approv
 In three short lines, list what is now set up. Then suggest what to try next, picking the two that fit what you saw:
 
 - Approve the learning in the **Inbox**, then ask an agent for a task in this repo and watch it follow the rule.
-- Add a scope for a part of the code with its own rules (`frontend/**`, or the `angular` stack).
+- Ask to "describe this project": the `describe-project` skill adds a scope with its first rules for each part of the code that has its own (`frontend/**`, or the `angular` stack).
 - Link related projects with `[[project-name]]` so agents learn about the services this one talks to.
 - Attach the project's OpenAPI spec on its **API** tab, so agents call endpoints with exact shapes.
 - Ask "anything you could fix here?" to see the findings agents have reported.

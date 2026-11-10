@@ -414,6 +414,10 @@ export class Api {
   moveSection = (id: string, body: { document_id: string; position?: number | null }) =>
     this.send<EditResult>('POST', `/sections/${id}/move`, body);
 
+  /** Pinned: agents always get it in full. */
+  setPinned = (id: string, pinned: boolean) =>
+    this.send<Section>('PUT', `/sections/${id}/pinned`, { pinned });
+
   moveTargets = (docId: string) => this.get<MoveTarget[]>(`/documents/${docId}/move-targets`);
   versions = (id: string) => this.get<SectionVersion[]>(`/sections/${id}/versions`);
   revert = (id: string, version: number) =>

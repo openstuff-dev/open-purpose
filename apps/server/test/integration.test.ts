@@ -683,6 +683,62 @@ describe('OpenPurpose with groups and organizations', () => {
     await client.close();
   });
 
+  it('detects stacks from dependency names, and tells the agent to send them back', async () => {
+    const { client, call } = await mcp(t.jonas);
+    const fe = await call('get_context', {
+      remote_url: SSH_REMOTE,
+      path: 'frontend/src/app/editor.ts',
+      manifests: [{ path: 'frontend/package.json', dependencies: ['@angular/core'] }],
+    });
+    expect(fe.text).toContain('Acme Logistics › Angular apps (stack "angular")');
+    expect(fe.text).toContain(
+      'Pass `stacks: ["angular","frontend","node"]` to later calls for this path instead of manifests.',
+    );
+    const again = await call('get_context', {
+      remote_url: SSH_REMOTE,
+      path: 'frontend/src/app/editor.ts',
+      stacks: ['angular', 'frontend', 'node'],
+    });
+    expect(again.text).toContain('Acme Logistics › Angular apps (stack "angular")');
+    await client.close();
+  });
+
+  it('offers only the tools a client asks for', async () => {
+    const names = async (query: string) => {
+      const client = new Client({ name: 'test-agent', version: '1.0.0' });
+      await client.connect(
+        new StreamableHTTPClientTransport(new URL(`${base}/mcp${query}`), {
+          requestInit: { headers: { authorization: `Bearer ${t.jonas}` } },
+        }),
+      );
+      const { tools } = await client.listTools();
+      await client.close();
+      return tools.map((x) => x.name);
+    };
+    const all = await names('');
+    expect(all).toHaveLength(30);
+    const read = await names('?tools=read');
+    expect(read).toContain('get_context');
+    expect(read).toContain('get_review');
+    expect(read).not.toContain('propose_learning');
+    expect(await names('?tools=read,propose_learning')).toEqual(
+      all.filter((n) => read.includes(n) || n === 'propose_learning'),
+    );
+    const res = await fetch(`${base}/mcp?tools=get_contxt`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${t.jonas}`,
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { message: string } }).error.message).toContain(
+      'Unknown tools: get_contxt',
+    );
+  });
+
   it('files a learning under the frontend only', async () => {
     const { client, call } = await mcp(t.jonas);
     const r = await call('propose_learning', {
@@ -878,6 +934,58 @@ describe('OpenPurpose with groups and organizations', () => {
       if (s.slug === 'lint-package' || s.slug === 'scripts') await api('DELETE', `/scopes/${s.id}`);
   });
 
+  it('creates a scope with its first guidelines, and says where rules go while it has none', async () => {
+    const { client, call } = await mcp(t.jonas);
+    const r = await call('create_scope', {
+      name: 'Docs site',
+      description: 'The public docs.',
+      paths: ['site/**'],
+      sections: [{ heading: 'Pages are MDX', body: 'Write every page as MDX, never as HTML.' }],
+      reason: 'The site has its own conventions.',
+      remote_url: HTTPS_REMOTE,
+    });
+    expect(r.text).toContain('Scope `docs-site` proposed for **Customer Portal** with 1 guideline');
+    const p = (await api('GET', '/proposals?status=pending')).data.find(
+      (x: any) => x.kind === 'new_scope' && x.heading === 'Docs site',
+    );
+    // Reviewed as one text: the description, then a "## " section per guideline.
+    expect(p.body).toBe(
+      'The public docs.\n\n## Pages are MDX\n\nWrite every page as MDX, never as HTML.',
+    );
+    expect((await call('get_review', { proposal_id: p.id })).text).toContain(
+      'each "## " line after it starts one of its first guidelines',
+    );
+    expect((await api('POST', `/proposals/${p.id}/approve`, {})).status).toBe(200);
+    const done = (await api('GET', `/proposals/${p.id}`)).data;
+    const scope = (await api('GET', `/scopes/${done.result_scope_id}`)).data;
+    expect(scope.description).toBe('The public docs.');
+    const ctx = (await call('get_context', { remote_url: HTTPS_REMOTE, path: 'site/index.mdx' })).text;
+    expect(ctx).toContain('## Customer Portal › Docs site');
+    expect(ctx).toContain('Write every page as MDX, never as HTML.');
+    await client.close();
+
+    // A scope without rules is named in get_context, with the document its rules go in.
+    const admin = await mcp(ADMIN);
+    const bare = await admin.call('create_scope', {
+      name: 'Infra',
+      description: 'Terraform.',
+      paths: ['infra/**'],
+      reason: 'Own conventions.',
+      remote_url: HTTPS_REMOTE,
+    });
+    const docId = /add_section\(document_id="([0-9a-f]{8})"\)/.exec(bare.text)?.[1];
+    expect(docId).toBeDefined();
+    const empty = (await admin.call('get_context', { remote_url: HTTPS_REMOTE, path: 'infra/main.tf' }))
+      .text;
+    expect(empty).toContain(
+      `> **Customer Portal › Infra applies here (path "infra/**") but has no rules yet.**`,
+    );
+    expect(empty).toContain(`add it with \`add_section\` to Guidelines \`[d:${docId}]\``);
+    await admin.client.close();
+    for (const x of (await api('GET', `/scopes?project_id=${projectId}`)).data)
+      if (x.slug === 'docs-site' || x.slug === 'infra') await api('DELETE', `/scopes/${x.id}`);
+  });
+
   it('lets agents propose a document with its first sections, which a person creates by approving', async () => {
     const { client, call } = await mcp(t.jonas);
     const r = await call('propose_document', {
@@ -1044,7 +1152,10 @@ describe('OpenPurpose with groups and organizations', () => {
     expect(listed.find((d: any) => d.id === doc.id).section_count).toBe(1);
     const scopes = (await api('GET', `/scopes?project_id=${projectId}`)).data;
     expect(scopes.find((x: any) => x.id === scope.id).section_count).toBe(1);
-    expect((await api('GET', `/scopes/${scope.id}`)).data.documents[0].section_count).toBe(1);
+    const docs = (await api('GET', `/scopes/${scope.id}`)).data.documents;
+    expect(docs.find((d: any) => d.id === scopeDoc.id).section_count).toBe(1);
+    // A new scope starts with an empty Guidelines document, so agents see where its rules go.
+    expect(docs.find((d: any) => d.slug === 'guidelines').section_count).toBe(0);
     // The project counts its own documents and its scopes' documents.
     expect(await projectCount()).toBe(before + 2);
 
@@ -1447,8 +1558,60 @@ describe('OpenPurpose with groups and organizations', () => {
     expect((await api('GET', '/me', undefined, { token: ADMIN, agent: true })).status).toBe(400);
   });
 
-  it('shortens the most general sections when a context is over its budget', async () => {
+  it('sends background as first sentences, unless the task is about it or full asks', async () => {
     const args = { remote_url: SSH_REMOTE, path: 'frontend/src/app.ts' };
+    const { client, call } = await mcp(t.jonas);
+    const groupDoc = (await api('GET', '/documents?organization_id=group')).data.find(
+      (d: any) => d.kind === 'guidelines',
+    );
+    const body = [
+      'Every ledger entry is reconciled nightly.',
+      ...Array.from({ length: 30 }, (_, i) => `Step ${i} of the reconciliation is checked.`),
+      'The last step is signed off by finance.',
+    ].join(' ');
+    const ledger = (
+      await api('POST', `/documents/${groupDoc.id}/sections`, { heading: 'Ledger checks', body })
+    ).data.section;
+
+    const plain = (await call('get_context', args)).text;
+    expect(plain).toContain(`Every ledger entry is reconciled nightly. … _(`);
+    expect(plain).toContain(`\`read_section s:${ledger.id.slice(0, 8)}\``);
+    expect(plain).not.toContain('signed off by finance');
+    expect(plain).toMatch(/background sections? shows? only the first sentence/);
+    // Rules for the frontend scope stay whole.
+    expect(plain).toContain('## Customer Portal › Frontend');
+    expect(plain).toContain('#### Every user action must be undoable');
+    // Too short to be worth a lookup: sent whole.
+    expect(plain).not.toContain('Self-service portal. …');
+
+    const onTask = await call('get_context', {
+      ...args,
+      task: 'Fix the nightly ledger reconciliation',
+    });
+    expect(onTask.text).toContain('signed off by finance');
+    const full = await call('get_context', { ...args, full: true });
+    expect(full.text).toContain('signed off by finance');
+    expect(full.text).not.toContain('only the first sentence');
+
+    // A pinned section always goes in full. Only people who edit there may pin it.
+    const pin = (pinned: boolean, token?: string) =>
+      api('PUT', `/sections/${ledger.id}/pinned`, { pinned }, token ? { token } : undefined);
+    expect((await pin(true, t.jonas)).status).toBe(403);
+    expect((await pin(true)).data.pinned).toBe(true);
+    const pinned = (await call('get_context', args)).text;
+    expect(pinned).toContain('signed off by finance');
+    expect(pinned).toContain(`\`[s:${ledger.id.slice(0, 8)} · propose · pinned]\``);
+    expect(pinned).toContain('**pinned** sections always apply, whatever your task.');
+    expect((await pin(false)).data.pinned).toBe(false);
+    expect((await call('get_context', args)).text).not.toContain('signed off by finance');
+
+    await removeSection(ledger.id);
+    await client.close();
+  });
+
+  it('shortens the most general sections when a context is over its budget', async () => {
+    // full: the budget alone decides here, not which sections are background.
+    const args = { remote_url: SSH_REMOTE, path: 'frontend/src/app.ts', full: true };
     const { client, call } = await mcp(t.jonas);
     const before = (await api('GET', '/me')).data.group.context_max_tokens;
     expect(before).toBeNull(); // opt-in
@@ -1608,16 +1771,17 @@ describe('OpenPurpose with groups and organizations', () => {
     await api('POST', `/documents/${doc.id}/sections`, { heading: 'Everything', body: long }, sol);
     // The group's (hidden) budget doesn't count; the organization's does.
     await api('PUT', '/group', { context_max_tokens: 1000 }, sol);
-    expect((await api('POST', '/context', {}, sol)).data.budget).toMatchObject({
+    const full = { full: true };
+    expect((await api('POST', '/context', full, sol)).data.budget).toMatchObject({
       max_tokens: null,
       shortened: 0,
     });
     await api('PATCH', `/organizations/${org.id}`, { context_max_tokens: 1000 }, sol);
-    const ctx = (await api('POST', '/context', {}, sol)).data;
+    const ctx = (await api('POST', '/context', full, sol)).data;
     expect(ctx.budget).toMatchObject({ max_tokens: 1000, shortened: 1 });
     expect(ctx.markdown).toContain('Rule 0 applies everywhere. … _(');
     await api('PATCH', `/organizations/${org.id}`, { context_max_tokens: null }, sol);
-    expect((await api('POST', '/context', {}, sol)).data.budget).toMatchObject({
+    expect((await api('POST', '/context', full, sol)).data.budget).toMatchObject({
       max_tokens: null,
       shortened: 0,
     });
@@ -1796,6 +1960,48 @@ definitions:`,
       // Access; the project or document (or the level); everything else; the commit.
       expect([path, sent.length]).toEqual([path, 4]);
     }
+  });
+
+  it("shows which stacks the organization's projects share, and which no scope covers", async () => {
+    const made: string[] = [];
+    for (const slug of ['vue-one', 'vue-two']) {
+      const p = await api('POST', '/projects', { organization_id: o.logistics, name: slug, slug });
+      made.push(p.data.id);
+      await api('POST', `/projects/${p.data.id}/repositories`, {
+        remote_url: `https://github.com/acme/${slug}.git`,
+      });
+    }
+    const { client, call } = await mcp(t.jonas);
+    for (const slug of ['vue-one', 'vue-two'])
+      await call('get_context', {
+        remote_url: `https://github.com/acme/${slug}.git`,
+        path: '.',
+        manifests: [{ path: 'package.json', dependencies: ['vue'] }],
+      });
+    const listed = JSON.parse((await call('list_scopes', { project: 'logistics/vue-one' })).text);
+    expect(listed.stacks_in_organization).toContainEqual({
+      stack: 'vue',
+      projects: ['vue-one', 'vue-two'],
+      scopes: [],
+    });
+    expect(listed.next).toContain('No organization scope covers');
+    expect(listed.next).toContain('vue (2 projects)');
+    expect(listed.next).toContain('create_scope with level "organization"');
+
+    // Once an organization scope covers it, there is nothing to suggest for vue.
+    const vue = await api('POST', '/scopes', {
+      organization_id: o.logistics,
+      name: 'Vue apps',
+      stacks: ['vue'],
+    });
+    const after = JSON.parse((await call('list_scopes', { project: 'logistics/vue-one' })).text);
+    expect(after.stacks_in_organization).toContainEqual(
+      expect.objectContaining({ stack: 'vue', scopes: ['vue-apps'] }),
+    );
+    expect(after.next ?? '').not.toContain('vue (');
+    await client.close();
+    await api('DELETE', `/scopes/${vue.data.id}`);
+    for (const id of made) await api('DELETE', `/projects/${id}`);
   });
 
   it('resolves the same slug per organization', async () => {

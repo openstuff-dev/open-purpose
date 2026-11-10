@@ -160,6 +160,8 @@ const fileSchema = z.object({
           updated_by: ref,
           // Files from before sections could be archived don't have it.
           archived_at: time.nullable().optional(),
+          // Nor from before sections could be pinned.
+          pinned: z.boolean().optional(),
           versions: z.array(
             z.object({
               version: z.number().int().min(1),

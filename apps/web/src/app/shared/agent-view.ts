@@ -150,6 +150,16 @@ function samplePath(glob: string): string {
                               title="Agents get the first sentence only, to stay within the context budget"
                               >Shortened</span
                             >
+                          } @else if (s.pinned) {
+                            <span os-badge title="Always sent in full, whatever the task"
+                              >Pinned</span
+                            >
+                          } @else if (s.brief) {
+                            <span
+                              os-badge
+                              title="Background: agents get the first sentence, and read the rest when their task needs it"
+                              >First sentence</span
+                            >
                           }
                         </div>
                         <app-md [text]="s.body" />
@@ -247,7 +257,8 @@ export class AgentView {
     const cut = r.budget.shortened
       ? ` · ${r.budget.shortened} ${r.budget.shortened === 1 ? 'section' : 'sections'} shortened`
       : '';
-    return `~${n(r.budget.tokens)} tokens${of}${cut}`;
+    const brief = r.budget.brief ? ` · ${r.budget.brief} as first sentence` : '';
+    return `~${n(r.budget.tokens)} tokens${of}${cut}${brief}`;
   }
 
   count(b: ContextResult['blocks'][number]): number {

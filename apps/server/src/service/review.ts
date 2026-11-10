@@ -13,6 +13,7 @@ import {
   addEvent,
   canReview,
   documentSections,
+  scopeText,
   getProposal,
   insertRevision,
   isOpen,
@@ -293,6 +294,7 @@ export async function reviseProposal(
     if (heading === p.heading && input.body === p.body) throw badRequest('Nothing changed');
     // A document's text must still split into sections, or approving it would fail later.
     if (p.kind === 'new_document') documentSections(input.body);
+    if (p.kind === 'new_scope') scopeText(input.body);
     const revision = await insertRevision(c, a, p, heading, input.body, input.note ?? '');
     if (p.status === 'changes_requested' && isAuthor(a, p)) {
       await c.query('UPDATE proposals SET status = \'pending\' WHERE id = $1', [p.id]);
@@ -481,6 +483,7 @@ export function renderReviewForAgent(
       `- Slug: ${spec.slug}`,
       `- Paths: ${list(spec.path_globs)}`,
       `- Stacks: ${list(spec.stacks)}`,
+      '- The text is its description; each "## " line after it starts one of its first guidelines.',
     );
   } else {
     out.push(`- Heading: ${p.heading}`);

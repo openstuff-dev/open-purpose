@@ -184,7 +184,8 @@ export class PreviewPage {
     const cut = r.budget.shortened
       ? ` · ${r.budget.shortened} ${r.budget.shortened === 1 ? 'section' : 'sections'} shortened`
       : '';
-    return `~${n(r.budget.tokens)} tokens${of}${cut}`;
+    const brief = r.budget.brief ? ` · ${r.budget.brief} as first sentence` : '';
+    return `~${n(r.budget.tokens)} tokens${of}${cut}${brief}`;
   }
 
   scoped(r: ContextResult) {

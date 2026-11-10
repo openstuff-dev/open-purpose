@@ -103,6 +103,8 @@ export interface Section {
   heading: string;
   body: string;
   mode: EditMode;
+  /** Agents always get it in full, even where the rest is first sentences. */
+  pinned: boolean;
   position: number;
   version: number;
   updated_at: string;

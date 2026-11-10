@@ -13,10 +13,13 @@ organization, the project and the part of the code you are in (a repository or a
    - \`remote_url\` from \`git remote get-url origin\`
    - \`project\` from \`.openpurpose.json\` if that file exists
    - \`path\`: the file or folder you are about to work on
-   - \`manifests\`: the nearest \`package.json\`, \`*.csproj\` or similar, with its content
+   - \`task\`: what you are about to do, in one line
+   - \`manifests\`: the nearest \`package.json\`, \`*.csproj\` or similar: its path and
+     dependency names, not the whole file
    Follow what it returns. More specific rules override general ones.
 2. When you move to a different part of the repo (for example from \`frontend/\`
-   to \`backend/\`), call \`get_context\` again with the new path and manifest.
+   to \`backend/\`), call \`get_context\` again with the new path and manifest. For
+   the same path, send the \`stacks\` it returned instead of the manifest.
 3. If no project is found, ask me which project this repo belongs to, then call
    \`register_repository\` (or \`create_project\`) and create \`.openpurpose.json\`.
    \`get_context\` shows each document's id as \`[d:…]\`: add sections with
@@ -26,8 +29,12 @@ organization, the project and the part of the code you are in (a repository or a
    outdated or repeats another, call \`archive_section\`; when it belongs in
    another document, call \`move_section\`. Give the reason and tell me in one
    line what you archived or moved.
+   Check \`list_scopes\` for the project: if a distinct area (e.g. \`apps/server/**\`,
+   \`apps/web/**\`, \`packages/<name>/**\`, \`site/**\`) or stack lacks a scope,
+   suggest it with \`create_scope\`, with the rules that hold there as its first
+   \`sections\`. When \`get_context\` says a scope has no rules yet, add them there.
 4. When I correct you and the correction should apply next time, call
-   \`propose_learning\` with the same remote/path/manifests. Say in one line that
+   \`propose_learning\` with the same remote/path and stacks. Say in one line that
    you did. Do not propose one-off preferences or task-specific details.
 5. Never try to change a section marked \`locked\`.
 6. \`[[name]]\` in OpenPurpose text links to another project or a glossary term, and
