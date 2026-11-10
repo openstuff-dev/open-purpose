@@ -1503,8 +1503,48 @@ describe('OpenPurpose with groups and organizations', () => {
     expect((await api('GET', '/me', undefined, { token: ADMIN, agent: true })).status).toBe(400);
   });
 
-  it('shortens the most general sections when a context is over its budget', async () => {
+  it('sends background as first sentences, unless the task is about it or full asks', async () => {
     const args = { remote_url: SSH_REMOTE, path: 'frontend/src/app.ts' };
+    const { client, call } = await mcp(t.jonas);
+    const groupDoc = (await api('GET', '/documents?organization_id=group')).data.find(
+      (d: any) => d.kind === 'guidelines',
+    );
+    const body = [
+      'Every ledger entry is reconciled nightly.',
+      ...Array.from({ length: 30 }, (_, i) => `Step ${i} of the reconciliation is checked.`),
+      'The last step is signed off by finance.',
+    ].join(' ');
+    const ledger = (
+      await api('POST', `/documents/${groupDoc.id}/sections`, { heading: 'Ledger checks', body })
+    ).data.section;
+
+    const plain = (await call('get_context', args)).text;
+    expect(plain).toContain(`Every ledger entry is reconciled nightly. … _(`);
+    expect(plain).toContain(`\`read_section s:${ledger.id.slice(0, 8)}\``);
+    expect(plain).not.toContain('signed off by finance');
+    expect(plain).toMatch(/background sections? shows? only the first sentence/);
+    // Rules for the frontend scope stay whole.
+    expect(plain).toContain('## Customer Portal › Frontend');
+    expect(plain).toContain('#### Every user action must be undoable');
+    // Too short to be worth a lookup: sent whole.
+    expect(plain).not.toContain('Self-service portal. …');
+
+    const onTask = await call('get_context', {
+      ...args,
+      task: 'Fix the nightly ledger reconciliation',
+    });
+    expect(onTask.text).toContain('signed off by finance');
+    const full = await call('get_context', { ...args, full: true });
+    expect(full.text).toContain('signed off by finance');
+    expect(full.text).not.toContain('only the first sentence');
+
+    await removeSection(ledger.id);
+    await client.close();
+  });
+
+  it('shortens the most general sections when a context is over its budget', async () => {
+    // full: the budget alone decides here, not which sections are background.
+    const args = { remote_url: SSH_REMOTE, path: 'frontend/src/app.ts', full: true };
     const { client, call } = await mcp(t.jonas);
     const before = (await api('GET', '/me')).data.group.context_max_tokens;
     expect(before).toBeNull(); // opt-in
@@ -1664,16 +1704,17 @@ describe('OpenPurpose with groups and organizations', () => {
     await api('POST', `/documents/${doc.id}/sections`, { heading: 'Everything', body: long }, sol);
     // The group's (hidden) budget doesn't count; the organization's does.
     await api('PUT', '/group', { context_max_tokens: 1000 }, sol);
-    expect((await api('POST', '/context', {}, sol)).data.budget).toMatchObject({
+    const full = { full: true };
+    expect((await api('POST', '/context', full, sol)).data.budget).toMatchObject({
       max_tokens: null,
       shortened: 0,
     });
     await api('PATCH', `/organizations/${org.id}`, { context_max_tokens: 1000 }, sol);
-    const ctx = (await api('POST', '/context', {}, sol)).data;
+    const ctx = (await api('POST', '/context', full, sol)).data;
     expect(ctx.budget).toMatchObject({ max_tokens: 1000, shortened: 1 });
     expect(ctx.markdown).toContain('Rule 0 applies everywhere. … _(');
     await api('PATCH', `/organizations/${org.id}`, { context_max_tokens: null }, sol);
-    expect((await api('POST', '/context', {}, sol)).data.budget).toMatchObject({
+    expect((await api('POST', '/context', full, sol)).data.budget).toMatchObject({
       max_tokens: null,
       shortened: 0,
     });

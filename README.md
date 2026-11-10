@@ -124,6 +124,12 @@ second organization under Settings › Organizations.
   the real MCP tool's output, word for word. The server runs the tool as that
   agent, offers only read tools, and only lets a person look through an agent's
   eyes if they can already read everything that agent can.
+- **Background on demand.** `get_context` sends the rules for the code at hand in full: the
+  guidelines and learnings of the project and of the scopes that matched. Everything else
+  (purpose, business logic, glossary, reference, and what applies to the whole organization or
+  workspace) comes as its heading and first sentence, with the `read_section` call for the rest.
+  An agent that passes `task` ("change the primary button colour") gets the five background
+  sections that match it best in full too. `full: true` sends everything in full.
 - **Context budget.** Big rule sets don't flood an agent. When `get_context` would be
   larger than the budget (estimated as characters / 4), the most general sections are
   cut to their heading and first sentence: workspace first, then organization, project and

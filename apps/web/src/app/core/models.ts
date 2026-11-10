@@ -400,14 +400,14 @@ export interface ContextResult {
       id: string;
       kind: DocKind;
       title: string;
-      sections: (Section & { shortened?: boolean })[];
+      sections: (Section & { shortened?: boolean; brief?: boolean })[];
     }[];
   }[];
   learning_target: { label: string };
   related: { direction: 'uses' | 'used_by'; node: GraphNode }[];
   apis: (ApiSpec & { project_ref: string; project_name: string; relation: 'this' | 'uses' | 'used_by' })[];
   /** tokens are estimated as characters / 4. */
-  budget: { max_tokens: number | null; tokens: number; shortened: number };
+  budget: { max_tokens: number | null; tokens: number; shortened: number; brief: number };
   markdown: string;
 }
 

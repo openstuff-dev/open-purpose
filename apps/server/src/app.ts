@@ -1335,6 +1335,8 @@ export async function buildApp(pool: Pool, config: Config): Promise<FastifyInsta
               manifests: z.array(manifest).optional(),
               scopes: z.array(z.string()).optional(),
               include_learnings: z.boolean().optional(),
+              task: z.string().max(500).optional(),
+              full: z.boolean().optional(),
             }),
             req.body,
           ),

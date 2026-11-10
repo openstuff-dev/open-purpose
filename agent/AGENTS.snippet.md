@@ -8,6 +8,7 @@ organization, the project and the part of the code you are in (a repository or a
    - `remote_url` from `git remote get-url origin`
    - `project` from `.openpurpose.json` if that file exists
    - `path`: the file or folder you are about to work on
+   - `task`: what you are about to do, in one line
    - `manifests`: the nearest `package.json`, `*.csproj` or similar: its path and
      dependency names, not the whole file
    Follow what it returns. More specific rules override general ones.

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { excerpt } from '../src/service/context.js';
+import {
+  briefGeneral,
+  excerpt,
+  taskScore,
+  taskTerms,
+  type ContextBlock,
+} from '../src/service/context.js';
 import { parseRemote, slugify } from '../src/domain/remote.js';
 import { detectStacks } from '../src/domain/stacks.js';
 import { matchScopes, mostSpecific, normalizePath } from '../src/domain/scopes.js';
@@ -370,5 +376,55 @@ describe('document proposal text', () => {
   it('refuses text before the first heading and empty headings', () => {
     expect(parseDocumentBody('Intro\n\n## A')).toHaveProperty('error');
     expect(parseDocumentBody('## A\n\n##\n')).toHaveProperty('error');
+  });
+});
+
+describe('background sections and the task', () => {
+  const long = (lead: string) => `${lead} ${'More words follow here. '.repeat(40)}`;
+  const section = (id: string, heading: string, body: string) =>
+    ({ id: `${id}0000000`, heading, body, mode: 'propose' }) as never;
+  const block = (level: ContextBlock['level'], kind: string, sections: never[]): ContextBlock =>
+    ({
+      level,
+      label: level,
+      scope: null,
+      documents: [{ id: 'd', kind, title: kind, mode: 'propose', sections }],
+      empty_documents: [],
+    }) as unknown as ContextBlock;
+
+  it('keeps the words of a task that say what it touches', () => {
+    expect(taskTerms('Change the colour of the primary Button, please!')).toEqual([
+      'colour',
+      'primary',
+      'button',
+    ]);
+    expect(taskTerms(undefined)).toEqual([]);
+  });
+
+  it('scores a heading above a body, and finds words by their start', () => {
+    const terms = ['colour', 'button'];
+    expect(taskScore({ heading: 'Colours', body: 'Use tokens for buttons.' }, terms)).toBe(3);
+    expect(taskScore({ heading: 'Theming', body: 'Never hard-code a colour.' }, terms)).toBe(1);
+    expect(taskScore({ heading: 'Theming', body: 'Use color tokens.' }, terms)).toBe(0);
+  });
+
+  it('sends background as first sentences, rules for this code in full, and task matches in full', () => {
+    const purpose = section('a', 'What we do', long('We run trains.'));
+    const orgRules = section('b', 'Colours', long('Use the --os tokens.'));
+    const short = section('c', 'Tone', 'Be brief.');
+    const projectRules = section('d', 'Forms', long('Validate on blur.'));
+    const blocks = [
+      block('organization', 'purpose', [purpose]),
+      block('organization', 'guidelines', [orgRules, short]),
+      block('project-scope', 'guidelines', [projectRules]),
+    ];
+    expect(briefGeneral(blocks, 'change the button colour')).toBe(1);
+    const brief = (s: unknown) => (s as { brief?: boolean }).brief === true;
+    expect([purpose, orgRules, short, projectRules].map(brief)).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ]);
   });
 });

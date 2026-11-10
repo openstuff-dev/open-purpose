@@ -73,8 +73,8 @@ Workflow:
    the path you are working in and the nearest manifest (package.json, *.csproj, ...): its path and the
    names of its dependencies, not the whole file. Always send the remote: parts of a project can be bound
    to one repository. On later calls for the same path, send the stacks it returned instead of manifests.
-   Follow what it says. More specific rules override general ones. When a context is large, its most
-   general sections are shortened to their first sentence; read those with read_section when they matter.
+   Pass the task in a line as task. Follow what it says. More specific rules override general ones.
+   Background sections come as their first sentence; read those with read_section when they matter.
 2. If no project is found, ask the user which project the repo belongs to, then call register_repository
    (or create_project), and write .openpurpose.json with {"project": "<slug>"} in the repo root.
 3. When the user corrects you in a way that should also apply next time, call propose_learning with the
@@ -334,14 +334,20 @@ export function createMcpServer(
       title: 'Get context',
       description:
         'Get the workspace, organization, project and scope-specific guidelines that apply to the code you are about to work on. Call this before starting a task. ' +
-        "Over the organization's size budget, the most general sections are shortened to their first sentence; read_section gives the full text.",
+        'Rules for this code come in full; background (purpose, glossary, organization-wide content, ...) as first sentences, except what matches task. read_section gives the full text.',
       inputSchema: {
         ...locate,
         scopes: z
           .array(z.string())
           .optional()
           .describe('Scope slugs to include even if path/stack do not match'),
-        include_learnings: z.boolean().optional().describe('Default true'),
+        include_learnings: z.boolean().default(true),
+        task: z
+          .string()
+          .max(500)
+          .optional()
+          .describe('What you are about to do, in a line, e.g. "change the primary button colour"'),
+        full: z.boolean().default(false).describe('Every section in full'),
       },
     },
     (args) =>
