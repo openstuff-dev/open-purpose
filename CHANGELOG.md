@@ -3,6 +3,47 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.6.0
+
+Migrations `022_section_pinned` and `023_repository_stacks` add a pinned flag to sections and a
+table of the stacks each repository uses. Back up first.
+
+### Agents (MCP)
+
+- `get_context` sends the rules for the code at hand in full: the guidelines and learnings of the
+  project and of the scopes that matched. Purpose, business logic, glossary, reference, and what
+  applies to the whole organization or workspace come as heading and first sentence, with the
+  `read_section` call for the rest. An agent that passes `task` gets the background sections that
+  match it in full too, and `full: true` sends everything in full. **This changes what existing
+  setups send**: pin the organization-wide rules that must always apply.
+- Agents send a manifest's path and dependency names instead of the whole file, and on later calls
+  the stacks `get_context` returned. Full `content` still works.
+- `?tools=` on the MCP URL (or `X-OpenPurpose-Tools`) offers fewer tools, such as `read` or
+  `read,propose_learning`, so a client spends fewer tokens on tool schemas. JSON replies are
+  compact.
+- `create_scope` takes the scope's first guidelines as `sections`. They are reviewed with it, in one
+  text with its description. Every new scope gets a Guidelines document.
+- `get_context` names a scope that applies but has no rules yet, and the document its rules go in.
+- `list_scopes` shows which stacks the organization's projects use and which scopes cover them, and
+  suggests an organization scope for a stack several projects share.
+- New skill `describe-project`: maps a repository and suggests a scope with its first rules for each
+  part of the code with rules of its own, plus organization scopes for shared stacks.
+
+### Web app
+
+- Editors pin a section so agents always get it in full, whatever their task. The context budget
+  leaves pinned sections whole too.
+- What agents see marks sections sent as their first sentence, and pinned ones.
+- Every Settings tab says what it's for. Account and People show a placeholder while they load
+  slowly and say what didn't load, and revoking or removing says what stays.
+- Every snippet meant to be copied shows in a code block with a Copy button.
+- Moved onto `@openstuff-dev/ui` 0.1.9 and `ui-angular` 0.1.10.
+
+### API
+
+- `PUT /sections/:id/pinned` pins or unpins a section. `POST /context` takes `task` and `full`.
+- Exports carry each section's `pinned` flag, and imports restore it.
+
 ## 0.5.0
 
 Migrations `020_server_integrations` and `021_deploy_token` add the server's connections table.
