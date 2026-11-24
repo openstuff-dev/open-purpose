@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "openpurpose": {
+      "type": "http",
+      "url": "https://purpose.openstuff.app/mcp",
+      "headers": {
+        "Authorization": "Bearer ${OPENPURPOSE_TOKEN}"
+      }
+    }
+  }
+}
