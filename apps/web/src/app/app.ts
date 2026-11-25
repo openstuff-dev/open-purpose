@@ -1,28 +1,37 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   effect,
-  type ElementRef,
   inject,
   signal,
   untracked,
-  viewChild,
 } from '@angular/core';
 import { type HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import {
+  AgentBar,
+  AgentMode,
+  AgentShell,
+  AgentSwitch,
   Button,
   Field,
   IconButton,
+  IdentityBadge,
   Menu,
   MenuItem,
   MenuLabel,
   MenuSeparator,
   PopoverTrigger,
+  SearchTrigger,
+  ShellFooter,
+  ShellNavLabel,
+  ShellSwitcher,
+  ShellSwitcherButton,
+  ShellUser,
 } from '@openstuff-dev/ui-angular';
-import { positionAnchors } from '@openstuff-dev/ui';
 import { Api } from './core/api';
 import { MAX_AGE_MS } from './core/get-cache';
 import { Badges } from './core/badges';
@@ -47,14 +56,24 @@ import { SignInPage } from './pages/sign-in';
     FormsModule,
     Icon,
     Palette,
+    AgentBar,
+    AgentShell,
+    AgentSwitch,
     Button,
     IconButton,
+    IdentityBadge,
     Field,
     Menu,
     MenuItem,
     MenuLabel,
     MenuSeparator,
     PopoverTrigger,
+    SearchTrigger,
+    ShellFooter,
+    ShellNavLabel,
+    ShellSwitcher,
+    ShellSwitcherButton,
+    ShellUser,
     SignInPage,
     PendingPage,
   ],
@@ -70,9 +89,9 @@ import { SignInPage } from './pages/sign-in';
     } @else if (session.me(); as me) {
       @if (me.agent_view) {
         <!-- Agent mode: only what the agent itself gets back, nothing of the regular UI. -->
-        <div class="agent-shell">
-          <header class="agent-bar">
-            <span class="brand">
+        <div os-agent-shell>
+          <header os-agent-bar [exiting]="switching()" (exit)="toggleAgentMode()">
+            <span os-agent-brand class="brand">
               <svg viewBox="0 0 40 40" width="22" height="22" aria-hidden="true">
                 <use href="#openpurpose-mark" />
               </svg>
@@ -96,15 +115,6 @@ import { SignInPage } from './pages/sign-in';
                 >Agent in <strong>{{ session.org()?.name }}</strong></span
               >
             }
-            <button
-              os-button
-              size="sm"
-              type="button"
-              (click)="toggleAgentMode()"
-              [disabled]="switching()"
-            >
-              Exit agent mode
-            </button>
           </header>
           <main class="main" id="main">
             @for (k of [session.view()]; track k) {
@@ -122,28 +132,32 @@ import { SignInPage } from './pages/sign-in';
               OpenPurpose
             </a>
 
-            <div class="ws">
-              <button type="button" class="ws-button" [os-popover-trigger]="wsMenu">
+            <div os-shell-switcher>
+              <button type="button" os-shell-switcher-button [os-popover-trigger]="wsMenu">
                 @if (session.org(); as org) {
-                  <span class="badge" [style.background]="session.orgColor(org.id)">{{
+                  <span os-identity-badge [color]="session.orgColor(org.id)">{{
                     initials(org.name)
                   }}</span>
-                  <span class="ws-text"
+                  <span class="os-shell-switcher-text"
                     ><strong>{{ org.name }}</strong>
                     @if (session.groupShown()) {
                       <small>{{ me.group.name }}</small>
                     }
                   </span>
                 } @else {
-                  <span class="badge group">{{ initials(me.group.name) }}</span>
-                  <span class="ws-text"
+                  <span os-identity-badge neutral>{{ initials(me.group.name) }}</span>
+                  <span class="os-shell-switcher-text"
                     ><strong>{{ me.group.name }}</strong
                     ><small>Choose an organization</small></span
                   >
                 }
-                <app-icon name="chevrons-up-down" />
               </button>
-              <div os-menu #wsMenu="osPopover" class="ws-menu" aria-label="Switch organization">
+              <div
+                os-menu
+                #wsMenu="osPopover"
+                class="os-shell-switcher-menu"
+                aria-label="Switch organization"
+              >
                 @if (session.groupShown() && session.readableOrgs().length) {
                   <div os-menu-label>Organizations in {{ me.group.name }}</div>
                   @for (o of session.readableOrgs(); track o.id) {
@@ -154,7 +168,7 @@ import { SignInPage } from './pages/sign-in';
                       [attr.aria-checked]="o.id === session.orgId()"
                       (click)="pickOrg(o.id)"
                     >
-                      <span class="badge sm" [style.background]="session.orgColor(o.id)">{{
+                      <span os-identity-badge size="sm" [color]="session.orgColor(o.id)">{{
                         initials(o.name)
                       }}</span>
                       {{ o.name }}
@@ -175,7 +189,7 @@ import { SignInPage } from './pages/sign-in';
                       [attr.aria-checked]="g.id === me.group.id"
                       (click)="pickGroup(g.id)"
                     >
-                      <span class="badge sm group">{{ initials(g.name) }}</span>
+                      <span os-identity-badge size="sm" neutral>{{ initials(g.name) }}</span>
                       {{ g.name }}
                       @if (g.id === me.group.id) {
                         <app-icon name="check" />
@@ -230,7 +244,7 @@ import { SignInPage } from './pages/sign-in';
               </li>
             </ul>
             @if (session.groupShown()) {
-              <div class="nav-label">{{ me.group.name }}</div>
+              <div os-shell-nav-label>{{ me.group.name }}</div>
             }
             <ul>
               @if (session.groupShown()) {
@@ -242,7 +256,7 @@ import { SignInPage } from './pages/sign-in';
               }
             </ul>
 
-            <div class="rail-foot">
+            <div os-shell-footer>
               <ul>
                 <li>
                   <a routerLink="/settings" routerLinkActive="active"
@@ -250,11 +264,7 @@ import { SignInPage } from './pages/sign-in';
                   >
                 </li>
               </ul>
-              <div class="me-row">
-                <span class="avatar">{{ initials(me.actor.name) }}</span>
-                <span
-                  >{{ me.actor.name }}<small>{{ roleLine() }}</small></span
-                >
+              <div os-shell-user [name]="me.actor.name" [role]="roleLine()">
                 <button
                   os-icon-button
                   variant="ghost"
@@ -283,35 +293,19 @@ import { SignInPage } from './pages/sign-in';
               >
                 <app-icon name="menu" [size]="18" />
               </button>
-              <span class="topbar-title">{{ session.org()?.name ?? me.group.name }}</span>
-              <button
-                class="search-trigger"
-                type="button"
-                (click)="session.palette.set('')"
-                aria-label="Search and go to (Ctrl+K)"
-              >
-                <app-icon name="search" /><span>Search or jump to…</span
-                ><kbd>{{ mac ? '⌘' : 'Ctrl' }} K</kbd>
+              <span class="os-shell-topbar-title">{{ session.org()?.name ?? me.group.name }}</span>
+              <button os-search-trigger type="button" (click)="session.palette.set('')">
+                Search or jump to…
               </button>
               <button
+                os-agent-switch
                 type="button"
-                class="agent-switch"
-                role="switch"
-                aria-checked="false"
-                (click)="toggleAgentMode()"
                 [disabled]="switching()"
-                interestfor="agent-tip"
-                aria-describedby="agent-tip"
-                #agentSwitch
+                [tooltip]="agentTooltip()"
+                (click)="toggleAgentMode()"
               >
-                <app-icon name="bot" [size]="15" /><span class="agent-switch-label">Agent mode</span
-                ><span class="track" aria-hidden="true"><span class="thumb"></span></span>
+                Agent mode
               </button>
-              <div class="os-tooltip agent-tip" popover="hint" id="agent-tip" #agentTip>
-                See exactly what an agent in {{ session.org()?.name ?? 'an organization' }} gets
-                back from OpenPurpose: the text of get_context and the other read tools, word for
-                word, and nothing else.
-              </div>
             </header>
             <main class="main" id="main">
               @for (k of [session.view()]; track k) {
@@ -354,6 +348,7 @@ export class App {
   private api = inject(Api);
   private router = inject(Router);
   private switcher = inject(ContextSwitch);
+  private agentMode = inject(AgentMode);
   readonly badges = inject(Badges);
   readonly railOpen = signal(false);
   readonly loadError = signal('');
@@ -362,15 +357,20 @@ export class App {
   /** Sign-in, sign-up and the sign-in callback show on their own, signed in or not. */
   readonly publicPage = signal(isPublicUrl(location.pathname));
   readonly initials = initials;
-  readonly mac = /Mac|iPhone|iPad/.test(navigator.platform);
+  readonly agentTooltip = computed(
+    () =>
+      `See exactly what an agent in ${this.session.org()?.name ?? 'an organization'} gets back from OpenPurpose: the text of get_context and the other read tools, word for word, and nothing else.`,
+  );
 
   constructor() {
     // OpenVersion and OpenAnnounce, when a server admin connected them. Nothing waits for it.
     inject(ServerIntegrations).start();
     // Agent mode restyles the whole document (drawers and dialogs live outside the shell).
-    effect(() =>
-      document.documentElement.classList.toggle('agent-mode', !!this.session.me()?.agent_view),
-    );
+    effect(() => {
+      const on = !!this.session.me()?.agent_view;
+      this.agentMode.set(on);
+      document.documentElement.classList.toggle('agent-mode', on);
+    });
     // Agent mode can also end without the switch (e.g. the organization went away):
     // leave the console then.
     effect(() => {
@@ -389,12 +389,6 @@ export class App {
         untracked(() => {
           this.badges.clear();
         });
-    });
-    // The agent tip is anchored in CSS; the polyfill (where needed) has to see it once it renders.
-    effect(() => {
-      const trigger = this.agentSwitch()?.nativeElement;
-      const tip = this.agentTip()?.nativeElement;
-      if (trigger && tip) void positionAnchors([trigger, tip]);
     });
     this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe((e) => {
       this.railOpen.set(false);
@@ -431,8 +425,6 @@ export class App {
   }
 
   readonly switching = signal(false);
-  private readonly agentSwitch = viewChild<ElementRef<HTMLElement>>('agentSwitch');
-  private readonly agentTip = viewChild<ElementRef<HTMLElement>>('agentTip');
 
   async toggleAgentMode(): Promise<void> {
     const on = !this.session.me()?.agent_view;
