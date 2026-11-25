@@ -20,6 +20,8 @@ import {
   Control,
   EmptyState,
   Field,
+  TabLink,
+  TabNav,
 } from '@openstuff-dev/ui-angular';
 import { Api } from '../core/api';
 import type { Graph, GraphNode, LinkRef, ProjectDetail, Website } from '../core/models';
@@ -73,6 +75,8 @@ const TABS: Tab[] = [
     Badge,
     Chip,
     CodeBlock,
+    TabLink,
+    TabNav,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -171,19 +175,17 @@ const TABS: Tab[] = [
         here reach all of {{ p.name }}; a scope's documents reach only its part of the code.
       </p>
 
-      <nav class="os-tab-list page-tabs" aria-label="Project sections">
+      <nav os-tab-nav class="page-tabs" label="Project sections">
         @for (t of tabs(); track t.key) {
           <a
-            class="os-tab"
+            os-tab-link
             [routerLink]="[]"
             [queryParams]="{ tab: t.key === 'documents' ? null : t.key }"
             replaceUrl
+            [count]="t.count"
             [attr.aria-current]="current() === t.key ? 'page' : null"
           >
             <app-icon [name]="t.icon" [size]="15" />{{ t.label }}
-            @if (t.count !== null) {
-              <span class="tab-count">{{ t.count }}</span>
-            }
           </a>
         }
       </nav>
