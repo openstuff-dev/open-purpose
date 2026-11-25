@@ -3,6 +3,12 @@
 Each release is a Docker image at `ghcr.io/openstuff-dev/open-purpose:<version>`.
 Migrations run when the new version starts and only move forward, so back up first.
 
+## 0.6.1
+
+### Web app
+
+- Adopted the shared shell chrome, sticky page sub-menu, and Agent Mode components from `@openstuff-dev/ui` `0.1.10` and `@openstuff-dev/ui-angular` `0.1.11`.
+
 ## 0.6.0
 
 Migrations `022_section_pinned` and `023_repository_stacks` add a pinned flag to sections and a
